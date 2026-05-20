@@ -47,7 +47,7 @@ import {
   normalizeRuntimeLayout,
   resolveAppliedInteractionLayout,
 } from './pivot/layout/resolveInteractionLayout';
-import { buildSelectionFilteredFormData } from './pivot/update/initialUpdatePlan';
+import { buildSelectionFilteredFormData } from './pivot/query/specs';
 import { buildTreeDimensionFilterValues } from './pivot/filters';
 import { useDimensionFilterValues } from './pivot/chart/useDimensionFilterValues';
 import { buildInteractionChips } from './pivot/layout/interactionDrag';

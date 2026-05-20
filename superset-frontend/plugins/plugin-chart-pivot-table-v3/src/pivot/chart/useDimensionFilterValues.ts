@@ -28,8 +28,7 @@ import { isEqual } from 'lodash';
 import { type PivotTableQueryFormData } from '../../types';
 import { getStableColumnKey } from '../../utils';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
-import { type QuerySpec } from '../query/specs';
-import { buildSelectionFilteredFormData } from '../update/initialUpdatePlan';
+import { buildSelectionFilteredFormData, type QuerySpec } from '../query/specs';
 import { type PivotSelectedFilters } from '../filters';
 
 const DIMENSION_VALUES_REQUEST_GROUP = 'pivot-v3-dimension-values';

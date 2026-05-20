@@ -36,7 +36,7 @@ import {
 } from './utils';
 import { getMetricKeys, getMetricKey } from './pivot/metrics';
 import { buildRuntimeLayoutFromFormData } from './pivot/layout/resolveInteractionLayout';
-import { buildInitialPivotUpdatePlan } from './pivot/update/initialUpdatePlan';
+import { buildInitialPivotUpdatePlan } from './pivot/query/specs';
 import { buildInitialRuntimeFromSpecResults } from './pivot/runtime/ingestQueryResults';
 
 const { DATABASE_DATETIME } = TimeFormats;

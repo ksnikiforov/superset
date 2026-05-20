@@ -17,13 +17,13 @@
  * under the License.
  */
 
-import { formatQueryName } from '../../../../src/pivot/query/specs';
 import buildQuery from '../../../../src/buildQuery';
 import {
   buildInitialPivotUpdatePlan,
   buildSelectionFilteredFormData,
   buildSelectionFilterClauses,
-} from '../../../../src/pivot/update/initialUpdatePlan';
+  formatQueryName,
+} from '../../../../src/pivot/query/specs';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../../src/types';
 import { METRICS_PLACEHOLDER } from '../../../../src/pivot/core/tokens';
 import { buildFormData } from '../../fixtures/pivotFormData';

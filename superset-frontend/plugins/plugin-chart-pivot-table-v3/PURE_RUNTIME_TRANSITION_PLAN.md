@@ -303,10 +303,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28760` | `-4750` | `< 28000` |
-| Strict core pipeline | `11337` | `11564` | `+227` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `4924` | `+241` | `3000-4000` |
-| Broad core pipeline | `16020` | `16488` | `+468` | `11000-13000` |
+| Full production `src` | `33510` | `28730` | `-4780` | `< 28000` |
+| Strict core pipeline | `11337` | `11533` | `+196` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `4923` | `+240` | `3000-4000` |
+| Broad core pipeline | `16020` | `16456` | `+436` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -314,10 +314,11 @@ Current strict core breakdown:
 | --- | ---: |
 | `pivot/runtime/*` | `3814` |
 | `pivot/expansion/*` | `2567` |
-| `pivot/query/*` | `1409` |
+| `pivot/query/*` | `1550` |
 | `pivot/layout/*` | `770` |
-| core/shared/domain helpers | `1800` |
-| formatting/data/render-model/update support | `1204` |
+| `pivot/core/*` | `252` |
+| core domain helpers | `1548` |
+| formatting/data/render-model support | `1032` |
 
 Interpretation: plugin-wide source has shrunk, but core pipeline source has
 grown because runtime authority moved out of chart/control code before the old
@@ -552,6 +553,12 @@ Latest planned-fetch cleanup: planned query execution no longer rewrites
 request form data to the first missing spec's metrics. Each planned spec is the
 metric authority for its own query object, which keeps split metric/measure
 loads from inheriting unrelated support metrics at the bundle boundary.
+
+Latest initial-planning cleanup: `pivot/update/initialUpdatePlan.ts` is gone.
+Selection-filter normalization, interaction layout resolution, time-offset
+merging, and bootstrap spec creation now live at the planned query boundary in
+`query/specs.ts`. This removes a wrapper module and makes transform, buildQuery,
+and seamless updates enter the same query-planning surface.
 
 Checkpoint: deleting `PivotExpansionPlan.hasMissingNodes` is not currently a
 safe simplification. A trial cut changed persisted row x column restore by

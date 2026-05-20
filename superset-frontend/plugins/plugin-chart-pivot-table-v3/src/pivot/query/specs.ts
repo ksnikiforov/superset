@@ -35,6 +35,7 @@ import {
   type PivotDimensionSortingMap,
   type PivotMetricDatabarMap,
   type PivotMetricFormattingMap,
+  type PivotRuntimeLayout,
   type PivotPath,
   type PivotPathValue,
   type PivotTableQueryFormData,
@@ -47,12 +48,14 @@ import {
   collectMetricFormattingMetricsForQuery,
   hasTotalSorting,
   mergeMetrics,
+  getStableColumnKey,
 } from '../../utils';
 import { parsePath } from '../core/path';
 import {
   buildLayoutContext,
   type LayoutContext,
 } from '../layout/LayoutContext';
+import { resolveInteractionFormData } from '../layout/resolveInteractionLayout';
 import { getMetricKey } from '../metrics';
 import { collectRequiredTimeOffsets } from '../measureLeaves';
 import {
@@ -78,6 +81,7 @@ import {
 } from '../runtime/projection';
 import { type PivotFactCoverage } from '../runtime/types';
 import { stableStringify } from '../shared/stableStringify';
+import { normalizeFormDataExtraFilters } from './normalizeExtraFormData';
 
 export const QUERY_NAME_PREFIX = 'pivot_v3';
 export const formatQueryName = (rowDepth: number, colDepth: number) =>
@@ -1139,4 +1143,141 @@ export const buildInitialQuerySpecs = (
     });
   }
   return specs;
+};
+
+export type SelectionFilterMap = Record<string, DataRecordValue[]>;
+
+type BuildSelectionFilterClausesParams = {
+  formData: PivotTableQueryFormData;
+  selection?: SelectionFilterMap;
+};
+
+export const buildSelectionFilterClauses = ({
+  formData,
+  selection,
+}: BuildSelectionFilterClausesParams): QueryObjectFilterClause[] => {
+  if (!selection || Object.keys(selection).length === 0) {
+    return [];
+  }
+  const dimensionMap = new Map(
+    formData.dimensions.map(dimension => [
+      getStableColumnKey(dimension),
+      dimension,
+    ]),
+  );
+  return Object.entries(selection).flatMap(([key, values]) => {
+    if (!Array.isArray(values) || values.length === 0) {
+      return [];
+    }
+    const col = dimensionMap.get(key) ?? (key as unknown as QueryFormColumn);
+    return [
+      {
+        col,
+        op: 'IN' as const,
+        val: values,
+      },
+    ];
+  });
+};
+
+export const buildSelectionFilteredFormData = ({
+  formData,
+  selection,
+}: BuildSelectionFilterClausesParams): PivotTableQueryFormData => {
+  const selectionFilters = buildSelectionFilterClauses({
+    formData,
+    selection,
+  });
+  return normalizeFormDataExtraFilters(
+    selectionFilters.length > 0
+      ? {
+          ...formData,
+          extra_form_data: {
+            ...(formData.extra_form_data ?? {}),
+            filters: [
+              ...(formData.extra_form_data?.filters ?? []),
+              ...selectionFilters,
+            ],
+          },
+        }
+      : formData,
+  );
+};
+
+const withMetricOverrides = ({
+  formData,
+  metricsOverride,
+  measureLeavesByMetricOverride,
+}: {
+  formData: PivotTableQueryFormData;
+  metricsOverride?: PivotTableQueryFormData['metrics'];
+  measureLeavesByMetricOverride?: PivotTableQueryFormData['measureLeavesByMetric'];
+}) => {
+  if (
+    metricsOverride === undefined &&
+    measureLeavesByMetricOverride === undefined
+  ) {
+    return formData;
+  }
+  return {
+    ...formData,
+    ...(metricsOverride !== undefined ? { metrics: metricsOverride } : {}),
+    ...(measureLeavesByMetricOverride !== undefined
+      ? { measureLeavesByMetric: measureLeavesByMetricOverride }
+      : {}),
+  };
+};
+
+export type BuildInitialPivotUpdatePlanParams = {
+  formData: PivotTableQueryFormData;
+  runtimeLayout?: PivotRuntimeLayout;
+  selection?: SelectionFilterMap;
+  metricsOverride?: PivotTableQueryFormData['metrics'];
+  measureLeavesByMetricOverride?: PivotTableQueryFormData['measureLeavesByMetric'];
+};
+
+export type InitialPivotUpdatePlan = {
+  formData: PivotTableQueryFormData;
+  layout: ReturnType<typeof buildLayoutContext>;
+  specs: PlannedQuerySpec[];
+};
+
+export const buildInitialPivotUpdatePlan = ({
+  formData,
+  runtimeLayout,
+  selection,
+  metricsOverride,
+  measureLeavesByMetricOverride,
+}: BuildInitialPivotUpdatePlanParams): InitialPivotUpdatePlan => {
+  const resolvedSelection =
+    selection === undefined ? formData.pivotSelectedFilters : selection;
+  const normalizedFormData = buildSelectionFilteredFormData({
+    formData,
+    selection: resolvedSelection,
+  });
+  const formDataWithOverrides = withMetricOverrides({
+    formData: normalizedFormData,
+    metricsOverride,
+    measureLeavesByMetricOverride,
+  });
+  const resolvedFormData = resolveInteractionFormData({
+    formData: formDataWithOverrides,
+    runtimeLayout: runtimeLayout ?? normalizedFormData.pivotRuntimeLayout,
+  });
+  const layout = buildLayoutContext(resolvedFormData);
+  const timeOffsets = Array.from(
+    new Set([
+      ...(resolvedFormData.time_offsets ?? []),
+      ...layout.requiredTimeOffsets,
+    ]),
+  );
+  const resolvedFormDataWithOffsets =
+    timeOffsets.length > 0
+      ? { ...resolvedFormData, time_offsets: timeOffsets }
+      : resolvedFormData;
+  return {
+    formData: resolvedFormDataWithOffsets,
+    layout,
+    specs: buildInitialQuerySpecs(resolvedFormDataWithOffsets, layout),
+  };
 };
