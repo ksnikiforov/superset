@@ -845,95 +845,93 @@ const isIntersectionTarget = (target: ExpansionCoverageTarget) =>
   target.need.rowScope.kind !== 'root' &&
   target.need.columnScope.kind !== 'root';
 
-type ExpansionQuerySpecRequest =
-  | {
-      kind: 'branch';
-      formData: PivotTableQueryFormData;
-      layout: LayoutContext;
-      target: ExpansionCoverageTarget;
-    }
-  | {
-      kind: 'batch';
-      formData: PivotTableQueryFormData;
-      layout: LayoutContext;
-      batch: ExpansionCoverageTarget[];
-    }
-  | {
-      kind: 'intersection';
-      formData: PivotTableQueryFormData;
-      layout: LayoutContext;
-      target: ExpansionCoverageTarget;
-    };
+type ExpansionSpecContext = {
+  formData: PivotTableQueryFormData;
+  layout: LayoutContext;
+};
 
-const buildExpansionQuerySpecsForRequest = (
-  request: ExpansionQuerySpecRequest,
-): PlannedQuerySpec[] => {
-  if (request.kind === 'branch') {
-    const coverageTarget = request.target;
-    const { axis } = coverageTarget;
-    const path = parsePath(coverageTarget.pathKey);
-    const scopedPath = targetScopePaths(coverageTarget, axis)[0] ?? [];
-    return buildAxisExpansionSpecs({
-      ...request,
+const buildSingleTargetExpansionSpecs = ({
+  formData,
+  layout,
+  target,
+}: ExpansionSpecContext & {
+  target: ExpansionCoverageTarget;
+}): PlannedQuerySpec[] => {
+  const { axis } = target;
+  const path = parsePath(target.pathKey);
+  const scopedPath = targetScopePaths(target, axis)[0] ?? [];
+  return buildAxisExpansionSpecs({
+    formData,
+    layout,
+    axis,
+    path,
+    queryAnchorPath: scopedPath,
+    coverageTarget: target,
+    filters: ctx =>
+      buildPathFilters(
+        axis === 'row' ? ctx.rowGroupbyForQuery : ctx.colGroupbyForQuery,
+        scopedPath,
+        formData.colTypeMap,
+      ),
+    suffix: `|branch:${axis}:${target.pathKey}`,
+    scope: {
+      kind: 'axisPaths',
       axis,
-      path,
-      queryAnchorPath: scopedPath,
-      coverageTarget,
-      filters: ctx =>
-        buildPathFilters(
-          axis === 'row' ? ctx.rowGroupbyForQuery : ctx.colGroupbyForQuery,
-          scopedPath,
-          request.formData.colTypeMap,
-        ),
-      suffix: `|branch:${axis}:${coverageTarget.pathKey}`,
-      scope: {
-        kind: 'axisPaths',
-        axis,
-        paths: [scopedPath],
-      },
-    });
-  }
-  if (request.kind === 'batch') {
-    const { formData, layout, batch } = request;
-    const coverageTarget = batch[0];
-    if (!coverageTarget) {
-      return [];
-    }
-    const batchAxis = coverageTarget.axis;
-    const representative = parsePath(coverageTarget.pathKey);
-    const parentPathKey = serializePath(representative.slice(0, -1));
-    const scopedPaths = batch.flatMap(target =>
-      targetScopePaths(target, batchAxis),
-    );
-    const parentDimensionPath = scopedPaths[0]?.slice(0, -1) ?? [];
-    const siblingValues = scopedPaths.map(path => path[path.length - 1]);
-    return buildAxisExpansionSpecs({
-      formData,
-      layout,
-      axis: batchAxis,
-      path: representative,
-      queryAnchorPath: scopedPaths[0] ?? [],
-      coverageTarget,
-      filters: ctx =>
-        buildBatchFilterClauses({
-          axisGroupby:
-            batchAxis === 'row'
-              ? ctx.rowGroupbyForQuery
-              : ctx.colGroupbyForQuery,
-          parentPath: parentDimensionPath,
-          siblingValues,
-          colTypeMap: formData.colTypeMap,
-        }),
-      suffix: `|batch:${batchAxis}:${parentPathKey}`,
-      scope: {
-        kind: 'axisPaths',
-        axis: batchAxis,
-        paths: scopedPaths,
-      },
-    });
-  }
+      paths: [scopedPath],
+    },
+  });
+};
 
-  const { formData, layout, target } = request;
+const buildBatchTargetExpansionSpecs = ({
+  formData,
+  layout,
+  targets,
+}: ExpansionSpecContext & {
+  targets: ExpansionCoverageTarget[];
+}): PlannedQuerySpec[] => {
+  const coverageTarget = targets[0];
+  if (!coverageTarget) {
+    return [];
+  }
+  const batchAxis = coverageTarget.axis;
+  const representative = parsePath(coverageTarget.pathKey);
+  const parentPathKey = serializePath(representative.slice(0, -1));
+  const scopedPaths = targets.flatMap(target =>
+    targetScopePaths(target, batchAxis),
+  );
+  const parentDimensionPath = scopedPaths[0]?.slice(0, -1) ?? [];
+  const siblingValues = scopedPaths.map(path => path[path.length - 1]);
+  return buildAxisExpansionSpecs({
+    formData,
+    layout,
+    axis: batchAxis,
+    path: representative,
+    queryAnchorPath: scopedPaths[0] ?? [],
+    coverageTarget,
+    filters: ctx =>
+      buildBatchFilterClauses({
+        axisGroupby:
+          batchAxis === 'row' ? ctx.rowGroupbyForQuery : ctx.colGroupbyForQuery,
+        parentPath: parentDimensionPath,
+        siblingValues,
+        colTypeMap: formData.colTypeMap,
+      }),
+    suffix: `|batch:${batchAxis}:${parentPathKey}`,
+    scope: {
+      kind: 'axisPaths',
+      axis: batchAxis,
+      paths: scopedPaths,
+    },
+  });
+};
+
+const buildIntersectionTargetExpansionSpecs = ({
+  formData,
+  layout,
+  target,
+}: ExpansionSpecContext & {
+  target: ExpansionCoverageTarget;
+}): PlannedQuerySpec[] => {
   const rowPaths = pathsFromAxisScope(target.need.rowScope);
   const columnPaths = pathsFromAxisScope(target.need.columnScope);
   const anchor = resolveIntersectionExpansionAnchor({
@@ -969,49 +967,58 @@ const buildExpansionQuerySpecsForRequest = (
   });
 };
 
-export const buildExpansionQuerySpecs = ({
+export const buildExpansionQuerySpecPhases = ({
   formData,
   layout,
   targets,
-  includeIntersections = true,
-}: {
-  formData: PivotTableQueryFormData;
-  layout: LayoutContext;
+}: ExpansionSpecContext & {
   targets: ExpansionCoverageTarget[];
-  includeIntersections?: boolean;
-}): PlannedQuerySpec[] => {
+}) => {
   const intersections = targets.filter(isIntersectionTarget);
   const { batches, singles } = optimizeExpansionFetchPlan({
     targets: targets.filter(target => !isIntersectionTarget(target)),
   });
-  return [
-    ...singles.flatMap(target =>
-      buildExpansionQuerySpecsForRequest({
-        kind: 'branch',
+  return {
+    nonIntersectionSpecs: [
+      ...singles.flatMap(target =>
+        buildSingleTargetExpansionSpecs({
+          formData,
+          layout,
+          target,
+        }),
+      ),
+      ...batches.flatMap(batch =>
+        buildBatchTargetExpansionSpecs({
+          formData,
+          layout,
+          targets: batch,
+        }),
+      ),
+    ],
+    intersectionSpecs: intersections.flatMap(target =>
+      buildIntersectionTargetExpansionSpecs({
         formData,
         layout,
         target,
       }),
     ),
-    ...batches.flatMap(batch =>
-      buildExpansionQuerySpecsForRequest({
-        kind: 'batch',
-        formData,
-        layout,
-        batch,
-      }),
-    ),
-    ...(includeIntersections
-      ? intersections.flatMap(target =>
-          buildExpansionQuerySpecsForRequest({
-            kind: 'intersection',
-            formData,
-            layout,
-            target,
-          }),
-        )
-      : []),
-  ];
+  };
+};
+
+export const buildExpansionQuerySpecs = ({
+  formData,
+  layout,
+  targets,
+}: ExpansionSpecContext & {
+  targets: ExpansionCoverageTarget[];
+}): PlannedQuerySpec[] => {
+  const { nonIntersectionSpecs, intersectionSpecs } =
+    buildExpansionQuerySpecPhases({
+      formData,
+      layout,
+      targets,
+    });
+  return [...nonIntersectionSpecs, ...intersectionSpecs];
 };
 
 export const buildInitialQuerySpecs = (

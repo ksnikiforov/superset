@@ -313,9 +313,10 @@ Execution order is now most-impactful first:
 | 5 | Chart runtime shrink | Chart shell wires hooks only | Move remaining query/runtime/filter orchestration out only when it deletes chart-owned decisions; avoid extraction-only controllers | Medium deletion; lower architectural risk |
 
 Priority 1 has now removed caller-visible branch/batch/intersection expansion
-requests. The remaining Priority 1 work is to collapse the private
-branch/batch/intersection query-spec union into first-class coverage needs
-without losing transport batching. The intended shape remains:
+requests and the private request-shaped query-spec union. The remaining
+Priority 1 work is to keep shrinking the private transport helpers until query
+planning is expressed directly as coverage phases plus transport grouping. The
+intended shape remains:
 
 ```text
 visible/runtime intent
@@ -348,8 +349,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `12150` insertions, `18273` deletions, net `-6123`.
-- Current production TypeScript/TSX total: about `27387` lines.
+- Production `src`: `12146` insertions, `18273` deletions, net `-6127`.
+- Current production TypeScript/TSX total: about `27383` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -361,18 +362,18 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27387` | `-6123` | `< 28000` |
-| Strict core pipeline | `11337` | `11152` | `-185` | `8000` |
+| Full production `src` | `33510` | `27383` | `-6127` | `< 28000` |
+| Strict core pipeline | `11337` | `11148` | `-189` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4026` | `-657` | `3000-4000` |
-| Broad core pipeline | `16020` | `15178` | `-842` | `11000-13000` |
+| Broad core pipeline | `16020` | `15174` | `-846` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3535` |
-| `pivot/expansion/*` | `2215` |
-| `pivot/query/*` | `1485` |
+| `pivot/expansion/*` | `2204` |
+| `pivot/query/*` | `1492` |
 | `pivot/layout/*` | `739` |
 | `pivot/core/*` | `252` |
 | core domain helpers | `1537` |
@@ -400,6 +401,12 @@ hydration loop submits one set of `ExpansionCoverageTarget`s, and
 `query/specs.ts` privately chooses singleton branch specs, batched sibling
 specs, and delayed intersection specs. Batching remains, but only as transport
 planning below the coverage boundary.
+
+Latest query phase cleanup: `query/specs.ts` no longer converts coverage
+targets into a private `{ kind: branch | batch | intersection }` request union.
+Coverage targets now flow directly into single-target, batched-target, and
+intersection spec helpers, and `fetchPivotExpansion` consumes explicit
+non-intersection and intersection phases instead of rebuilding all specs twice.
 
 Latest expansion-execution cleanup: sibling batching now groups by the
 query-scope path carried by the coverage need, not by the rendered display path

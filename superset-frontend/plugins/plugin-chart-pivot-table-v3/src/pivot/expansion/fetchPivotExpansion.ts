@@ -20,7 +20,7 @@ import { type ChartDataWarning } from '../data/ChartDataClient';
 import { type PivotTableQueryFormData } from '../../types';
 import { type ExpansionCoverageTarget } from './planner';
 import { type LayoutContext } from '../layout/LayoutContext';
-import { buildExpansionQuerySpecs } from '../query/specs';
+import { buildExpansionQuerySpecPhases } from '../query/specs';
 import { type PivotFactStore } from '../runtime/factStore';
 import { type ChunkedWorkOptions } from '../runtime/chunkedWork';
 import {
@@ -46,35 +46,24 @@ export const fetchPivotExpansion = async (
   request: FetchPivotExpansionRequest,
 ): Promise<FetchPivotExpansionResult> => {
   try {
-    const nonIntersectionSpecs = buildExpansionQuerySpecs({
-      formData: request.formData,
-      layout: request.layout,
-      targets: request.targets,
-      includeIntersections: false,
-    });
-    const nonIntersectionResult = await fetchPlannedQuerySpecs({
-      formData: request.formData,
-      specs: nonIntersectionSpecs,
-      requestGroupId: request.requestGroupId,
-      factStore: request.factStore,
-      chunkSize: request.chunkSize,
-      shouldContinue: request.shouldContinue,
-      yieldToMain: request.yieldToMain,
-    });
-    const intersectionSpecs = buildExpansionQuerySpecs({
-      formData: request.formData,
-      layout: request.layout,
-      targets: request.targets,
-    }).filter(spec => spec.meta.factSelector.scope.kind === 'intersection');
-    const intersectionResult = await fetchPlannedQuerySpecs({
-      formData: request.formData,
-      specs: intersectionSpecs,
-      requestGroupId: request.requestGroupId,
-      factStore: request.factStore,
-      chunkSize: request.chunkSize,
-      shouldContinue: request.shouldContinue,
-      yieldToMain: request.yieldToMain,
-    });
+    const { nonIntersectionSpecs, intersectionSpecs } =
+      buildExpansionQuerySpecPhases({
+        formData: request.formData,
+        layout: request.layout,
+        targets: request.targets,
+      });
+    const fetchSpecs = (specs: typeof nonIntersectionSpecs) =>
+      fetchPlannedQuerySpecs({
+        formData: request.formData,
+        specs,
+        requestGroupId: request.requestGroupId,
+        factStore: request.factStore,
+        chunkSize: request.chunkSize,
+        shouldContinue: request.shouldContinue,
+        yieldToMain: request.yieldToMain,
+      });
+    const nonIntersectionResult = await fetchSpecs(nonIntersectionSpecs);
+    const intersectionResult = await fetchSpecs(intersectionSpecs);
     const results = [
       ...nonIntersectionResult.results,
       ...intersectionResult.results,
