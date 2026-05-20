@@ -867,8 +867,6 @@ export type ExpansionQuerySpecRequest =
       formData: PivotTableQueryFormData;
       layout: LayoutContext;
       batch: BatchGroup;
-      chunkIndex?: number;
-      representativePath?: PivotPath;
     }
   | {
       kind: 'intersection';
@@ -910,19 +908,13 @@ export const buildExpansionQuerySpecs = (
     });
   }
   if (request.kind === 'batch') {
-    const {
-      formData,
-      layout,
-      batch,
-      chunkIndex = 0,
-      representativePath,
-    } = request;
+    const { formData, layout, batch } = request;
     const coverageTarget = batch.targets[0];
     const representativeKey = batch.targets[0]?.pathKey;
-    if ((!representativeKey && !representativePath) || !coverageTarget) {
+    if (!representativeKey || !coverageTarget) {
       return [];
     }
-    const representative = representativePath ?? parsePath(representativeKey);
+    const representative = parsePath(representativeKey);
     const parentPath = parsePath(batch.parentPathKey);
     const parentDimensionPath = projectQueryFilterPath({
       layout,
@@ -945,7 +937,7 @@ export const buildExpansionQuerySpecs = (
           siblingValues: batch.siblingValues,
           colTypeMap: formData.colTypeMap,
         }),
-      suffix: `|batch:${batch.axis}:${batch.parentPathKey}|chunk:${chunkIndex}`,
+      suffix: `|batch:${batch.axis}:${batch.parentPathKey}`,
       scope: {
         kind: 'axisPaths',
         axis: batch.axis,

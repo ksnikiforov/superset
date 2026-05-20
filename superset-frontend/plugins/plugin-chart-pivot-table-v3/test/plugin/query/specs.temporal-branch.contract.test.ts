@@ -190,7 +190,7 @@ describe('temporal branch query specs contract', () => {
         `${formatQueryName(
           spec.meta.factSelector.coverage.rowDepth,
           spec.meta.factSelector.coverage.columnDepth,
-        )}|batch:row:|chunk:0`,
+        )}|batch:row:`,
       );
     });
   });
