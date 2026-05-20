@@ -308,7 +308,7 @@ test('builds render node display state for toggles and aggregate emphasis', () =
     expandedRows: new Set([country.key]),
     layout: {
       hideMetricHeaderOnRows: false,
-      layout: { axisCoverageNeeds: [], pivotProgram },
+      layout: { pivotProgram },
     },
     isLeafTierVisible: false,
   });
@@ -331,7 +331,7 @@ test('hides metric toggles when measure leaves are visible', () => {
     expandedRows: new Set<string>(),
     layout: {
       hideMetricHeaderOnRows: false,
-      layout: { axisCoverageNeeds: [], pivotProgram: rowMetricFirstProgram },
+      layout: { pivotProgram: rowMetricFirstProgram },
     },
     isLeafTierVisible: true,
   });

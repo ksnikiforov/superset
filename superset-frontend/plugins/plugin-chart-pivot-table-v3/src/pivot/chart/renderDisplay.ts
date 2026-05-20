@@ -33,7 +33,6 @@ import {
   SUBTOTAL_TOKEN,
 } from '../core/tokens';
 import { formatPivotLabelValue } from '../core/tree';
-import { buildDesiredExpandedKeys } from '../expansion/stateModel';
 import {
   createMetricNodePolicy,
   getMetricLabelFromPath,
@@ -303,10 +302,7 @@ type RenderNodeDisplayLayout = Pick<
   PivotLayoutResult,
   'hideMetricHeaderOnRows'
 > & {
-  layout: Pick<
-    PivotLayoutResult['layout'],
-    'axisCoverageNeeds' | 'pivotProgram'
-  >;
+  layout: Pick<PivotLayoutResult['layout'], 'pivotProgram'>;
 };
 
 export const buildRenderNodeDisplayState = ({
@@ -331,18 +327,10 @@ export const buildRenderNodeDisplayState = ({
   } = createMetricNodePolicy(layout.layout.pivotProgram);
   const isMetricTokenValue = (value: unknown) =>
     isMetricTokenForKeys(value, metricLabelSet);
-  const intentRows = buildDesiredExpandedKeys({
-    axis: 'row',
-    tree: { rows: rowNodes, cols: {}, cells: {} },
-    axisCoverageNeeds: layout.layout.axisCoverageNeeds,
-    program: layout.layout.pivotProgram,
-    manualExpanded: new Set(),
-    manualCollapsed: new Set(),
-  });
   const manualExpandedRowDepths = new Set<number>();
   expandedRows.forEach(key => {
     const node = rowNodes[key];
-    if (intentRows.has(key) || !node?.hasChildren) {
+    if (!node?.hasChildren) {
       return;
     }
     manualExpandedRowDepths.add(countDimDepth(node.path));
