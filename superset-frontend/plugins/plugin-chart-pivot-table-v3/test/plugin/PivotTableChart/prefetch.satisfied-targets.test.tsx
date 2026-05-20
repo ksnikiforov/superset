@@ -61,9 +61,7 @@ const createDeferred = <T,>(): Deferred<T> => {
 };
 
 const getRequestPath = (params: Parameters<typeof fetchPivotBranch>[0]) =>
-  params.kind === 'branch'
-    ? parsePath(params.target.coverageTarget.pathKey)
-    : [];
+  params.kind === 'branch' ? parsePath(params.target.pathKey) : [];
 
 const rowGroupby = ['r1', 'r2', 'r3'];
 const colGroupby: string[] = [];
@@ -113,11 +111,7 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
             kind: 'branch',
             formData,
             layout,
-            target: {
-              axis: batch.axis,
-              pathKey: target.pathKey,
-              coverageTarget: target.coverageTarget,
-            },
+            target,
             factStore,
           }),
         ),

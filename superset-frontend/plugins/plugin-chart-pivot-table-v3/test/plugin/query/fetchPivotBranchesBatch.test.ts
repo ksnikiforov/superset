@@ -92,6 +92,14 @@ const hasCompatibleCoverage = (
 
 const mockPost = SupersetClient.post as jest.Mock;
 
+type TestBatchTarget = Pick<
+  BatchGroup['targets'][number],
+  'axis' | 'pathKey' | 'batchSignature'
+>;
+type TestBatchGroup = Omit<BatchGroup, 'targets'> & {
+  targets: TestBatchTarget[];
+};
+
 const withBatchCoverageTargets = ({
   layout,
   batch,
@@ -99,26 +107,26 @@ const withBatchCoverageTargets = ({
   visibleColDepth,
 }: {
   layout: ReturnType<typeof buildLayoutContext>;
-  batch: BatchGroup;
+  batch: TestBatchGroup;
   visibleRowDepth: number;
   visibleColDepth: number;
 }): BatchGroup => ({
   ...batch,
   targets: batch.targets.map(target => ({
-    ...target,
-    coverageTarget: buildAxisExpansionCoverageTarget({
+    ...buildAxisExpansionCoverageTarget({
       program: layout.pivotProgram,
       axis: target.axis,
       pathKey: target.pathKey,
       rowDepth: visibleRowDepth,
       columnDepth: visibleColDepth,
     }),
+    batchSignature: target.batchSignature,
   })),
 });
 
 const fetchBatch = (
   params: Omit<FetchPivotExpansionRequest, 'kind' | 'layout' | 'batch'> & {
-    batch: BatchGroup;
+    batch: TestBatchGroup;
     visibleRowDepth: number;
     visibleColDepth: number;
     currentTree?: PivotTreeData;
@@ -167,7 +175,7 @@ describe('fetchBatch', () => {
       groupbyRows: ['country', 'state', 'city'],
       groupbyColumns: [],
     });
-    const batch: BatchGroup = {
+    const batch: TestBatchGroup = {
       axis: 'row',
       signature: 'sig',
       parentPathKey: serializePath(['US']),
@@ -222,7 +230,7 @@ describe('fetchBatch', () => {
       groupbyRows: ['country', 'state', 'city'],
       groupbyColumns: [],
     });
-    const batch: BatchGroup = {
+    const batch: TestBatchGroup = {
       axis: 'row',
       signature: 'sig',
       parentPathKey: serializePath(['US']),
@@ -269,7 +277,7 @@ describe('fetchBatch', () => {
       groupbyRows: ['country', 'state'],
       groupbyColumns: [],
     });
-    const batch: BatchGroup = {
+    const batch: TestBatchGroup = {
       axis: 'row',
       signature: 'sig',
       parentPathKey: serializePath([]),
@@ -302,7 +310,7 @@ describe('fetchBatch', () => {
       metrics: ['m1'],
       metricsLayout: MetricsLayoutEnum.COLUMNS,
     });
-    const batch: BatchGroup = {
+    const batch: TestBatchGroup = {
       axis: 'row',
       signature: 'sig',
       parentPathKey: serializePath(['US']),
@@ -391,7 +399,7 @@ describe('fetchBatch', () => {
       rowTotals: false,
       colTotals: false,
     });
-    const batch: BatchGroup = {
+    const batch: TestBatchGroup = {
       axis: 'row',
       signature: 'sig',
       parentPathKey: serializePath(['US']),
@@ -457,7 +465,7 @@ describe('fetchBatch', () => {
       rowTotals: false,
       colTotals: false,
     });
-    const batch: BatchGroup = {
+    const batch: TestBatchGroup = {
       axis: 'row',
       signature: 'values-only',
       parentPathKey: '',

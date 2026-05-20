@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13313` insertions, `18182` deletions, net `-4869`.
-- Current production TypeScript/TSX total: about `28641` lines.
+- Production `src`: `13308` insertions, `18186` deletions, net `-4878`.
+- Current production TypeScript/TSX total: about `28632` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,27 +358,35 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28641` | `-4869` | `< 28000` |
-| Strict core pipeline | `11337` | `11476` | `+139` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `4893` | `+210` | `3000-4000` |
-| Broad core pipeline | `16020` | `16369` | `+349` | `11000-13000` |
+| Full production `src` | `33510` | `28632` | `-4878` | `< 28000` |
+| Strict core pipeline | `11337` | `11468` | `+131` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `4951` | `+268` | `3000-4000` |
+| Broad core pipeline | `16020` | `16419` | `+399` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3769` |
-| `pivot/expansion/*` | `2555` |
-| `pivot/query/*` | `1521` |
+| `pivot/expansion/*` | `2545` |
+| `pivot/query/*` | `1520` |
 | `pivot/layout/*` | `770` |
 | `pivot/core/*` | `252` |
 | core domain helpers | `1580` |
-| formatting/data/render-model support | `1020` |
+| formatting/data/render-model support | `1032` |
 
 Interpretation: plugin-wide source has shrunk, but core pipeline source has
 grown because runtime authority moved out of chart/control code before the old
 planner and render-repair surfaces were fully deleted. The next large cuts must
 reduce strict core, not only move lines into it.
+
+Latest acceleration cleanup: expansion axis fetches now pass
+`ExpansionCoverageTarget` directly instead of wrapping the same axis/path/need
+inside a second `FetchTarget` object. Batch candidates extend the coverage
+target only with transport grouping metadata. The bounded row x column
+intersection path is preserved through an explicit `requiresPathDiscovery`
+planner flag, so already-visible row/column paths still choose a narrower
+intersection request instead of broader same-axis branch batches.
 
 Latest fact-boundary cleanup: `PivotFactStore` now rejects facts whose row or
 column path depth does not match the declared batch coverage. Test expansion

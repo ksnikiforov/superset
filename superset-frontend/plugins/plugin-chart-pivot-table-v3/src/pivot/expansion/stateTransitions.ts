@@ -46,7 +46,7 @@ const PIVOT_AXES: PivotAxis[] = ['row', 'col'];
 
 const createEmptyExpansionPlan = (): PivotExpansionPlan => ({
   targets: [],
-  hasMissingNodes: false,
+  requiresPathDiscovery: false,
 });
 
 const createExpansionMetricPolicy = (program: PivotProgram) => {
@@ -687,21 +687,20 @@ export const planHydrationIteration = ({
       : [];
   const shouldFetchIntersectionOnly =
     intersectionTargets.length > 0 &&
-    !rowPlan.hasMissingNodes &&
-    !colPlan.hasMissingNodes;
-  const axisPlansForTransport = shouldFetchIntersectionOnly
-    ? {
-        rowPlan: createEmptyExpansionPlan(),
-        colPlan: createEmptyExpansionPlan(),
-      }
-    : suppressOppositeRootFetches({
-        rowPlan,
-        colPlan,
-        desiredRows,
-        desiredCols,
-      });
+    !rowPlan.requiresPathDiscovery &&
+    !colPlan.requiresPathDiscovery;
   const { rowPlan: rowPlanForTransport, colPlan: colPlanForTransport } =
-    axisPlansForTransport;
+    shouldFetchIntersectionOnly
+      ? {
+          rowPlan: createEmptyExpansionPlan(),
+          colPlan: createEmptyExpansionPlan(),
+        }
+      : suppressOppositeRootFetches({
+          rowPlan,
+          colPlan,
+          desiredRows,
+          desiredCols,
+        });
 
   if (
     rowPlanForTransport.targets.length === 0 &&

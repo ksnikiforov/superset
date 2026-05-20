@@ -97,17 +97,13 @@ const buildFetchTarget = ({
   visibleColDepth: number;
 }) => {
   const pathKey = serializePath(path);
-  return {
+  return buildAxisExpansionCoverageTarget({
+    program: layout.pivotProgram,
     axis,
     pathKey,
-    coverageTarget: buildAxisExpansionCoverageTarget({
-      program: layout.pivotProgram,
-      axis,
-      pathKey,
-      rowDepth: visibleRowDepth,
-      columnDepth: visibleColDepth,
-    }),
-  };
+    rowDepth: visibleRowDepth,
+    columnDepth: visibleColDepth,
+  });
 };
 
 const fetchBranch = (

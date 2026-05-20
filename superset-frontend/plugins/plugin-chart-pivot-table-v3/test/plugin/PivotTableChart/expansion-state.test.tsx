@@ -1883,9 +1883,7 @@ describe('PivotTableChart expansion state persistence', () => {
     branchExpansionMock.mockImplementation((params: FetchPivotBranchParams) =>
       Promise.resolve(
         buildMockBranchFetchResult(params, {
-          data:
-            treesByDepth.get(params.target.coverageTarget.need.rowDepth) ??
-            shallowTree,
+          data: treesByDepth.get(params.target.need.rowDepth) ?? shallowTree,
         }),
       ),
     );

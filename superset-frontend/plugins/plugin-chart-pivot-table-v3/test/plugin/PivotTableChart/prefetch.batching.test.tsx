@@ -325,8 +325,10 @@ describe('PivotTableChart batching on persisted restore', () => {
           rowPathKeys: [serializePath(['A']), serializePath(['B'])],
           columnPathKeys: [serializePath(['CA']), serializePath(['NY'])],
           coverageTarget: expect.objectContaining({
-            rowDepth: 2,
-            columnDepth: 2,
+            need: expect.objectContaining({
+              rowDepth: 2,
+              columnDepth: 2,
+            }),
           }),
         }),
       }),

@@ -60,13 +60,7 @@ export type PivotExpansionCoverageDiff = (
   targets: ExpansionCoverageTarget[],
 ) => ExpansionCoverageTarget[];
 
-export type FetchTarget = {
-  axis: PivotAxis;
-  pathKey: string;
-  coverageTarget: ExpansionCoverageTarget;
-};
-
-export type BatchCandidate = FetchTarget & {
+export type BatchCandidate = ExpansionCoverageTarget & {
   batchSignature: string;
 };
 
@@ -85,15 +79,17 @@ export type IntersectionFetchTarget = {
   coverageTarget: ExpansionCoverageTarget;
 };
 
-export type ExpansionFetchTarget = FetchTarget | IntersectionFetchTarget;
+export type ExpansionFetchTarget =
+  | ExpansionCoverageTarget
+  | IntersectionFetchTarget;
 
 export const isIntersectionFetchTarget = (
   target: ExpansionFetchTarget,
 ): target is IntersectionFetchTarget => 'kind' in target;
 
 export type PivotExpansionPlan = {
-  targets: FetchTarget[];
-  hasMissingNodes: boolean;
+  targets: ExpansionCoverageTarget[];
+  requiresPathDiscovery: boolean;
 };
 
 const targetKey = ({ axis, pathKey, need }: ExpansionCoverageTarget) =>
@@ -282,11 +278,13 @@ const buildGroupedFetchTargets = ({
   program: PivotProgram;
   targets: ExpansionCoverageTarget[];
   nodes: Record<string, PivotTreeNode>;
-}): FetchTarget[] => {
+}): ExpansionCoverageTarget[] => {
   const groups = new Map<string, string[]>();
   const targetByPathKey = new Map(
     targets.map(target => [target.pathKey, target]),
   );
+  const fetchTargets: ExpansionCoverageTarget[] = [];
+
   targets.forEach(({ pathKey }) => {
     const groupKey = coverageKeyForPathKey(program, axis, pathKey);
     const existing = groups.get(groupKey);
@@ -297,8 +295,6 @@ const buildGroupedFetchTargets = ({
     }
   });
 
-  const fetchTargets: FetchTarget[] = [];
-
   for (const keys of groups.values()) {
     const representative =
       keys.find(
@@ -307,11 +303,7 @@ const buildGroupedFetchTargets = ({
       keys.find(key => nodes[key]) ??
       keys[0];
 
-    fetchTargets.push({
-      axis,
-      pathKey: representative,
-      coverageTarget: targetByPathKey.get(representative) ?? targets[0],
-    });
+    fetchTargets.push(targetByPathKey.get(representative) ?? targets[0]);
   }
 
   return fetchTargets;
@@ -333,7 +325,7 @@ export const planExpansionForAxis = ({
   getMissingExpansionCoverage: PivotExpansionCoverageDiff;
 }): PivotExpansionPlan => {
   const fetchTargets = new Map<string, ExpansionCoverageTarget>();
-  let hasMissingNodes = false;
+  let requiresPathDiscovery = false;
   const hasNonRootExpanded =
     expandedKeys.size > 1 ||
     (expandedKeys.size === 1 && !expandedKeys.has(rootKey));
@@ -360,12 +352,13 @@ export const planExpansionForAxis = ({
     ),
   );
 
-  candidates.forEach(({ node, target }) => {
+  candidates.forEach(({ target }) => {
     const keyForTarget = targetKey(target);
     if (!missingTargetKeys.has(keyForTarget)) {
       return;
     }
-    hasMissingNodes ||= !node;
+    const node = nodes[target.pathKey];
+    requiresPathDiscovery ||= !node;
     fetchTargets.set(keyForTarget, target);
   });
 
@@ -399,6 +392,6 @@ export const planExpansionForAxis = ({
       targets: Array.from(fetchTargets.values()),
       nodes,
     }),
-    hasMissingNodes,
+    requiresPathDiscovery,
   };
 };

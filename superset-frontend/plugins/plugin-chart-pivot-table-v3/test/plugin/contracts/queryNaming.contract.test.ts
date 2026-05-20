@@ -35,17 +35,13 @@ const branchQueryNames = ({
     kind: 'branch',
     formData,
     layout,
-    target: {
+    target: buildAxisExpansionCoverageTarget({
+      program: layout.pivotProgram,
       axis: 'row',
       pathKey,
-      coverageTarget: buildAxisExpansionCoverageTarget({
-        program: layout.pivotProgram,
-        axis: 'row',
-        pathKey,
-        rowDepth: 0,
-        columnDepth: 0,
-      }),
-    },
+      rowDepth: 0,
+      columnDepth: 0,
+    }),
   }).map(spec => spec.queryName);
 };
 

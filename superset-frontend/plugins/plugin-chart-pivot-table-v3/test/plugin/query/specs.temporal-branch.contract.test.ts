@@ -59,17 +59,13 @@ const fetchTarget = ({
   visibleColDepth: number;
 }) => {
   const pathKey = serializePath(path);
-  return {
+  return buildAxisExpansionCoverageTarget({
+    program: layout.pivotProgram,
     axis,
     pathKey,
-    coverageTarget: buildAxisExpansionCoverageTarget({
-      program: layout.pivotProgram,
-      axis,
-      pathKey,
-      rowDepth: visibleRowDepth,
-      columnDepth: visibleColDepth,
-    }),
-  };
+    rowDepth: visibleRowDepth,
+    columnDepth: visibleColDepth,
+  });
 };
 
 describe('temporal branch query specs contract', () => {
@@ -154,28 +150,24 @@ describe('temporal branch query specs contract', () => {
       siblingValues: ['1483228800000', '1514764800000'],
       targets: [
         {
-          axis: 'row',
-          pathKey: serializePath(['1483228800000']),
-          batchSignature: 'temporal-batch',
-          coverageTarget: fetchTarget({
+          ...fetchTarget({
             layout,
             axis: 'row',
             path: ['1483228800000'],
             visibleRowDepth: 0,
             visibleColDepth: 0,
-          }).coverageTarget,
+          }),
+          batchSignature: 'temporal-batch',
         },
         {
-          axis: 'row',
-          pathKey: serializePath(['1514764800000']),
-          batchSignature: 'temporal-batch',
-          coverageTarget: fetchTarget({
+          ...fetchTarget({
             layout,
             axis: 'row',
             path: ['1514764800000'],
             visibleRowDepth: 0,
             visibleColDepth: 0,
-          }).coverageTarget,
+          }),
+          batchSignature: 'temporal-batch',
         },
       ],
     };

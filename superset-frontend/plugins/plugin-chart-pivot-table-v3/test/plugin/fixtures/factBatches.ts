@@ -66,9 +66,7 @@ export const getMockExpansionRequestAxis = (
   if (params.kind === 'intersection') {
     return 'row';
   }
-  return params.kind === 'batch'
-    ? params.batch.axis
-    : params.target.coverageTarget.axis;
+  return params.kind === 'batch' ? params.batch.axis : params.target.axis;
 };
 
 export const getMockExpansionRequestPath = (
@@ -80,7 +78,7 @@ export const getMockExpansionRequestPath = (
   return parsePath(
     params.kind === 'batch'
       ? (params.batch.targets[0]?.pathKey ?? '')
-      : params.target.coverageTarget.pathKey,
+      : params.target.pathKey,
   );
 };
 

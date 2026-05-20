@@ -63,7 +63,6 @@ import { collectRequiredTimeOffsets } from '../measureLeaves';
 import {
   type BatchGroup,
   type ExpansionCoverageTarget,
-  type FetchTarget,
   type IntersectionFetchTarget,
 } from '../expansion/planner';
 import {
@@ -861,7 +860,7 @@ export type ExpansionQuerySpecRequest =
       kind: 'branch';
       formData: PivotTableQueryFormData;
       layout: LayoutContext;
-      target: FetchTarget;
+      target: ExpansionCoverageTarget;
     }
   | {
       kind: 'batch';
@@ -882,7 +881,7 @@ export const buildExpansionQuerySpecs = (
   request: ExpansionQuerySpecRequest,
 ): PlannedQuerySpec[] => {
   if (request.kind === 'branch') {
-    const { coverageTarget } = request.target;
+    const coverageTarget = request.target;
     const { axis } = coverageTarget;
     const path = parsePath(coverageTarget.pathKey);
     return buildAxisExpansionSpecs({
@@ -918,7 +917,7 @@ export const buildExpansionQuerySpecs = (
       chunkIndex = 0,
       representativePath,
     } = request;
-    const coverageTarget = batch.targets[0]?.coverageTarget;
+    const coverageTarget = batch.targets[0];
     const representativeKey = batch.targets[0]?.pathKey;
     if ((!representativeKey && !representativePath) || !coverageTarget) {
       return [];

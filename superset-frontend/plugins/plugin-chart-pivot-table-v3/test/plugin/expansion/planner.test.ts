@@ -106,10 +106,6 @@ describe('pivot/expansion/planner', () => {
     expect(plan.targets[0]).toMatchObject({
       axis: 'row',
       pathKey: aKey,
-      coverageTarget: {
-        axis: 'row',
-        pathKey: aKey,
-      },
     });
   });
 
@@ -135,10 +131,6 @@ describe('pivot/expansion/planner', () => {
     expect(plan.targets[0]).toMatchObject({
       axis: 'row',
       pathKey: aKey,
-      coverageTarget: {
-        axis: 'row',
-        pathKey: aKey,
-      },
     });
   });
 

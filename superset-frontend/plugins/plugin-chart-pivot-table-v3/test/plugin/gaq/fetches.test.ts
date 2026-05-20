@@ -55,6 +55,14 @@ const waitForAsyncDataMock = waitForAsyncData as jest.MockedFunction<
   typeof waitForAsyncData
 >;
 
+type TestBatchTarget = Pick<
+  BatchGroup['targets'][number],
+  'axis' | 'pathKey' | 'batchSignature'
+>;
+type TestBatchGroup = Omit<BatchGroup, 'targets'> & {
+  targets: TestBatchTarget[];
+};
+
 const fetchBranch = (
   params: Omit<FetchPivotExpansionRequest, 'kind' | 'layout' | 'target'> & {
     axis: PivotAxis;
@@ -81,23 +89,19 @@ const fetchBranch = (
     factStore,
     requestGroupId,
     layout,
-    target: {
+    target: buildAxisExpansionCoverageTarget({
+      program: layout.pivotProgram,
       axis,
       pathKey,
-      coverageTarget: buildAxisExpansionCoverageTarget({
-        program: layout.pivotProgram,
-        axis,
-        pathKey,
-        rowDepth: visibleRowDepth,
-        columnDepth: visibleColDepth,
-      }),
-    },
+      rowDepth: visibleRowDepth,
+      columnDepth: visibleColDepth,
+    }),
   });
 };
 
 const fetchBatch = (
   params: Omit<FetchPivotExpansionRequest, 'kind' | 'layout' | 'batch'> & {
-    batch: BatchGroup;
+    batch: TestBatchGroup;
     visibleRowDepth: number;
     visibleColDepth: number;
     currentTree?: PivotTreeData;
@@ -121,14 +125,14 @@ const fetchBatch = (
     batch: {
       ...batch,
       targets: batch.targets.map(target => ({
-        ...target,
-        coverageTarget: buildAxisExpansionCoverageTarget({
+        ...buildAxisExpansionCoverageTarget({
           program: layout.pivotProgram,
           axis: target.axis,
           pathKey: target.pathKey,
           rowDepth: visibleRowDepth,
           columnDepth: visibleColDepth,
         }),
+        batchSignature: target.batchSignature,
       })),
     },
   });
@@ -204,7 +208,7 @@ describe('Global Async Queries (HTTP 202) support', () => {
     });
     waitForAsyncDataMock.mockResolvedValue([{ data: [] }]);
 
-    const batch: BatchGroup = {
+    const batch: TestBatchGroup = {
       axis: 'row',
       signature: 'sig',
       parentPathKey: serializePath(['US']),

@@ -32,8 +32,8 @@ import {
   type BatchCandidate,
   type BatchGroup,
   createExpansionCoverageDiff,
+  type ExpansionCoverageTarget,
   type ExpansionFetchTarget,
-  type FetchTarget,
   type IntersectionFetchTarget,
   isIntersectionFetchTarget,
 } from './planner';
@@ -204,7 +204,7 @@ const createRuntimeExpansionCoverageDiff = ({
 const resolveExpansionFetchPlan = (
   targets: ExpansionFetchTarget[],
 ): {
-  singles: FetchTarget[];
+  singles: ExpansionCoverageTarget[];
   batches: BatchGroup[];
   intersections: IntersectionFetchTarget[];
 } => {
@@ -213,7 +213,7 @@ const resolveExpansionFetchPlan = (
     if (isIntersectionFetchTarget(target)) {
       continue;
     }
-    const { rowDepth, columnDepth } = target.coverageTarget.need;
+    const { rowDepth, columnDepth } = target.need;
     const batchSignature = `${target.axis}|${rowDepth}|${columnDepth}`;
     batchCandidates.push({ ...target, batchSignature });
   }

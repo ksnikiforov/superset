@@ -82,17 +82,13 @@ const fetchBranch = (
     factStore,
     requestGroupId,
     layout,
-    target: {
+    target: buildAxisExpansionCoverageTarget({
+      program: layout.pivotProgram,
       axis,
       pathKey,
-      coverageTarget: buildAxisExpansionCoverageTarget({
-        program: layout.pivotProgram,
-        axis,
-        pathKey,
-        rowDepth: visibleRowDepth,
-        columnDepth: visibleColDepth,
-      }),
-    },
+      rowDepth: visibleRowDepth,
+      columnDepth: visibleColDepth,
+    }),
   });
 };
 

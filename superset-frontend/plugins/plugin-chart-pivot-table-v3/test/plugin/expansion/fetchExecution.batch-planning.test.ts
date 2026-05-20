@@ -20,17 +20,26 @@ import {
   optimizeExpansionFetchPlan,
   MAX_BATCH_SIBLINGS,
 } from '../../../src/pivot/expansion/fetchExecution';
-import { type FetchTarget } from '../../../src/pivot/expansion/planner';
+import { type BatchCandidate } from '../../../src/pivot/expansion/planner';
 import { parsePath, serializePath } from '../../../src/pivot/core/path';
 import { type PivotPathValue } from '../../../src/types';
 
 const makeTarget = (
   path: PivotPathValue[],
   signature = 'sig',
-): FetchTarget & { batchSignature: string } => ({
+): BatchCandidate => ({
   axis: 'row',
   pathKey: serializePath(path),
   batchSignature: signature,
+  need: {
+    rowDepth: path.length,
+    columnDepth: 0,
+    rowDimensions: [],
+    columnDimensions: [],
+    valueKeys: [],
+    rowScope: { kind: 'paths', paths: [path] },
+    columnScope: { kind: 'root' },
+  },
 });
 
 describe('fetchPlanOptimizer', () => {

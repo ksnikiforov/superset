@@ -45,17 +45,13 @@ const fetchTarget = ({
   visibleColDepth: number;
 }) => {
   const pathKey = serializePath(path);
-  return {
+  return buildAxisExpansionCoverageTarget({
+    program: layout.pivotProgram,
     axis,
     pathKey,
-    coverageTarget: buildAxisExpansionCoverageTarget({
-      program: layout.pivotProgram,
-      axis,
-      pathKey,
-      rowDepth: visibleRowDepth,
-      columnDepth: visibleColDepth,
-    }),
-  };
+    rowDepth: visibleRowDepth,
+    columnDepth: visibleColDepth,
+  });
 };
 
 describe('runtime coverage query specs contract', () => {
@@ -207,28 +203,24 @@ describe('runtime coverage query specs contract', () => {
       siblingValues: ['US', 'CA'],
       targets: [
         {
-          axis: 'row',
-          pathKey: serializePath(['US']),
-          batchSignature: 'values-only',
-          coverageTarget: fetchTarget({
+          ...fetchTarget({
             layout,
             axis: 'row',
             path: ['US'],
             visibleRowDepth: 1,
             visibleColDepth: 0,
-          }).coverageTarget,
+          }),
+          batchSignature: 'values-only',
         },
         {
-          axis: 'row',
-          pathKey: serializePath(['CA']),
-          batchSignature: 'values-only',
-          coverageTarget: fetchTarget({
+          ...fetchTarget({
             layout,
             axis: 'row',
             path: ['CA'],
             visibleRowDepth: 1,
             visibleColDepth: 0,
-          }).coverageTarget,
+          }),
+          batchSignature: 'values-only',
         },
       ],
     };
@@ -260,16 +252,14 @@ describe('runtime coverage query specs contract', () => {
       siblingValues: [SUBTOTAL_TOKEN],
       targets: [
         {
-          axis: 'row',
-          pathKey: serializePath(['US', SUBTOTAL_TOKEN]),
-          batchSignature: 'subtotal-display',
-          coverageTarget: fetchTarget({
+          ...fetchTarget({
             layout,
             axis: 'row',
             path: ['US', SUBTOTAL_TOKEN],
             visibleRowDepth: 2,
             visibleColDepth: 0,
-          }).coverageTarget,
+          }),
+          batchSignature: 'subtotal-display',
         },
       ],
     };
