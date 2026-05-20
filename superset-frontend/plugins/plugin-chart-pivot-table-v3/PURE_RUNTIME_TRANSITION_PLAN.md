@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13172` insertions, `18260` deletions, net `-5088`.
-- Current production TypeScript/TSX total: about `28422` lines.
+- Production `src`: `13154` insertions, `18260` deletions, net `-5106`.
+- Current production TypeScript/TSX total: about `28404` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,10 +358,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28422` | `-5088` | `< 28000` |
-| Strict core pipeline | `11337` | `11328` | `-9` | `8000` |
+| Full production `src` | `33510` | `28404` | `-5106` | `< 28000` |
+| Strict core pipeline | `11337` | `11310` | `-27` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4883` | `+200` | `3000-4000` |
-| Broad core pipeline | `16020` | `16211` | `+191` | `11000-13000` |
+| Broad core pipeline | `16020` | `16193` | `+173` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -871,6 +871,11 @@ the measure-axis materialization pass. The separate production
 `applyMeasureLeafValuesToTree` traversal/export is gone, sync materialization
 does one less full-tree pass, and async materialization has one less scheduled
 yield stage before measure-axis projection.
+
+Latest materializer finalization cleanup: sync and async materialization now
+share one semantic tree finalization path for applying measure hierarchy and
+row subtotal labels. This removes duplicated finalization logic while keeping
+metric, measure, and subtotal structure inside `materializePivotTree.ts`.
 
 Latest query-target boundary cleanup: branch, batch, and intersection query
 spec requests now consume the compiled expansion planner target directly.

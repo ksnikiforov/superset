@@ -1133,63 +1133,54 @@ const buildTreeFromFactBatchAsync = async ({
   return tree;
 };
 
-const materializePivotTree = ({
-  batches,
-  metrics,
-  formData,
-  measureHierarchy,
-  rowSubtotalLevels,
-  colSubtotalLevels,
-  pivotProgram,
-}: MaterializePivotTreeInput): PivotTreeData => {
+const finalizeMaterializedTree = (
+  tree: PivotTreeData,
+  {
+    metrics,
+    formData,
+    measureHierarchy,
+    pivotProgram,
+  }: MaterializePivotTreeInput,
+) =>
+  labelRowSubtotalLeaves(
+    applyMeasureHierarchyAxis(
+      tree,
+      measureHierarchy,
+      pivotProgram,
+      formData.metricLabelMap as Record<string, string> | undefined,
+    ),
+    metrics,
+    formData.metricLabelMap as Record<string, string> | undefined,
+  );
+
+const materializePivotTree = (
+  input: MaterializePivotTreeInput,
+): PivotTreeData => {
+  const { batches } = input;
   const branchTree = batches.reduce<PivotTreeData>(
     (acc, batch) =>
       mergeTrees(
         acc,
         buildTreeFromFactBatch({
+          ...input,
           batch,
-          formData,
-          pivotProgram,
-          rowSubtotalLevels,
-          colSubtotalLevels,
         }),
       ),
     {} as PivotTreeData,
   );
-  const branchWithMeasures = applyMeasureHierarchyAxis(
-    branchTree,
-    measureHierarchy,
-    pivotProgram,
-    formData.metricLabelMap as Record<string, string> | undefined,
-  );
-  return labelRowSubtotalLeaves(
-    branchWithMeasures,
-    metrics,
-    formData.metricLabelMap as Record<string, string> | undefined,
-  );
+  return finalizeMaterializedTree(branchTree, input);
 };
 
-const materializePivotTreeAsync = async ({
-  batches,
-  metrics,
-  formData,
-  measureHierarchy,
-  rowSubtotalLevels,
-  colSubtotalLevels,
-  pivotProgram,
-  chunkSize,
-  shouldContinue,
-  yieldToMain,
-}: MaterializePivotTreeInput & ChunkedWorkOptions): Promise<PivotTreeData> => {
+const materializePivotTreeAsync = async (
+  input: MaterializePivotTreeInput & ChunkedWorkOptions,
+): Promise<PivotTreeData> => {
+  const { batches, chunkSize, shouldContinue, yieldToMain } = input;
   let branchTree = {} as PivotTreeData;
   for (let idx = 0; idx < batches.length; idx += 1) {
     // eslint-disable-next-line no-await-in-loop
     const nextTree = await buildTreeFromFactBatchAsync({
+      ...input,
       batch: batches[idx],
-      formData,
-      pivotProgram,
-      rowSubtotalLevels,
-      colSubtotalLevels,
       chunkSize,
       shouldContinue,
       yieldToMain,
@@ -1199,18 +1190,9 @@ const materializePivotTreeAsync = async ({
     branchTree = mergeTrees(branchTree, nextTree);
   }
   await yieldChunkedWork({ shouldContinue, yieldToMain });
-  const branchWithMeasures = applyMeasureHierarchyAxis(
-    branchTree,
-    measureHierarchy,
-    pivotProgram,
-    formData.metricLabelMap as Record<string, string> | undefined,
-  );
+  const tree = finalizeMaterializedTree(branchTree, input);
   await yieldChunkedWork({ shouldContinue, yieldToMain });
-  return labelRowSubtotalLeaves(
-    branchWithMeasures,
-    metrics,
-    formData.metricLabelMap as Record<string, string> | undefined,
-  );
+  return tree;
 };
 
 const groupFactStoreBatchesByMaterializationPlan = ({
