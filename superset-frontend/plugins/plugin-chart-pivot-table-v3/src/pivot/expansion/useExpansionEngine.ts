@@ -205,13 +205,16 @@ export const useExpansionEngine = ({
     [loadingCounts],
   );
   const fetchFormDataRef = useRef(fetchFormData);
+  const initialExpansionState =
+    coerceExpansionState(persistedExpansionState) ??
+    createEmptyExpansionState();
   const explicitExpandedRef = useRef<AxisSetMap>({
-    row: new Set(),
-    col: new Set(),
+    row: new Set(initialExpansionState.rows),
+    col: new Set(initialExpansionState.cols),
   });
   const explicitCollapsedRef = useRef<AxisSetMap>({
-    row: new Set(),
-    col: new Set(),
+    row: new Set(initialExpansionState.collapsedRows),
+    col: new Set(initialExpansionState.collapsedCols),
   });
   const [errorMessage, setErrorMessage] = useState<string>();
   const [warnings, setWarnings] = useState<ChartDataWarning[]>([]);
@@ -227,7 +230,6 @@ export const useExpansionEngine = ({
     [],
   );
 
-  const expansionStateMemoryRef = useRef<PivotExpansionStateKeys>();
   const expansionPersistenceDepsRef = useRef<ExpansionPersistenceDeps>({
     shouldPersist: shouldPersistExpansionState,
     setControlValue,
@@ -240,7 +242,6 @@ export const useExpansionEngine = ({
     setDataMask,
     mergeOwnState,
   };
-  const persistedExpansionStateRef = useRef<unknown>(persistedExpansionState);
   const previousDataRef = useRef<PivotTreeData | null>(null);
   const groupbyRowKeys = useMemo(
     () => pivotProgram.rowDimensions.map(getStableColumnKey),
@@ -262,7 +263,6 @@ export const useExpansionEngine = ({
     [expansionRequestLifecycle],
   );
 
-  useSyncRef(persistedExpansionStateRef, persistedExpansionState);
   useSyncRef(treeRef, tree);
   useSyncRef(expandedRef, expandedByAxis);
   useSyncRef(fetchFormDataRef, fetchFormData);
@@ -278,26 +278,6 @@ export const useExpansionEngine = ({
   const clearLoadingState = useCallback(() => {
     setLoadingCounts(new Map());
   }, []);
-
-  const readSessionExpansionState = useCallback(() => {
-    if (!expansionStateMemoryRef.current) {
-      expansionStateMemoryRef.current =
-        coerceExpansionState(persistedExpansionStateRef.current) ??
-        createEmptyExpansionState();
-    }
-    return expansionStateMemoryRef.current;
-  }, []);
-
-  const writeSessionExpansionState = useCallback(
-    (nextState: PivotExpansionStateKeys, options?: { persist?: boolean }) => {
-      expansionStateMemoryRef.current = nextState;
-      if (options?.persist === false) {
-        return;
-      }
-      persistExpansionStateKeys(nextState, expansionPersistenceDepsRef.current);
-    },
-    [],
-  );
 
   const commitExpansionState = useCallback(
     ({ tree: nextTree, expanded: nextExpanded }: ExpansionStateCommit) => {
@@ -371,9 +351,12 @@ export const useExpansionEngine = ({
       });
       explicitExpandedRef.current = visible.visibleExpanded;
       explicitCollapsedRef.current = visible.visibleCollapsed;
-      writeSessionExpansionState(visible.persistedState);
+      persistExpansionStateKeys(
+        visible.persistedState,
+        expansionPersistenceDepsRef.current,
+      );
     },
-    [pivotProgram, writeSessionExpansionState],
+    [pivotProgram],
   );
 
   const resolveExpandedForMetrics = useCallback(
@@ -549,7 +532,12 @@ export const useExpansionEngine = ({
     const previousSemanticSignature = expansionSemanticSignatureRef.current;
     expansionSemanticSignatureRef.current = expansionSemanticSignature;
     const hasNewData = previousDataRef.current !== data;
-    const sessionExpansionState = readSessionExpansionState();
+    const sessionExpansionState: PivotExpansionStateKeys = {
+      rows: Array.from(explicitExpandedRef.current.row),
+      cols: Array.from(explicitExpandedRef.current.col),
+      collapsedRows: Array.from(explicitCollapsedRef.current.row),
+      collapsedCols: Array.from(explicitCollapsedRef.current.col),
+    };
     const currentLayout = {
       rows: groupbyRowKeys,
       cols: groupbyColumnKeys,
@@ -621,9 +609,12 @@ export const useExpansionEngine = ({
       row: new Set(persistedState.collapsedRows),
       col: new Set(persistedState.collapsedCols),
     };
-    writeSessionExpansionState(persistedState, {
-      persist: !isInitialMount && shouldResetExpanded,
-    });
+    if (!isInitialMount && shouldResetExpanded) {
+      persistExpansionStateKeys(
+        persistedState,
+        expansionPersistenceDepsRef.current,
+      );
+    }
 
     const resolvedRows = resolveExpandedForMetrics(
       'row',
@@ -673,8 +664,6 @@ export const useExpansionEngine = ({
     expansionRequestLifecycle,
     resolveExpandedForMetrics,
     reportAsyncError,
-    readSessionExpansionState,
-    writeSessionExpansionState,
   ]);
 
   const handleRetry = useCallback(() => {

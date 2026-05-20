@@ -303,17 +303,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28775` | `-4735` | `< 28000` |
-| Strict core pipeline | `11337` | `11579` | `+242` | `8000` |
+| Full production `src` | `33510` | `28764` | `-4746` | `< 28000` |
+| Strict core pipeline | `11337` | `11568` | `+231` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4924` | `+241` | `3000-4000` |
-| Broad core pipeline | `16020` | `16503` | `+483` | `11000-13000` |
+| Broad core pipeline | `16020` | `16492` | `+472` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3818` |
-| `pivot/expansion/*` | `2578` |
+| `pivot/expansion/*` | `2567` |
 | `pivot/query/*` | `1409` |
 | `pivot/layout/*` | `770` |
 | core/shared/domain helpers | `1800` |
@@ -541,6 +541,20 @@ Latest expansion-transport cleanup: `query/fetchPlanOptimizer.ts` is gone.
 Sibling batching is now owned by `expansion/fetchExecution.ts`, and the batch
 request shape is owned by `expansion/planner.ts`. Query planning no longer owns
 transport batching vocabulary.
+
+Latest expansion-state cleanup: `useExpansionEngine` no longer keeps a separate
+session expansion-state memory layer. Explicit expanded/collapsed refs are the
+session state, and persistence writes directly from the visible manifest state.
+This removes another adapter between user expansion intent and manifest-driven
+hydration.
+
+Checkpoint: deleting `PivotExpansionPlan.hasMissingNodes` is not currently a
+safe simplification. A trial cut changed persisted row x column restore by
+suppressing the expected intersection request after batched branch results
+arrived out of order. The branch is not just legacy compatibility; it protects
+the no-blank-intersection UX while the scheduler still materializes in
+iterations. The better deletion target is the scheduler/executor boundary, not
+blindly removing this flag.
 
 Latest metric-identity cleanup: metric keys no longer fall back to saved metric
 verbose names, and formatting keys now use the same canonical metric key as the
