@@ -116,8 +116,8 @@ describe('temporal branch query specs contract', () => {
           spec.meta.factSelector.coverage.columnDepth,
         )}|scope:${stableStringify({
           axis: 'row',
-          kind: 'axisPaths',
-          paths: [path],
+          kind: 'scopedFull',
+          ancestorPaths: [path],
         })}`,
       );
     });
@@ -185,8 +185,8 @@ describe('temporal branch query specs contract', () => {
           spec.meta.factSelector.coverage.columnDepth,
         )}|scope:${stableStringify({
           axis: 'row',
-          kind: 'axisPaths',
-          paths: [['1483228800000'], ['1514764800000']],
+          kind: 'scopedFull',
+          ancestorPaths: [['1483228800000'], ['1514764800000']],
         })}`,
       );
     });

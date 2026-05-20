@@ -52,6 +52,15 @@ const axisScope = (
   paths: [path],
 });
 
+const scopedFullScope = (
+  axis: 'row' | 'col',
+  path: PivotPath,
+): PivotFactSelector['scope'] => ({
+  kind: 'scopedFull',
+  axis,
+  ancestorPaths: [path],
+});
+
 describe('expansion fact coverage', () => {
   it('derives loaded expansion coverage from typed fact selectors', () => {
     const program = compilePivotProgram({
@@ -67,7 +76,7 @@ describe('expansion fact coverage', () => {
           rowDimensions: ['country', 'city'],
           columnDimensions: ['year'],
         },
-        scope: axisScope('row', ['France']),
+        scope: scopedFullScope('row', ['France']),
         valueKeys: ['sales'],
       },
       {
@@ -77,7 +86,7 @@ describe('expansion fact coverage', () => {
           rowDimensions: ['country', 'city'],
           columnDimensions: ['year', 'quarter', 'month'],
         },
-        scope: axisScope('row', ['France']),
+        scope: scopedFullScope('row', ['France']),
         valueKeys: ['sales'],
       },
     ];
@@ -275,13 +284,13 @@ describe('coverage manifest diff', () => {
     expect(
       diffCoverageManifest({
         required,
-        factSelectors: [batch(axisScope('row', ['USA']))],
+        factSelectors: [batch(scopedFullScope('row', ['USA']))],
       }),
     ).toEqual([]);
     expect(
       diffCoverageManifest({
         required,
-        factSelectors: [batch(axisScope('row', ['Canada']))],
+        factSelectors: [batch(scopedFullScope('row', ['Canada']))],
       }),
     ).toEqual(required);
   });
@@ -294,7 +303,7 @@ describe('coverage manifest diff', () => {
     expect(
       diffCoverageManifest({
         required,
-        factSelectors: [batch(axisScope('row', ['USA', 'California']))],
+        factSelectors: [batch(scopedFullScope('row', ['USA', 'California']))],
       }),
     ).toEqual(required);
   });
@@ -310,7 +319,7 @@ describe('coverage manifest diff', () => {
     expect(
       diffCoverageManifest({
         required,
-        factSelectors: [batch(axisScope('row', ['USA']))],
+        factSelectors: [batch(scopedFullScope('row', ['USA']))],
       }),
     ).toEqual([]);
   });
@@ -334,9 +343,9 @@ describe('coverage manifest diff', () => {
         required,
         factSelectors: [
           batch({
-            kind: 'axisPaths',
+            kind: 'scopedFull',
             axis: 'row',
-            paths: [['USA'], ['Canada']],
+            ancestorPaths: [['USA'], ['Canada']],
           }),
         ],
       }),
@@ -375,7 +384,7 @@ describe('coverage manifest diff', () => {
               rowDimensions: ['country', 'city', 'store'],
               columnDimensions: ['year', 'quarter'],
             },
-            scope: axisScope('row', ['USA']),
+            scope: scopedFullScope('row', ['USA']),
             valueKeys: ['sales'],
           },
         ],
@@ -406,7 +415,7 @@ describe('coverage manifest diff', () => {
               rowDepth: 4,
               columnDepth: 2,
             }),
-            scope: axisScope('row', ['USA']),
+            scope: scopedFullScope('row', ['USA']),
             valueKeys: ['sales'],
           },
         ],
@@ -490,11 +499,7 @@ describe('branch fact coverage', () => {
           rowDimensions: ['returnFlag', 'orderPriority'],
           columnDimensions: ['shipMode'],
         },
-        scope: {
-          kind: 'axisPaths',
-          axis: 'row',
-          paths: [['A']],
-        },
+        scope: scopedFullScope('row', ['A']),
         valueKeys: ['averageOrderValue'],
       },
     ];

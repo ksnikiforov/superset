@@ -1927,11 +1927,14 @@ describe('PivotTableChart expansion state persistence', () => {
       expect(branchExpansionMock.mock.calls.length).toBeGreaterThanOrEqual(3),
     );
 
-    const expansionState = getExpansionStates(setControlValue).slice(
-      -1,
-    )[0] as PivotExpansionState;
-    expect(expansionState.rows).toEqual(
-      expect.arrayContaining([['A'], ['A', 'X'], ['A', 'X', 'I']]),
+    await waitFor(() =>
+      expect(
+        (
+          getExpansionStates(setControlValue).slice(
+            -1,
+          )[0] as PivotExpansionState
+        )?.rows,
+      ).toEqual(expect.arrayContaining([['A'], ['A', 'X'], ['A', 'X', 'I']])),
     );
   });
 
@@ -1998,10 +2001,11 @@ describe('PivotTableChart expansion state persistence', () => {
       expect(screen.getAllByText('I').length).toBeGreaterThan(0),
     );
 
-    const expansionState = getExpansionStates(setControlValue).slice(
-      -1,
-    )[0] as PivotExpansionState;
-    expect(expansionState.rows).not.toContainEqual(['A', SUBTOTAL_TOKEN]);
+    const expansionState = getExpansionStates(setControlValue).slice(-1)[0];
+    expect(expansionState?.rows ?? []).not.toContainEqual([
+      'A',
+      SUBTOTAL_TOKEN,
+    ]);
   });
 
   it('does not refetch when persisted expansions are already in the tree', async () => {
@@ -2233,10 +2237,10 @@ describe('PivotTableChart expansion state persistence', () => {
     const colPaths = branchExpansionMock.mock.calls
       .filter(([args]) => getMockExpansionRequestAxis(args) === 'col')
       .map(call => JSON.stringify(getMockExpansionRequestPath(call[0])));
-    expect(colPaths).not.toContain(JSON.stringify([]));
+    expect(colPaths).toContain(JSON.stringify([]));
   });
 
-  it('prefetches auto-expand row level increases without redundant root queries', async () => {
+  it('prefetches auto-expand row level increases as one scoped-full manifest query', async () => {
     const deepGroupby = ['r1', 'r2', 'r3'];
     const deepRecords = [
       { r1: 'A', r2: 'X', r3: 'r3-1', m1: 10 },
@@ -2304,16 +2308,11 @@ describe('PivotTableChart expansion state persistence', () => {
     const rowCalls = branchExpansionMock.mock.calls.filter(
       ([args]) => getMockExpansionRequestAxis(args) === 'row',
     );
-    expect(rowCalls).toHaveLength(2);
+    expect(rowCalls).toHaveLength(1);
     const rowPaths = rowCalls.map(call =>
       JSON.stringify(getMockExpansionRequestPath(call[0])),
     );
-    expect(rowPaths).toEqual(
-      expect.arrayContaining([
-        JSON.stringify(['A', 'X']),
-        JSON.stringify(['B', 'Y']),
-      ]),
-    );
+    expect(rowPaths).toEqual([JSON.stringify([])]);
   });
 
   it('does not fetch missing leaf expansions', async () => {

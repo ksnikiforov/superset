@@ -153,9 +153,9 @@ describe('runtime coverage query specs contract', () => {
       ),
     ).toBe(true);
     expect(specs[0].meta.factSelector.scope).toMatchObject({
-      kind: 'axisPaths',
+      kind: 'scopedFull',
       axis: 'col',
-      paths: [['Furniture']],
+      ancestorPaths: [['Furniture']],
     });
   });
 

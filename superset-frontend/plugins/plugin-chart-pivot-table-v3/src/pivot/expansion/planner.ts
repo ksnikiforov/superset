@@ -27,11 +27,14 @@ import { decodeMetricKey } from '../core/tokens';
 import {
   diffCoverageManifest,
   normalizeFactValueKeys,
+  pathsFromAxisScope,
+  type PivotAxisCoverageNeed,
   type PivotCoverageNeed,
 } from '../runtime/coverage';
 import {
   buildFactValueKeys,
   type PivotFactSelector,
+  type PivotFactStoreBatchScope,
 } from '../runtime/factStore';
 import {
   canRequestAxisExpansion,
@@ -57,11 +60,45 @@ export const isIntersectionCoverageTarget = (target: ExpansionCoverageTarget) =>
   target.need.rowScope.kind !== 'root' &&
   target.need.columnScope.kind !== 'root';
 
+export const targetAxisScope = (
+  target: ExpansionCoverageTarget,
+  paths = pathsFromAxisScope(
+    target.axis === 'row' ? target.need.rowScope : target.need.columnScope,
+  ),
+): PivotFactStoreBatchScope => {
+  const scope =
+    target.axis === 'row' ? target.need.rowScope : target.need.columnScope;
+  return scope.kind === 'scopedFull'
+    ? {
+        kind: 'scopedFull',
+        axis: target.axis,
+        ancestorPaths: paths,
+      }
+    : {
+        kind: 'axisPaths',
+        axis: target.axis,
+        paths,
+      };
+};
+
+export const factSelectorFromTarget = (
+  target: ExpansionCoverageTarget,
+): PivotFactSelector => ({
+  coverage: {
+    rowDepth: target.need.rowDepth,
+    columnDepth: target.need.columnDepth,
+    rowDimensions: target.need.rowDimensions,
+    columnDimensions: target.need.columnDimensions,
+  },
+  scope: targetAxisScope(target),
+  valueKeys: target.need.valueKeys,
+});
+
 const needKey = ({ need }: ExpansionCoverageTarget) => stableStringify(need);
 
 const axisPathScopeFromPath = (path: PivotPath) => ({
-  kind: 'paths' as const,
-  paths: [path],
+  kind: 'scopedFull' as const,
+  ancestorPaths: [path],
 });
 
 const projectionFilterPath = (projection: PivotAxisProjection) =>
@@ -181,6 +218,36 @@ export const buildAxisExpansionCoverageTarget = ({
         axis === 'row' ? axisPathScopeFromPath(branchPath) : { kind: 'root' },
       columnScope:
         axis === 'col' ? axisPathScopeFromPath(branchPath) : { kind: 'root' },
+    },
+  };
+};
+
+export const buildAxisCoverageNeedTarget = ({
+  need,
+  program,
+  rowDepth: visibleRowDepth,
+  columnDepth: visibleColDepth,
+}: {
+  need: PivotAxisCoverageNeed;
+  program: PivotProgram;
+  rowDepth: number;
+  columnDepth: number;
+}): ExpansionCoverageTarget => {
+  const rowDepth = need.axis === 'row' ? need.depth : visibleRowDepth;
+  const columnDepth = need.axis === 'col' ? need.depth : visibleColDepth;
+  return {
+    axis: need.axis,
+    pathKey: serializePath(pathsFromAxisScope(need.scope)[0] ?? []),
+    need: {
+      rowDepth,
+      columnDepth,
+      rowDimensions: program.rowDimensions.slice(0, rowDepth),
+      columnDimensions: program.columnDimensions.slice(0, columnDepth),
+      valueKeys: buildFactValueKeys({
+        metricKeys: program.metricKeys,
+      }),
+      rowScope: need.axis === 'row' ? need.scope : { kind: 'root' },
+      columnScope: need.axis === 'col' ? need.scope : { kind: 'root' },
     },
   };
 };

@@ -564,9 +564,9 @@ describe('pivot/expansion/stateTransitions', () => {
         columnDimensions: ['month', 'day'],
       },
       scope: {
-        kind: 'axisPaths',
+        kind: 'scopedFull',
         axis: 'col',
-        paths: [parsePath(xKey)],
+        ancestorPaths: [parsePath(xKey)],
       },
       valueKeys: ['sales'],
     };

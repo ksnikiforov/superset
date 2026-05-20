@@ -96,14 +96,14 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `26479` | `-7031` | `< 20000` |
-| Strict core pipeline | `12907` | `10690` | `-2217` | `< 8000` |
+| Full production `src` | `33510` | `26467` | `-7043` | `< 20000` |
+| Strict core pipeline | `12907` | `10678` | `-2229` | `< 8000` |
 
 Diagnostic scope only:
 
 | Scope | Baseline lines | Current lines | Delta |
 | --- | ---: | ---: | ---: |
-| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7788` | `-910` |
+| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7776` | `-922` |
 
 Core pipeline breakdown:
 
@@ -177,6 +177,11 @@ Completed structural cuts:
   update plan.
 - Branch coverage planning now stores requested depth pairs directly in one
   ordered set instead of maintaining parallel pair arrays and key maps.
+- Hydration now executes one compiled manifest fetch instead of an iterative
+  expansion loop; the old `fetchExecution.ts` wrapper and convergence/exhaustion
+  states were removed.
+- Expansion branch coverage is now first-class `scopedFull` fact coverage
+  instead of overloading `axisPaths` to mean subtree loading.
 - Fact store batch filtering now only carries the intersection scope matcher it
   actually enforces; root and axis-path batches stay batch-level coverage
   records.

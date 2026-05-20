@@ -411,9 +411,9 @@ describe('fetchBatch', () => {
     store.upsertBatch({
       coverage: preloadedSpec.meta.factSelector.coverage,
       scope: {
-        kind: 'axisPaths',
+        kind: 'scopedFull',
         axis: 'row',
-        paths: [['US', 'CA']],
+        ancestorPaths: [['US', 'CA']],
       },
       valueKeys: ['m1'],
       facts: [],

@@ -62,6 +62,7 @@ import { getMetricKey } from '../metrics';
 import { collectRequiredTimeOffsets } from '../measureLeaves';
 import {
   isIntersectionCoverageTarget,
+  targetAxisScope,
   type ExpansionCoverageTarget,
 } from '../expansion/planner';
 import { coerceValueForColumn, normalizeTemporalValue } from './pathFilters';
@@ -838,11 +839,7 @@ const buildAxisPathExpansionSpecs = ({
       paths: scopedPaths,
       colTypeMap: formData.colTypeMap,
     }),
-    scope: {
-      kind: 'axisPaths',
-      axis,
-      paths: scopedPaths,
-    },
+    scope: targetAxisScope(coverageTarget, scopedPaths),
   });
 };
 

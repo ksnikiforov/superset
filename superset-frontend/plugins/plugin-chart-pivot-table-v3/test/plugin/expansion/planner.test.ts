@@ -136,9 +136,9 @@ describe('pivot/expansion/planner', () => {
           columnDimensions: ['month'],
         },
         scope: {
-          kind: 'axisPaths',
+          kind: 'scopedFull',
           axis: 'row',
-          paths: [['A']],
+          ancestorPaths: [['A']],
         },
         valueKeys: ['sales', 'profit'],
       },
@@ -182,9 +182,9 @@ describe('pivot/expansion/planner', () => {
             columnDimensions: ['month'],
           },
           scope: {
-            kind: 'axisPaths',
+            kind: 'scopedFull',
             axis: 'row',
-            paths: [['A']],
+            ancestorPaths: [['A']],
           },
           valueKeys: ['sales', 'profit'],
         },
@@ -237,9 +237,9 @@ describe('pivot/expansion/planner', () => {
           columnDimensions: [],
         },
         scope: {
-          kind: 'axisPaths',
+          kind: 'scopedFull',
           axis: 'row',
-          paths: [
+          ancestorPaths: [
             ['US', 'CA'],
             ['US', 'NY'],
           ],
@@ -277,9 +277,9 @@ describe('pivot/expansion/planner', () => {
           columnDimensions: ['month'],
         },
         scope: {
-          kind: 'axisPaths',
+          kind: 'scopedFull',
           axis: 'row',
-          paths: [['A']],
+          ancestorPaths: [['A']],
         },
         valueKeys: ['sales'],
       },
@@ -398,9 +398,9 @@ describe('pivot/expansion/planner', () => {
             valueInsertIndex: 1,
           },
           scope: {
-            kind: 'axisPaths',
+            kind: 'scopedFull',
             axis: 'row',
-            paths: [['1-URGENT']],
+            ancestorPaths: [['1-URGENT']],
           },
           valueKeys: ['averageOrderValue'],
         },

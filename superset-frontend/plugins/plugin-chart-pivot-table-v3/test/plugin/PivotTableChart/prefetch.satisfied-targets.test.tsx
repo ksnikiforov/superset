@@ -160,12 +160,12 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
       expect.arrayContaining([
         expect.objectContaining({
           need: expect.objectContaining({
-            rowScope: { kind: 'paths', paths: [['A']] },
+            rowScope: { kind: 'scopedFull', ancestorPaths: [['A']] },
           }),
         }),
         expect.objectContaining({
           need: expect.objectContaining({
-            rowScope: { kind: 'paths', paths: [['A', 'X']] },
+            rowScope: { kind: 'scopedFull', ancestorPaths: [['A', 'X']] },
           }),
         }),
       ]),

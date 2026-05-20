@@ -36,7 +36,7 @@ import {
   type PivotExpansionStateKeys,
   coerceExpansionState,
 } from './stateModel';
-import { parsePath } from '../core/path';
+import { parsePath, serializePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { stableStringify } from '../shared/stableStringify';
 import { type LayoutContext } from '../layout/LayoutContext';
@@ -50,6 +50,7 @@ import { type PivotAxisCoverageNeed } from '../runtime/coverage';
 import {
   buildVisiblePersistedExpansionState,
   PIVOT_AXES,
+  planHydrationIteration,
   resolveCollapsedExpansionState,
   resolveExpansionToggleDecision,
   resolveReinitializedExpansionState,
@@ -58,19 +59,16 @@ import {
 } from './stateTransitions';
 import { useSyncRef } from '../shared/useSyncRef';
 import {
-  runHydrationExpansionFetchLoop,
-  type ExpansionFetchRuntime,
-} from './fetchExecution';
-import {
   createLatestRequestLifecycle,
-  type LatestRequestScope,
   yieldToMainThread,
 } from '../runtime/requestLifecycle';
+import { StaleChunkedWorkError } from '../runtime/chunkedWork';
 import { materializeLoadedPivotTreeFromFactStoreAsync } from '../runtime/materializePivotTree';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { getStableColumnKey } from '../../utils';
+import { pathsFromAxisScope } from '../runtime/coverage';
+import { fetchPivotExpansion } from './fetchPivotExpansion';
 
-const MAX_HYDRATION_ITERATIONS = 12;
 type AxisSetMap = Record<PivotAxis, Set<string>>;
 type ExpansionIntentSets = {
   expanded: AxisSetMap;
@@ -283,6 +281,9 @@ export const useExpansionEngine = ({
 
   const reportAsyncError = useCallback(
     (error: unknown) => {
+      if (error instanceof StaleChunkedWorkError) {
+        return;
+      }
       const message = error instanceof Error ? error.message : String(error);
       expansionRequestLifecycle.invalidate();
       setLoadingKeys(new Set());
@@ -369,31 +370,6 @@ export const useExpansionEngine = ({
     [axisCoverageNeeds, pivotProgram],
   );
 
-  const buildFetchRuntime = useCallback(
-    (requestScope: LatestRequestScope): ExpansionFetchRuntime => {
-      const factStore = factStoreRef.current as PivotFactStore;
-      const materializeLoadedTree = () =>
-        materializeLoadedPivotTreeFromFactStoreAsync({
-          store: factStore,
-          layout: fetchLayout,
-          formData: fetchFormData,
-          shouldContinue: requestScope.isCurrent,
-          yieldToMain: yieldToMainThread,
-        });
-      return {
-        requestScope,
-        instanceId: expansionInstanceId,
-        fetchFormData,
-        layout: fetchLayout,
-        factStore,
-        materializeLoadedTree,
-        addWarnings,
-        setLoadingKeys,
-      };
-    },
-    [addWarnings, expansionInstanceId, fetchFormData, fetchLayout],
-  );
-
   const collapseNode = useCallback(
     (axis: PivotAxis, node: PivotTreeNode) => {
       const expanded = expandedRef.current[axis];
@@ -433,20 +409,72 @@ export const useExpansionEngine = ({
       setLoadingKeys(new Set());
 
       try {
-        const result = await runHydrationExpansionFetchLoop({
-          baseTree: treeRef.current,
-          maxIterations: MAX_HYDRATION_ITERATIONS,
-          buildDesiredExpanded,
+        if (!requestScope.isCurrent()) {
+          return;
+        }
+        const desired = {
+          row: buildDesiredExpanded('row', treeRef.current),
+          col: buildDesiredExpanded('col', treeRef.current),
+        };
+        const factStore = factStoreRef.current as PivotFactStore;
+        const plan = planHydrationIteration({
+          tree: treeRef.current,
+          desired,
+          axisCoverageNeeds,
+          factSelectors: factStore.getCoverageSelectors(),
           program: pivotProgram,
-          fetchRuntime: buildFetchRuntime(requestScope),
         });
-        if (result.status === 'complete') {
+        let nextTree = treeRef.current;
+        if (plan.kind === 'fetch') {
+          setLoadingKeys(
+            new Set(
+              plan.targets.flatMap(target =>
+                target.need.rowScope.kind !== 'root' &&
+                target.need.columnScope.kind !== 'root'
+                  ? [
+                      ...pathsFromAxisScope(target.need.rowScope),
+                      ...pathsFromAxisScope(target.need.columnScope),
+                    ].map(serializePath)
+                  : [target.pathKey],
+              ),
+            ),
+          );
+          const requestGroupId = `${expansionInstanceId}:${requestScope.id}`;
+          requestScope.beginRequest(requestGroupId);
+          try {
+            const result = await fetchPivotExpansion({
+              targets: plan.targets,
+              layout: fetchLayout,
+              requestGroupId,
+              formData: fetchFormData,
+              factStore,
+              shouldContinue: requestScope.isCurrent,
+              yieldToMain: yieldToMainThread,
+            });
+            if (requestScope.isCurrent()) {
+              addWarnings(result.warnings);
+            }
+          } finally {
+            requestScope.finish(requestGroupId);
+          }
+          nextTree = await materializeLoadedPivotTreeFromFactStoreAsync({
+            store: factStore,
+            layout: fetchLayout,
+            formData: fetchFormData,
+            yieldToMain: yieldToMainThread,
+          });
+        }
+        if (requestScope.isCurrent()) {
+          const nextDesired = {
+            row: buildDesiredExpanded('row', nextTree),
+            col: buildDesiredExpanded('col', nextTree),
+          };
           const resolvedExpanded = resolveExpandedByAxisForMetrics(
-            result.desired,
-            result.tree,
+            nextDesired,
+            nextTree,
           );
           commitExpansionState({
-            tree: result.tree,
+            tree: nextTree,
             expanded: resolvedExpanded,
           });
           if (persistOnComplete) {
@@ -459,9 +487,13 @@ export const useExpansionEngine = ({
     },
     [
       buildDesiredExpanded,
-      buildFetchRuntime,
       commitExpansionState,
+      axisCoverageNeeds,
       expansionRequestLifecycle,
+      expansionInstanceId,
+      fetchFormData,
+      fetchLayout,
+      addWarnings,
       persistExpansionState,
       pivotProgram,
       resolveExpandedByAxisForMetrics,

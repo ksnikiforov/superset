@@ -51,6 +51,11 @@ export type PivotFactStoreBatchScope =
       paths: PivotPath[];
     }
   | {
+      kind: 'scopedFull';
+      axis: PivotAxis;
+      ancestorPaths: PivotPath[];
+    }
+  | {
       kind: 'intersection';
       rowPaths: PivotPath[];
       columnPaths: PivotPath[];

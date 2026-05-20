@@ -166,9 +166,23 @@ const scopeRestrictsAxis = (
   scope: PivotFactStoreBatchScope,
   axis: PivotAxis,
 ) =>
-  scope.kind === 'axisPaths' && scope.axis === axis
+  (scope.kind === 'axisPaths' || scope.kind === 'scopedFull') &&
+  scope.axis === axis
     ? true
     : scope.kind === 'intersection';
+
+const scopeAxisPaths = (scope: PivotFactStoreBatchScope, axis: PivotAxis) => {
+  if (
+    (scope.kind === 'axisPaths' || scope.kind === 'scopedFull') &&
+    scope.axis === axis
+  ) {
+    return scope.kind === 'axisPaths' ? scope.paths : scope.ancestorPaths;
+  }
+  if (scope.kind === 'intersection') {
+    return intersectionScopePaths(scope, axis);
+  }
+  return [];
+};
 
 const scopeCoversAxisPaths = (
   scope: PivotFactStoreBatchScope,
@@ -187,16 +201,20 @@ const scopeCoversAxisPaths = (
       path => path.length <= loadedDepth,
     );
   }
-  if (scope.kind === 'axisPaths' && scope.axis !== axis) {
+  if (
+    (scope.kind === 'axisPaths' || scope.kind === 'scopedFull') &&
+    scope.axis !== axis
+  ) {
     return true;
   }
-  const candidatePaths =
-    scope.kind === 'axisPaths'
-      ? scope.paths
-      : scope.kind === 'intersection'
-        ? intersectionScopePaths(scope, axis)
-        : [];
+  const candidatePaths = scopeAxisPaths(scope, axis);
   if (needScope.kind === 'scopedFull') {
+    if (
+      scope.kind === 'axisPaths' ||
+      (scope.kind !== 'scopedFull' && scope.kind !== 'intersection')
+    ) {
+      return false;
+    }
     return needScope.ancestorPaths.every(ancestorPath =>
       candidatePaths.some(candidatePath =>
         pathStartsWith(ancestorPath, candidatePath),
@@ -309,11 +327,16 @@ export const buildCoverageNeedFromFactSelector = ({
       columnScope: { kind: 'paths', paths: scope.columnPaths },
     };
   }
-  const scopedAxis = scope.kind === 'axisPaths' ? scope.axis : undefined;
-  const scopedPaths = scope.kind === 'axisPaths' ? scope.paths : undefined;
-  const axisScope = scopedPaths
-    ? ({ kind: 'paths', paths: scopedPaths } as const)
-    : ({ kind: 'root' } as const);
+  const scopedAxis =
+    scope.kind === 'axisPaths' || scope.kind === 'scopedFull'
+      ? scope.axis
+      : undefined;
+  const axisScope =
+    scope.kind === 'axisPaths'
+      ? ({ kind: 'paths', paths: scope.paths } as const)
+      : scope.kind === 'scopedFull'
+        ? ({ kind: 'scopedFull', ancestorPaths: scope.ancestorPaths } as const)
+        : ({ kind: 'root' } as const);
 
   return {
     rowDepth: coverage.rowDepth,
