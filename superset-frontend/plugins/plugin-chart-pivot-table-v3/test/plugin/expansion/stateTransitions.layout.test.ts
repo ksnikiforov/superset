@@ -26,13 +26,17 @@ const baseTransitionConfig = {
 
 describe('pivot/expansion/stateTransitions layout changes', () => {
   it('reports unchanged row and column layouts', () => {
-    expect(resolveLayoutTransition(baseTransitionConfig)).toMatchObject({
-      rowsChanged: false,
-      colsChanged: false,
-      shouldExpandRows: false,
-      shouldExpandCols: false,
-      rowStablePrefix: 1,
-      colStablePrefix: 0,
+    expect(resolveLayoutTransition(baseTransitionConfig)).toEqual({
+      row: {
+        changed: false,
+        shouldExpand: false,
+        stablePrefix: 1,
+      },
+      col: {
+        changed: false,
+        shouldExpand: false,
+        stablePrefix: 0,
+      },
     });
   });
 
@@ -44,11 +48,15 @@ describe('pivot/expansion/stateTransitions layout changes', () => {
         currentLayout: { rows: ['country', 'state'], cols: [] },
       }),
     ).toMatchObject({
-      rowsChanged: true,
-      colsChanged: false,
-      shouldExpandRows: true,
-      shouldExpandCols: false,
-      rowStablePrefix: 1,
+      row: {
+        changed: true,
+        shouldExpand: true,
+        stablePrefix: 1,
+      },
+      col: {
+        changed: false,
+        shouldExpand: false,
+      },
     });
   });
 
@@ -60,9 +68,11 @@ describe('pivot/expansion/stateTransitions layout changes', () => {
         currentLayout: { rows: ['country', 'state'], cols: [] },
       }),
     ).toMatchObject({
-      rowsChanged: true,
-      shouldExpandRows: false,
-      rowStablePrefix: 2,
+      row: {
+        changed: true,
+        shouldExpand: false,
+        stablePrefix: 2,
+      },
     });
   });
 
@@ -73,10 +83,14 @@ describe('pivot/expansion/stateTransitions layout changes', () => {
         currentLayout: { rows: [], cols: ['year', 'month'] },
       }),
     ).toMatchObject({
-      rowsChanged: false,
-      colsChanged: true,
-      shouldExpandCols: false,
-      colStablePrefix: 1,
+      row: {
+        changed: false,
+      },
+      col: {
+        changed: true,
+        shouldExpand: false,
+        stablePrefix: 1,
+      },
     });
   });
 });

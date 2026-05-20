@@ -153,21 +153,22 @@ export const runHydrationExpansionFetchLoop = async ({
     if (!isCurrent()) {
       return { status: 'stale' as const };
     }
-    const desiredRows = buildDesiredExpanded('row', currentTree);
-    const desiredCols = buildDesiredExpanded('col', currentTree);
+    const treeForIteration = currentTree;
+    const desired = {
+      row: buildDesiredExpanded('row', treeForIteration),
+      col: buildDesiredExpanded('col', treeForIteration),
+    };
     const hydrationPlan = planHydrationIteration({
-      tree: currentTree,
-      desiredRows,
-      desiredCols,
+      tree: treeForIteration,
+      desired,
       factSelectors: fetchRuntime.factStore.getCoverageSelectors(),
       program,
     });
     if (hydrationPlan.kind === 'complete') {
       return {
         status: 'complete' as const,
-        tree: currentTree,
-        desiredRows,
-        desiredCols,
+        tree: treeForIteration,
+        desired,
       };
     }
 

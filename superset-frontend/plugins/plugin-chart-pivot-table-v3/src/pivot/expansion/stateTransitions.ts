@@ -42,7 +42,7 @@ import type { PivotProgram } from '../runtime/types';
 import { isMetricTokenForKeys, isSubtotalToken } from '../core/tokens';
 import { createMetricNodePolicy } from '../metricsTotals';
 
-const PIVOT_AXES: PivotAxis[] = ['row', 'col'];
+export const PIVOT_AXES: PivotAxis[] = ['row', 'col'];
 
 const getAxisDimensionCount = (program: PivotProgram, axis: PivotAxis) =>
   (axis === 'row' ? program.rowDimensions : program.columnDimensions).length;
@@ -167,29 +167,15 @@ export const resolveLayoutTransition = ({
   previousLayout,
   currentLayout,
 }: ResolveLayoutTransitionInput) => {
-  const rowsChanged = !isSameLayout(previousLayout.rows, currentLayout.rows);
-  const colsChanged = !isSameLayout(previousLayout.cols, currentLayout.cols);
-  const shouldExpandRows =
-    currentLayout.rows.length > previousLayout.rows.length &&
-    isPrefix(previousLayout.rows, currentLayout.rows);
-  const shouldExpandCols =
-    currentLayout.cols.length > previousLayout.cols.length &&
-    isPrefix(previousLayout.cols, currentLayout.cols);
-  const rowStablePrefix = getStablePrefixLength(
-    previousLayout.rows,
-    currentLayout.rows,
-  );
-  const colStablePrefix = getStablePrefixLength(
-    previousLayout.cols,
-    currentLayout.cols,
-  );
+  const buildAxisTransition = (previous: string[], current: string[]) => ({
+    changed: !isSameLayout(previous, current),
+    shouldExpand:
+      current.length > previous.length && isPrefix(previous, current),
+    stablePrefix: getStablePrefixLength(previous, current),
+  });
   return {
-    rowsChanged,
-    colsChanged,
-    shouldExpandRows,
-    shouldExpandCols,
-    rowStablePrefix,
-    colStablePrefix,
+    row: buildAxisTransition(previousLayout.rows, currentLayout.rows),
+    col: buildAxisTransition(previousLayout.cols, currentLayout.cols),
   };
 };
 
@@ -458,12 +444,8 @@ export const resolveReinitializedExpansionState = (params: {
   tree: PivotTreeData;
   sessionState: PivotExpansionStateKeys;
   axisCoverageNeeds: PivotAxisCoverageNeed[];
-  rowStablePrefix: number;
-  colStablePrefix: number;
-  shouldResetExpandedRows: boolean;
-  shouldResetExpandedCols: boolean;
-  rowsChanged: boolean;
-  colsChanged: boolean;
+  layoutTransition: ReturnType<typeof resolveLayoutTransition>;
+  resetExpanded: Record<PivotAxis, boolean>;
   hasNewData: boolean;
   program: PivotProgram;
 }) => {
@@ -478,17 +460,17 @@ export const resolveReinitializedExpansionState = (params: {
       keys: sessionState.rows ?? [],
       collapsed: sessionState.collapsedRows ?? [],
       nodes: tree.rows,
-      stablePrefix: params.rowStablePrefix,
-      reset: params.shouldResetExpandedRows,
-      changed: params.rowsChanged,
+      stablePrefix: params.layoutTransition.row.stablePrefix,
+      reset: params.resetExpanded.row,
+      changed: params.layoutTransition.row.changed,
     },
     col: {
       keys: sessionState.cols ?? [],
       collapsed: sessionState.collapsedCols ?? [],
       nodes: tree.cols,
-      stablePrefix: params.colStablePrefix,
-      reset: params.shouldResetExpandedCols,
-      changed: params.colsChanged,
+      stablePrefix: params.layoutTransition.col.stablePrefix,
+      reset: params.resetExpanded.col,
+      changed: params.layoutTransition.col.changed,
     },
   };
   const axisState = Object.fromEntries(
@@ -521,43 +503,41 @@ export const resolveReinitializedExpansionState = (params: {
 
 export const planHydrationIteration = ({
   tree,
-  desiredRows,
-  desiredCols,
+  desired,
   factSelectors,
   program,
 }: {
   tree: PivotTreeData;
-  desiredRows: Set<string>;
-  desiredCols: Set<string>;
+  desired: Record<PivotAxis, Set<string>>;
   factSelectors: PivotFactSelector[];
   program: PivotProgram;
 }) => {
   const rowVisibility = collectAxisVisibility({
     axis: 'row',
     nodes: tree.rows,
-    expanded: desiredRows,
+    expanded: desired.row,
     program,
   });
   const colVisibility = collectAxisVisibility({
     axis: 'col',
     nodes: tree.cols,
-    expanded: desiredCols,
+    expanded: desired.col,
     program,
   });
   const visibleRowDepth = rowVisibility.visibleDepth;
   const visibleColDepth = colVisibility.visibleDepth;
-  const rowPathKeys = Array.from(desiredRows).filter(
+  const rowPathKeys = Array.from(desired.row).filter(
     key => key !== rootKey && tree.rows[key],
   );
-  const columnPathKeys = Array.from(desiredCols).filter(
+  const columnPathKeys = Array.from(desired.col).filter(
     key => key !== rootKey && tree.cols[key],
   );
-  const hasNonRootRows = Array.from(desiredRows).some(key => key !== rootKey);
-  const hasNonRootCols = Array.from(desiredCols).some(key => key !== rootKey);
+  const hasNonRootRows = Array.from(desired.row).some(key => key !== rootKey);
+  const hasNonRootCols = Array.from(desired.col).some(key => key !== rootKey);
   const rowExpansionKeys =
-    hasNonRootCols && !hasNonRootRows ? new Set<string>() : desiredRows;
+    hasNonRootCols && !hasNonRootRows ? new Set<string>() : desired.row;
   const colExpansionKeys =
-    hasNonRootRows && !hasNonRootCols ? new Set<string>() : desiredCols;
+    hasNonRootRows && !hasNonRootCols ? new Set<string>() : desired.col;
   const rowPlan = planExpansionForAxis({
     axis: 'row',
     program,
@@ -617,15 +597,13 @@ export const planHydrationIteration = ({
   ) {
     return {
       kind: 'complete',
-      desiredRows,
-      desiredCols,
+      desired,
     };
   }
 
   return {
     kind: 'fetch',
-    desiredRows,
-    desiredCols,
+    desired,
     targets: [
       ...rowPlanForTransport.targets,
       ...colPlanForTransport.targets,

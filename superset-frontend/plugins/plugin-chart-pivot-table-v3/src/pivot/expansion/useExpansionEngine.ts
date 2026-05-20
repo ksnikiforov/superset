@@ -49,6 +49,7 @@ import {
 import { type PivotAxisCoverageNeed } from '../runtime/coverage';
 import {
   buildVisiblePersistedExpansionState,
+  PIVOT_AXES,
   resolveCollapsedExpansionState,
   resolveExpansionToggleDecision,
   resolveReinitializedExpansionState,
@@ -70,6 +71,10 @@ import { getStableColumnKey } from '../../utils';
 
 const MAX_HYDRATION_ITERATIONS = 12;
 type AxisSetMap = Record<PivotAxis, Set<string>>;
+type ExpansionIntentSets = {
+  expanded: AxisSetMap;
+  collapsed: AxisSetMap;
+};
 type ExpansionStateCommit = {
   tree?: PivotTreeData;
   expanded?: Partial<AxisSetMap>;
@@ -80,6 +85,28 @@ const createEmptyExpansionState = (): PivotExpansionStateKeys => ({
   cols: [],
   collapsedRows: [],
   collapsedCols: [],
+});
+
+const expansionStateKeysToIntent = (
+  state: PivotExpansionStateKeys,
+): ExpansionIntentSets => ({
+  expanded: {
+    row: new Set(state.rows),
+    col: new Set(state.cols),
+  },
+  collapsed: {
+    row: new Set(state.collapsedRows),
+    col: new Set(state.collapsedCols),
+  },
+});
+
+const expansionIntentToStateKeys = (
+  intent: ExpansionIntentSets,
+): PivotExpansionStateKeys => ({
+  rows: Array.from(intent.expanded.row),
+  cols: Array.from(intent.expanded.col),
+  collapsedRows: Array.from(intent.collapsed.row),
+  collapsedCols: Array.from(intent.collapsed.col),
 });
 
 type ExpansionPersistenceDeps = {
@@ -176,14 +203,9 @@ export const useExpansionEngine = ({
   const initialExpansionState =
     coerceExpansionState(persistedExpansionState) ??
     createEmptyExpansionState();
-  const explicitExpandedRef = useRef<AxisSetMap>({
-    row: new Set(initialExpansionState.rows),
-    col: new Set(initialExpansionState.cols),
-  });
-  const explicitCollapsedRef = useRef<AxisSetMap>({
-    row: new Set(initialExpansionState.collapsedRows),
-    col: new Set(initialExpansionState.collapsedCols),
-  });
+  const expansionIntentRef = useRef<ExpansionIntentSets>(
+    expansionStateKeysToIntent(initialExpansionState),
+  );
   const [errorMessage, setErrorMessage] = useState<string>();
   const [warnings, setWarnings] = useState<ChartDataWarning[]>([]);
   const expansionSemanticSignatureRef = useRef<string | null>(null);
@@ -243,7 +265,7 @@ export const useExpansionEngine = ({
       if (nextTree) {
         treeRef.current = nextTree;
       }
-      (['row', 'col'] as const).forEach(axis => {
+      PIVOT_AXES.forEach(axis => {
         const expanded = nextExpanded?.[axis];
         if (expanded) {
           expandedRef.current[axis] = expanded;
@@ -294,16 +316,18 @@ export const useExpansionEngine = ({
   }, []);
 
   const persistExpansionState = useCallback(
-    (nextRows: Set<string>, nextCols: Set<string>) => {
+    (nextExpanded: AxisSetMap) => {
       const visible = buildVisiblePersistedExpansionState({
         tree: treeRef.current,
-        expanded: { row: nextRows, col: nextCols },
-        explicitExpanded: explicitExpandedRef.current,
-        explicitCollapsed: explicitCollapsedRef.current,
+        expanded: nextExpanded,
+        explicitExpanded: expansionIntentRef.current.expanded,
+        explicitCollapsed: expansionIntentRef.current.collapsed,
         program: pivotProgram,
       });
-      explicitExpandedRef.current = visible.visibleExpanded;
-      explicitCollapsedRef.current = visible.visibleCollapsed;
+      expansionIntentRef.current = {
+        expanded: visible.visibleExpanded,
+        collapsed: visible.visibleCollapsed,
+      };
       persistExpansionStateKeys(
         visible.persistedState,
         expansionPersistenceDepsRef.current,
@@ -318,12 +342,23 @@ export const useExpansionEngine = ({
         axis,
         expanded: nextExpanded,
         tree: nextTree,
-        collapsed: explicitCollapsedRef.current[axis],
+        collapsed: expansionIntentRef.current.collapsed[axis],
         program: pivotProgram,
         isLeafTierVisible:
           fetchLayout.measureHierarchy.leafTierVisibility === 'visible',
       }),
     [fetchLayout.measureHierarchy.leafTierVisibility, pivotProgram],
+  );
+
+  const resolveExpandedByAxisForMetrics = useCallback(
+    (expanded: AxisSetMap, nextTree: PivotTreeData): AxisSetMap =>
+      Object.fromEntries(
+        PIVOT_AXES.map(axis => [
+          axis,
+          resolveExpandedForMetrics(axis, expanded[axis], nextTree),
+        ]),
+      ) as AxisSetMap,
+    [resolveExpandedForMetrics],
   );
 
   const buildDesiredExpanded = useCallback(
@@ -333,8 +368,8 @@ export const useExpansionEngine = ({
         tree: nextTree,
         axisCoverageNeeds,
         program: pivotProgram,
-        manualExpanded: explicitExpandedRef.current[axis],
-        manualCollapsed: explicitCollapsedRef.current[axis],
+        manualExpanded: expansionIntentRef.current.expanded[axis],
+        manualCollapsed: expansionIntentRef.current.collapsed[axis],
       }),
     [axisCoverageNeeds, pivotProgram],
   );
@@ -369,12 +404,14 @@ export const useExpansionEngine = ({
       const collapsedState = resolveCollapsedExpansionState({
         node,
         expanded,
-        manualExpanded: explicitExpandedRef.current[axis],
-        manualCollapsed: explicitCollapsedRef.current[axis],
+        manualExpanded: expansionIntentRef.current.expanded[axis],
+        manualCollapsed: expansionIntentRef.current.collapsed[axis],
         nodes,
       });
-      explicitExpandedRef.current[axis] = collapsedState.nextManualExpanded;
-      explicitCollapsedRef.current[axis] = collapsedState.nextManualCollapsed;
+      expansionIntentRef.current.expanded[axis] =
+        collapsedState.nextManualExpanded;
+      expansionIntentRef.current.collapsed[axis] =
+        collapsedState.nextManualCollapsed;
 
       const resolvedExpanded = resolveExpandedForMetrics(
         axis,
@@ -384,10 +421,10 @@ export const useExpansionEngine = ({
       commitExpansionState({
         expanded: { [axis]: resolvedExpanded },
       });
-      persistExpansionState(
-        axis === 'row' ? resolvedExpanded : expandedRef.current.row,
-        axis === 'col' ? resolvedExpanded : expandedRef.current.col,
-      );
+      persistExpansionState({
+        ...expandedRef.current,
+        [axis]: resolvedExpanded,
+      });
     },
     [commitExpansionState, persistExpansionState, resolveExpandedForMetrics],
   );
@@ -407,22 +444,16 @@ export const useExpansionEngine = ({
           fetchRuntime: buildFetchRuntime(requestScope),
         });
         if (result.status === 'complete') {
-          const resolvedRows = resolveExpandedForMetrics(
-            'row',
-            result.desiredRows,
-            result.tree,
-          );
-          const resolvedCols = resolveExpandedForMetrics(
-            'col',
-            result.desiredCols,
+          const resolvedExpanded = resolveExpandedByAxisForMetrics(
+            result.desired,
             result.tree,
           );
           commitExpansionState({
             tree: result.tree,
-            expanded: { row: resolvedRows, col: resolvedCols },
+            expanded: resolvedExpanded,
           });
           if (persistOnComplete) {
-            persistExpansionState(resolvedRows, resolvedCols);
+            persistExpansionState(resolvedExpanded);
           }
         }
       } finally {
@@ -437,7 +468,7 @@ export const useExpansionEngine = ({
       expansionRequestLifecycle,
       persistExpansionState,
       pivotProgram,
-      resolveExpandedForMetrics,
+      resolveExpandedByAxisForMetrics,
     ],
   );
 
@@ -447,8 +478,8 @@ export const useExpansionEngine = ({
       const toggleDecision = resolveExpansionToggleDecision({
         node,
         expanded,
-        manualExpanded: explicitExpandedRef.current[axis],
-        manualCollapsed: explicitCollapsedRef.current[axis],
+        manualExpanded: expansionIntentRef.current.expanded[axis],
+        manualCollapsed: expansionIntentRef.current.collapsed[axis],
       });
       if (toggleDecision.kind === 'collapse') {
         expansionRequestLifecycle.invalidate();
@@ -458,8 +489,10 @@ export const useExpansionEngine = ({
       }
 
       if (toggleDecision.kind === 'expand') {
-        explicitExpandedRef.current[axis] = toggleDecision.nextManualExpanded;
-        explicitCollapsedRef.current[axis] = toggleDecision.nextManualCollapsed;
+        expansionIntentRef.current.expanded[axis] =
+          toggleDecision.nextManualExpanded;
+        expansionIntentRef.current.collapsed[axis] =
+          toggleDecision.nextManualCollapsed;
         hydrateAtomic(true).catch(reportAsyncError);
       }
     },
@@ -476,49 +509,40 @@ export const useExpansionEngine = ({
     const previousSemanticSignature = expansionSemanticSignatureRef.current;
     expansionSemanticSignatureRef.current = expansionSemanticSignature;
     const hasNewData = previousDataRef.current !== data;
-    const sessionExpansionState: PivotExpansionStateKeys = {
-      rows: Array.from(explicitExpandedRef.current.row),
-      cols: Array.from(explicitExpandedRef.current.col),
-      collapsedRows: Array.from(explicitCollapsedRef.current.row),
-      collapsedCols: Array.from(explicitCollapsedRef.current.col),
-    };
+    const sessionExpansionState = expansionIntentToStateKeys(
+      expansionIntentRef.current,
+    );
     const currentLayout = {
       rows: groupbyRowKeys,
       cols: groupbyColumnKeys,
     };
     const previousLayout = previousLayoutRef.current;
     const normalizedTree = hasNewData ? data : treeRef.current;
-    const {
-      rowsChanged,
-      colsChanged,
-      shouldExpandRows,
-      shouldExpandCols,
-      rowStablePrefix,
-      colStablePrefix,
-    } = resolveLayoutTransition({
+    const layoutTransition = resolveLayoutTransition({
       previousLayout,
       currentLayout,
     });
+    const layoutChanged = PIVOT_AXES.some(
+      axis => layoutTransition[axis].changed,
+    );
     const isInitialMount = previousSemanticSignature === null;
     const semanticSignatureChanged =
       previousSemanticSignature !== expansionSemanticSignature;
     const shouldReinitialize =
-      isInitialMount ||
-      semanticSignatureChanged ||
-      rowsChanged ||
-      colsChanged ||
-      hasNewData;
+      isInitialMount || semanticSignatureChanged || layoutChanged || hasNewData;
     if (!shouldReinitialize) {
       return;
     }
     previousLayoutRef.current = currentLayout;
     previousDataRef.current = data;
-    const shouldResetExpandedRows =
-      semanticSignatureChanged || (rowsChanged && !shouldExpandRows);
-    const shouldResetExpandedCols =
-      semanticSignatureChanged || (colsChanged && !shouldExpandCols);
-    const shouldResetExpanded =
-      shouldResetExpandedRows || shouldResetExpandedCols;
+    const shouldResetAxis = (axis: PivotAxis) =>
+      semanticSignatureChanged ||
+      (layoutTransition[axis].changed && !layoutTransition[axis].shouldExpand);
+    const resetExpanded = {
+      row: shouldResetAxis('row'),
+      col: shouldResetAxis('col'),
+    };
+    const shouldResetExpanded = PIVOT_AXES.some(axis => resetExpanded[axis]);
 
     expansionRequestLifecycle.invalidate();
     factStoreRef.current = createPivotFactStoreFromBatches(factBatches);
@@ -529,24 +553,13 @@ export const useExpansionEngine = ({
       tree: normalizedTree,
       sessionState: sessionExpansionState,
       axisCoverageNeeds,
-      rowStablePrefix,
-      colStablePrefix,
-      shouldResetExpandedRows,
-      shouldResetExpandedCols,
-      rowsChanged,
-      colsChanged,
+      layoutTransition,
+      resetExpanded,
       hasNewData,
       program: pivotProgram,
     });
     const { persistedState } = reinitializedExpansion;
-    explicitExpandedRef.current = {
-      row: new Set(persistedState.rows),
-      col: new Set(persistedState.cols),
-    };
-    explicitCollapsedRef.current = {
-      row: new Set(persistedState.collapsedRows),
-      col: new Set(persistedState.collapsedCols),
-    };
+    expansionIntentRef.current = expansionStateKeysToIntent(persistedState);
     if (!isInitialMount && shouldResetExpanded) {
       persistExpansionStateKeys(
         persistedState,
@@ -554,27 +567,21 @@ export const useExpansionEngine = ({
       );
     }
 
-    const resolvedRows = resolveExpandedForMetrics(
-      'row',
-      reinitializedExpansion.expanded.row,
-      normalizedTree,
-    );
-    const resolvedCols = resolveExpandedForMetrics(
-      'col',
-      reinitializedExpansion.expanded.col,
+    const resolvedExpanded = resolveExpandedByAxisForMetrics(
+      reinitializedExpansion.expanded,
       normalizedTree,
     );
 
     commitExpansionState({
       tree: normalizedTree,
-      expanded: { row: resolvedRows, col: resolvedCols },
+      expanded: resolvedExpanded,
     });
 
     const layoutChangedOnlyByHiddenAppend =
       !hasNewData &&
-      (rowsChanged || colsChanged) &&
-      (!rowsChanged || shouldExpandRows) &&
-      (!colsChanged || shouldExpandCols);
+      layoutChanged &&
+      (!layoutTransition.row.changed || layoutTransition.row.shouldExpand) &&
+      (!layoutTransition.col.changed || layoutTransition.col.shouldExpand);
     const shouldHydrateExpansionIntent =
       !layoutChangedOnlyByHiddenAppend &&
       (axisCoverageNeeds.length > 0 ||
@@ -598,7 +605,7 @@ export const useExpansionEngine = ({
     shouldPersistExpansionState,
     hydrateAtomic,
     expansionRequestLifecycle,
-    resolveExpandedForMetrics,
+    resolveExpandedByAxisForMetrics,
     reportAsyncError,
   ]);
 

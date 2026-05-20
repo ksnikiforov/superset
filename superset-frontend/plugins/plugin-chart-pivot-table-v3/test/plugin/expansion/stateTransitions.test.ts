@@ -327,8 +327,10 @@ describe('pivot/expansion/stateTransitions', () => {
     };
     const plan = planHydrationIteration({
       tree,
-      desiredRows: new Set([rootKey, aKey]),
-      desiredCols: new Set([rootKey, xKey]),
+      desired: {
+        row: new Set([rootKey, aKey]),
+        col: new Set([rootKey, xKey]),
+      },
       factSelectors: [loadedRootCoverage],
       program: testProgram,
     });
@@ -358,8 +360,10 @@ describe('pivot/expansion/stateTransitions', () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
     const plan = planHydrationIteration({
       tree,
-      desiredRows: new Set([rootKey, aKey]),
-      desiredCols: new Set([rootKey, xKey]),
+      desired: {
+        row: new Set([rootKey, aKey]),
+        col: new Set([rootKey, xKey]),
+      },
       factSelectors: [
         {
           coverage: {
@@ -405,8 +409,10 @@ describe('pivot/expansion/stateTransitions', () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: false });
     const plan = planHydrationIteration({
       tree,
-      desiredRows: new Set([rootKey, aKey]),
-      desiredCols: new Set([rootKey, xKey]),
+      desired: {
+        row: new Set([rootKey, aKey]),
+        col: new Set([rootKey, xKey]),
+      },
       factSelectors: [],
       program: testProgram,
     });
@@ -436,8 +442,10 @@ describe('pivot/expansion/stateTransitions', () => {
     };
     const plan = planHydrationIteration({
       tree,
-      desiredRows: new Set([rootKey]),
-      desiredCols: new Set([rootKey, xKey]),
+      desired: {
+        row: new Set([rootKey]),
+        col: new Set([rootKey, xKey]),
+      },
       factSelectors: [loadedBootstrapCoverage],
       program: testProgram,
     });
@@ -487,8 +495,10 @@ describe('pivot/expansion/stateTransitions', () => {
     };
     const plan = planHydrationIteration({
       tree,
-      desiredRows: new Set([rootKey]),
-      desiredCols: new Set([rootKey, xKey]),
+      desired: {
+        row: new Set([rootKey]),
+        col: new Set([rootKey, xKey]),
+      },
       factSelectors: [loadedBootstrapCoverage, loadedColumnBranch],
       program: testProgram,
     });
@@ -502,8 +512,10 @@ describe('pivot/expansion/stateTransitions', () => {
 
     const plan = planHydrationIteration({
       tree,
-      desiredRows: new Set([rootKey, aKey]),
-      desiredCols: new Set([rootKey, xKey]),
+      desired: {
+        row: new Set([rootKey, aKey]),
+        col: new Set([rootKey, xKey]),
+      },
       factSelectors: [],
       program: testProgram,
     });
@@ -552,8 +564,10 @@ describe('pivot/expansion/stateTransitions', () => {
 
     const plan = planHydrationIteration({
       tree,
-      desiredRows: new Set([rootKey, aKey]),
-      desiredCols: new Set([rootKey, xKey]),
+      desired: {
+        row: new Set([rootKey, aKey]),
+        col: new Set([rootKey, xKey]),
+      },
       factSelectors: [],
       program: metricProgram,
     });
@@ -600,8 +614,10 @@ describe('pivot/expansion/stateTransitions', () => {
 
     const plan = planHydrationIteration({
       tree,
-      desiredRows: new Set([rootKey, aKey]),
-      desiredCols: new Set([rootKey, xKey]),
+      desired: {
+        row: new Set([rootKey, aKey]),
+        col: new Set([rootKey, xKey]),
+      },
       factSelectors: [],
       program: metricProgram,
     });

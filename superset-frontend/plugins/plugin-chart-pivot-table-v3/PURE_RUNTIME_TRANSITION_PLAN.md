@@ -95,17 +95,17 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27130` | `-6380` | `< 28000` |
-| Strict core pipeline | `11337` | `10901` | `-436` | `8000` |
+| Full production `src` | `33510` | `27116` | `-6394` | `< 28000` |
+| Strict core pipeline | `11337` | `10887` | `-450` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4024` | `-659` | `3000-4000` |
-| Broad core pipeline | `16020` | `14927` | `-1093` | `11000-13000` |
+| Broad core pipeline | `16020` | `14913` | `-1107` | `11000-13000` |
 
 Strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3565` |
-| `pivot/expansion/*` | `2135` |
+| `pivot/expansion/*` | `2121` |
 | `pivot/query/*` | `1367` |
 | `pivot/layout/*` | `739` |
 | `pivot/core/*` | `159` |
@@ -146,6 +146,8 @@ Completed structural cuts:
 - The render model hook no longer exposes a second `renderTree`; chart code now
   passes the materialized expansion tree directly into formatting, filters, and
   view rendering.
+- Expansion reinitialization and hydration planning now use axis-keyed
+  transition state instead of parallel row/column transition fields.
 
 Remaining duplicate authority:
 
@@ -182,8 +184,8 @@ deletion-conscious.
 
 ## Next Commits
 
-1. Move Priority 2 in one larger pass: convert expansion loading/pending/manual
-   state to an axis-neutral transition shape and delete hook-local duplication.
+1. Continue Priority 2 only where it deletes code: reduce the remaining
+   expansion hook scheduler state or fold it into manifest execution.
 2. Attack Priority 3 only with tests first: isolate subtotal and measure-axis
    materialization behavior, then delete post-processing wrappers.
 3. Resume Priority 4 after materializer behavior is stable: render should stop

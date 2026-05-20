@@ -280,7 +280,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
     });
 
     const colKey = serializePath(['1-5']);
-    const colNode = result.current.renderTree.cols[colKey];
+    const colNode = tree.cols[colKey];
     expect(colNode).toBeDefined();
     expect(result.current.shouldShowToggle('col', colNode)).toBe(false);
   });
