@@ -18,7 +18,6 @@
  */
 import {
   createLatestRequestLifecycle,
-  executeLatestRequest,
   isAbortError,
 } from '../../../../src/pivot/runtime/requestLifecycle';
 
@@ -72,93 +71,38 @@ describe('requestLifecycle', () => {
     expect(cancel).not.toHaveBeenCalled();
   });
 
-  it('commits only the latest successful request', async () => {
+  it('marks previous scopes stale when a newer scope starts', () => {
     const lifecycle = createLatestRequestLifecycle();
-    const onSuccess = jest.fn();
-    const onSettled = jest.fn();
-    let resolveFirst: ((value: string) => void) | undefined;
-    const firstPromise = new Promise<string>(resolve => {
-      resolveFirst = resolve;
-    });
 
-    const first = executeLatestRequest({
-      lifecycle,
-      requestGroupId: 'pivot-v3-seamless',
-      run: () => firstPromise,
-      onSuccess,
-      onSettled,
-    });
-    const second = executeLatestRequest({
-      lifecycle,
-      requestGroupId: 'pivot-v3-seamless',
-      run: async () => 'second',
-      onSuccess,
-      onSettled,
-    });
+    const firstScope = lifecycle.beginScope();
+    const first = firstScope.beginRequest('pivot-v3-seamless');
+    const secondScope = lifecycle.beginScope();
+    const second = secondScope.beginRequest('pivot-v3-seamless');
 
-    await expect(second).resolves.toMatchObject({ status: 'success' });
-    resolveFirst?.('first');
-    await expect(first).resolves.toMatchObject({ status: 'stale' });
-
-    expect(onSuccess).toHaveBeenCalledTimes(1);
-    expect(onSuccess).toHaveBeenCalledWith(
-      'second',
-      expect.objectContaining({ id: 2 }),
-    );
-    expect(onSettled).toHaveBeenCalledTimes(1);
-    expect(onSettled).toHaveBeenCalledWith(expect.objectContaining({ id: 2 }));
+    expect(first.isCurrent()).toBe(false);
+    expect(firstScope.isCurrent()).toBe(false);
+    expect(second.isCurrent()).toBe(true);
+    expect(secondScope.isCurrent()).toBe(true);
   });
 
-  it('does not let stale completion unregister a newer reused request group', async () => {
+  it('does not let stale completion unregister a newer reused request group', () => {
     const cancel = jest.fn();
     const lifecycle = createLatestRequestLifecycle({ cancel });
-    let resolveFirst: ((value: string) => void) | undefined;
-    const firstPromise = new Promise<string>(resolve => {
-      resolveFirst = resolve;
-    });
+    const firstScope = lifecycle.beginScope();
+    const first = firstScope.beginRequest('pivot-v3-seamless');
+    const secondScope = lifecycle.beginScope();
+    secondScope.beginRequest('pivot-v3-seamless');
 
-    const first = executeLatestRequest({
-      lifecycle,
-      requestGroupId: 'pivot-v3-seamless',
-      run: () => firstPromise,
-    });
-    const second = executeLatestRequest({
-      lifecycle,
-      requestGroupId: 'pivot-v3-seamless',
-      run: () => new Promise(() => undefined),
-    });
-
-    resolveFirst?.('first');
-    await expect(first).resolves.toMatchObject({ status: 'stale' });
-
+    firstScope.finish(first);
     lifecycle.invalidate();
 
     expect(cancel).toHaveBeenCalledTimes(2);
     expect(cancel).toHaveBeenNthCalledWith(1, 'pivot-v3-seamless');
     expect(cancel).toHaveBeenNthCalledWith(2, 'pivot-v3-seamless');
-    expect(second).toBeInstanceOf(Promise);
   });
 
-  it('treats current aborts as settled requests without calling error handlers', async () => {
-    const lifecycle = createLatestRequestLifecycle();
-    const onError = jest.fn();
-    const onSettled = jest.fn();
-    const abortError = { name: 'AbortError' };
-
-    await expect(
-      executeLatestRequest({
-        lifecycle,
-        requestGroupId: 'pivot-v3-seamless',
-        run: async () => {
-          throw abortError;
-        },
-        onError,
-        onSettled,
-      }),
-    ).resolves.toMatchObject({ error: abortError, status: 'aborted' });
-
-    expect(isAbortError(abortError)).toBe(true);
-    expect(onError).not.toHaveBeenCalled();
-    expect(onSettled).toHaveBeenCalledTimes(1);
+  it('detects abort errors', () => {
+    expect(isAbortError({ name: 'AbortError' })).toBe(true);
+    expect(isAbortError(new Error('network failed'))).toBe(false);
   });
 });

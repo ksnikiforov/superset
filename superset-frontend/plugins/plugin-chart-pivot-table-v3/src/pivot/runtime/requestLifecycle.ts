@@ -130,71 +130,9 @@ export const createLatestRequestLifecycle = ({
   };
 };
 
-export type ExecuteLatestRequestResult<T> =
-  | {
-      status: 'success';
-      token: LatestRequestToken;
-      value: T;
-    }
-  | {
-      status: 'stale';
-      token: LatestRequestToken;
-    }
-  | {
-      error: unknown;
-      status: 'aborted' | 'error';
-      token: LatestRequestToken;
-    };
-
-export type ExecuteLatestRequestParams<T> = {
-  lifecycle: LatestRequestLifecycle;
-  requestGroupId: string;
-  run: (token: LatestRequestToken) => Promise<T>;
-  onStart?: (token: LatestRequestToken) => void;
-  onSuccess?: (value: T, token: LatestRequestToken) => void;
-  onError?: (error: unknown, token: LatestRequestToken) => void;
-  onSettled?: (token: LatestRequestToken) => void;
-};
-
 export type MainThreadYield = () => Promise<void>;
 
 export const yieldToMainThread = (): Promise<void> =>
   new Promise(resolve => {
     setTimeout(resolve, 0);
   });
-
-export const executeLatestRequest = async <T>({
-  lifecycle,
-  requestGroupId,
-  run,
-  onStart,
-  onSuccess,
-  onError,
-  onSettled,
-}: ExecuteLatestRequestParams<T>): Promise<ExecuteLatestRequestResult<T>> => {
-  const token = lifecycle.beginScope().beginRequest(requestGroupId);
-  onStart?.(token);
-
-  try {
-    const value = await run(token);
-    if (!token.isCurrent()) {
-      return { status: 'stale', token };
-    }
-    onSuccess?.(value, token);
-    return { status: 'success', token, value };
-  } catch (error) {
-    if (!token.isCurrent()) {
-      return { status: 'stale', token };
-    }
-    if (isAbortError(error)) {
-      return { error, status: 'aborted', token };
-    }
-    onError?.(error, token);
-    return { error, status: 'error', token };
-  } finally {
-    lifecycle.finish(token);
-    if (token.isCurrent()) {
-      onSettled?.(token);
-    }
-  }
-};

@@ -95,16 +95,16 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27250` | `-6260` | `< 28000` |
-| Strict core pipeline | `11337` | `11023` | `-314` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `4024` | `-659` | `3000-4000` |
-| Broad core pipeline | `16020` | `15047` | `-973` | `11000-13000` |
+| Full production `src` | `33510` | `27166` | `-6344` | `< 28000` |
+| Strict core pipeline | `11337` | `10945` | `-392` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `4018` | `-665` | `3000-4000` |
+| Broad core pipeline | `16020` | `14963` | `-1057` | `11000-13000` |
 
 Strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3571` |
+| `pivot/runtime/*` | `3493` |
 | `pivot/expansion/*` | `2221` |
 | `pivot/query/*` | `1395` |
 | `pivot/layout/*` | `739` |
@@ -148,6 +148,9 @@ Completed structural cuts:
   hook updates loading state directly where request lifecycle changes occur.
 - Expansion fetch runtime now captures the form-data snapshot at request start
   and uses its request scope directly for liveness checks.
+- Seamless runtime updates now use one latest-request scope across fetch and
+  materialization; the duplicate materialization lifecycle and generic request
+  wrapper were removed.
 - Collapsed dimension state no longer suppresses visible metric-tier expansion
   keys, so metric rows can reopen under a collapsed parent without expanding the
   dimension children.

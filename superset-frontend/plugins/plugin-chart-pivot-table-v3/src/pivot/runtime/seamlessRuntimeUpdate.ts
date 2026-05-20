@@ -37,13 +37,12 @@ import {
 } from './ingestQueryResults';
 import { materializeLoadedPivotTreeFromFactStoreAsync } from './materializePivotTree';
 import {
-  executeLatestRequest,
+  isAbortError,
   type LatestRequestLifecycle,
   yieldToMainThread,
 } from './requestLifecycle';
 
 const SEAMLESS_REQUEST_GROUP = 'pivot-v3-seamless';
-const SEAMLESS_MATERIALIZATION_GROUP = 'pivot-v3-seamless-materialize';
 
 type RuntimeSelection = Record<string, DataRecordValue[]>;
 
@@ -361,12 +360,10 @@ type SeamlessRuntimeUpdateConfig = {
   runtimeLayout: PivotRuntimeLayout;
   selection: RuntimeSelection;
   requestLifecycle: LatestRequestLifecycle;
-  materializationLifecycle: LatestRequestLifecycle;
 };
 
 export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
   requestLifecycle,
-  materializationLifecycle,
   baseFormData,
   sourceMetrics,
   sourceMeasureLeavesByMetric,
@@ -383,66 +380,53 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
     measureLeavesByMetricOverride: sourceMeasureLeavesByMetric,
   });
   const factStore = createPivotFactStore();
-  const fetchResult = await executeLatestRequest({
-    lifecycle: requestLifecycle,
-    requestGroupId: SEAMLESS_REQUEST_GROUP,
-    onStart: () => {
-      materializationLifecycle.invalidate();
-    },
-    run: token =>
-      fetchPlannedQuerySpecs({
-        formData,
-        specs,
-        requestGroupId: SEAMLESS_REQUEST_GROUP,
-        factStore,
-        shouldContinue: token.isCurrent,
-        yieldToMain: yieldToMainThread,
-      }),
-  });
-  if (fetchResult.status === 'stale') {
-    return { status: 'stale' };
-  }
-  if (fetchResult.status !== 'success') {
-    return { status: fetchResult.status, error: fetchResult.error };
-  }
+  const requestScope = requestLifecycle.beginScope();
+  const token = requestScope.beginRequest(SEAMLESS_REQUEST_GROUP);
 
-  const { results } = fetchResult.value;
-  const materializationResult = await executeLatestRequest({
-    lifecycle: materializationLifecycle,
-    requestGroupId: SEAMLESS_MATERIALIZATION_GROUP,
-    run: async token => {
-      await yieldToMainThread();
-      if (!token.isCurrent()) {
-        throw new Error('Latest materialization request is stale');
-      }
-      const tree = await materializeLoadedPivotTreeFromFactStoreAsync({
-        store: factStore,
-        layout,
-        formData,
-        shouldContinue: token.isCurrent,
-        yieldToMain: yieldToMainThread,
-      });
-      await yieldToMainThread();
-      if (!token.isCurrent()) {
-        throw new Error('Latest materialization request is stale');
-      }
-      return tree;
-    },
-  });
-  if (materializationResult.status === 'stale') {
-    return { status: 'stale' };
-  }
-  if (materializationResult.status !== 'success') {
+  try {
+    const { results } = await fetchPlannedQuerySpecs({
+      formData,
+      specs,
+      requestGroupId: SEAMLESS_REQUEST_GROUP,
+      factStore,
+      shouldContinue: requestScope.isCurrent,
+      yieldToMain: yieldToMainThread,
+    });
+    requestScope.finish(token);
+    if (!requestScope.isCurrent()) {
+      return { status: 'stale' as const };
+    }
+
+    await yieldToMainThread();
+    if (!requestScope.isCurrent()) {
+      return { status: 'stale' as const };
+    }
+    const tree = await materializeLoadedPivotTreeFromFactStoreAsync({
+      store: factStore,
+      layout,
+      formData,
+      shouldContinue: requestScope.isCurrent,
+      yieldToMain: yieldToMainThread,
+    });
+    await yieldToMainThread();
+    if (!requestScope.isCurrent()) {
+      return { status: 'stale' as const };
+    }
+
     return {
-      status: materializationResult.status,
-      error: materializationResult.error,
+      status: 'success' as const,
+      tree,
+      factBatches: factStore.getFactBatches(),
+      warnings: collectPlannedQueryWarnings(results),
     };
+  } catch (error) {
+    if (!requestScope.isCurrent()) {
+      return { status: 'stale' as const };
+    }
+    return isAbortError(error)
+      ? { status: 'aborted' as const, error }
+      : { status: 'error' as const, error };
+  } finally {
+    requestScope.finish(token);
   }
-
-  return {
-    status: 'success',
-    tree: materializationResult.value,
-    factBatches: factStore.getFactBatches(),
-    warnings: collectPlannedQueryWarnings(results),
-  };
 };

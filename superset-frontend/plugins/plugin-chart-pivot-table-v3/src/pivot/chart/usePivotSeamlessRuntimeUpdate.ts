@@ -143,17 +143,13 @@ export const usePivotSeamlessRuntimeUpdate = (
       }),
     [],
   );
-  const materializationLifecycle = useMemo(
-    () => createLatestRequestLifecycle(),
-    [],
-  );
 
   const resetSeamlessRuntimeState = useCallback(() => {
-    materializationLifecycle.invalidate();
+    requestLifecycle.invalidate();
     setWarnings([]);
     setError(undefined);
     setLoading(false);
-  }, [materializationLifecycle]);
+  }, [requestLifecycle]);
 
   useEffect(() => {
     // Ignore stale upstream updates while a local interaction update is still
@@ -199,7 +195,6 @@ export const usePivotSeamlessRuntimeUpdate = (
       setError(undefined);
       const updateResult = await fetchAndMaterializeSeamlessRuntimeUpdate({
         requestLifecycle,
-        materializationLifecycle,
         baseFormData,
         sourceMetrics,
         sourceMeasureLeavesByMetric,
@@ -239,7 +234,6 @@ export const usePivotSeamlessRuntimeUpdate = (
       commitFilters,
       commitUiRuntimeLayout,
       dimensionKeys,
-      materializationLifecycle,
       metricKeys,
       persistRuntimeState,
       requestLifecycle,
