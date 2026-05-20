@@ -237,15 +237,6 @@ const buildQueryShape = ({
   };
 };
 
-type ResolvedFetchContext = {
-  rowGroupbyForQuery: QueryFormColumn[];
-  colGroupbyForQuery: QueryFormColumn[];
-  metricsForQuery: QueryFormMetric[];
-  requiredTimeOffsets: string[];
-  materialization?: PivotFactMaterialization;
-  coverages: PivotFactCoverage[];
-};
-
 type PlannedQuerySpecParams = {
   coverage: PivotFactCoverage;
   metrics: QueryFormMetric[];
@@ -497,16 +488,14 @@ const resolveFetchContext = ({
   layout,
   axis,
   path,
-  queryAnchorPath,
   coverageTarget,
 }: {
   formData: PivotTableQueryFormData;
   layout: LayoutContext;
   axis: PivotAxis;
   path: PivotPath;
-  queryAnchorPath: PivotPath;
   coverageTarget: ExpansionCoverageTarget;
-}): ResolvedFetchContext => {
+}) => {
   const { metrics } = layout;
   const rowGroupby = layout.pivotProgram.rowDimensions;
   const colGroupby = layout.pivotProgram.columnDimensions;
@@ -526,6 +515,12 @@ const resolveFetchContext = ({
     path,
   });
   const { rowDepth, columnDepth: colDepth } = coverageTarget.need;
+  const branchAnchorDepth =
+    pathsFromAxisScope(
+      axis === 'row'
+        ? coverageTarget.need.rowScope
+        : coverageTarget.need.columnScope,
+    )[0]?.length ?? 0;
 
   const hasRowFormatting =
     collectDimensionFormattingMetricsForQuery(
@@ -578,7 +573,7 @@ const resolveFetchContext = ({
     program: layout.pivotProgram,
     axis,
     coverageTarget,
-    branchAnchorDepth: queryAnchorPath.length,
+    branchAnchorDepth,
     rowSubtotalLevels,
     columnSubtotalLevels: colSubtotalLevels,
     rowTotals: layout.rowTotals,
@@ -590,8 +585,6 @@ const resolveFetchContext = ({
   });
 
   return {
-    rowGroupbyForQuery: queryShape.rowGroupby,
-    colGroupbyForQuery: queryShape.colGroupby,
     metricsForQuery: queryShape.metrics,
     requiredTimeOffsets,
     materialization: resolveFactMaterialization({
@@ -637,7 +630,6 @@ const buildAxisExpansionSpecs = ({
   layout,
   axis,
   path,
-  queryAnchorPath,
   coverageTarget,
   filters,
   scope,
@@ -646,9 +638,8 @@ const buildAxisExpansionSpecs = ({
   layout: LayoutContext;
   axis: PivotAxis;
   path: PivotPath;
-  queryAnchorPath: PivotPath;
   coverageTarget: ExpansionCoverageTarget;
-  filters: (ctx: ResolvedFetchContext) => QueryObjectFilterClause[];
+  filters: QueryObjectFilterClause[];
   scope: PivotFactStoreBatchScope;
 }): PlannedQuerySpec[] => {
   if (!canRequestAxisExpansion({ program: layout.pivotProgram, axis, path })) {
@@ -660,11 +651,9 @@ const buildAxisExpansionSpecs = ({
     layout,
     axis,
     path,
-    queryAnchorPath,
     coverageTarget,
   });
 
-  const resolvedFilters = filters(ctx);
   return ctx.coverages.map(coverage =>
     buildPlannedQuerySpec({
       coverage,
@@ -672,7 +661,7 @@ const buildAxisExpansionSpecs = ({
       requiredTimeOffsets: ctx.requiredTimeOffsets,
       materialization: ctx.materialization,
       scope,
-      filters: resolvedFilters,
+      filters,
     }),
   );
 };
@@ -850,15 +839,15 @@ const buildAxisPathExpansionSpecs = ({
     layout,
     axis,
     path,
-    queryAnchorPath: scopedPaths[0] ?? [],
     coverageTarget,
-    filters: ctx =>
-      buildPathSetFilterClauses({
-        axisGroupby:
-          axis === 'row' ? ctx.rowGroupbyForQuery : ctx.colGroupbyForQuery,
-        paths: scopedPaths,
-        colTypeMap: formData.colTypeMap,
-      }),
+    filters: buildPathSetFilterClauses({
+      axisGroupby:
+        axis === 'row'
+          ? coverageTarget.need.rowDimensions
+          : coverageTarget.need.columnDimensions,
+      paths: scopedPaths,
+      colTypeMap: formData.colTypeMap,
+    }),
     scope: {
       kind: 'axisPaths',
       axis,
@@ -886,16 +875,15 @@ const buildIntersectionTargetExpansionSpecs = ({
     layout,
     axis: anchor.axis,
     path: anchor.path,
-    queryAnchorPath: anchor.path,
     coverageTarget: target,
-    filters: ctx => [
+    filters: [
       ...buildPathSetFilterClauses({
-        axisGroupby: ctx.rowGroupbyForQuery,
+        axisGroupby: target.need.rowDimensions,
         paths: rowPaths,
         colTypeMap: formData.colTypeMap,
       }),
       ...buildPathSetFilterClauses({
-        axisGroupby: ctx.colGroupbyForQuery,
+        axisGroupby: target.need.columnDimensions,
         paths: columnPaths,
         colTypeMap: formData.colTypeMap,
       }),
