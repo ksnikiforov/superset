@@ -95,17 +95,17 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27143` | `-6367` | `< 28000` |
-| Strict core pipeline | `11337` | `10922` | `-415` | `8000` |
+| Full production `src` | `33510` | `27133` | `-6377` | `< 28000` |
+| Strict core pipeline | `11337` | `10912` | `-425` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4018` | `-665` | `3000-4000` |
-| Broad core pipeline | `16020` | `14940` | `-1080` | `11000-13000` |
+| Broad core pipeline | `16020` | `14930` | `-1090` | `11000-13000` |
 
 Strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3464` |
-| `pivot/expansion/*` | `2227` |
+| `pivot/runtime/*` | `3436` |
+| `pivot/expansion/*` | `2245` |
 | `pivot/query/*` | `1395` |
 | `pivot/layout/*` | `739` |
 | `pivot/core/*` | `159` |
@@ -155,6 +155,10 @@ Completed structural cuts:
   finish API; request-group liveness is scope-owned.
 - Expansion hydration now rematerializes through the async materializer after
   fetches, so large expansion result commits can yield like seamless updates.
+- Expansion materialization is now size-aware: small result sets keep the
+  synchronous commit path, while large result sets use the async materializer.
+- Fact-batch materialization now owns fact-tree construction directly; the
+  separate sync/async fact-tree wrapper functions were removed.
 - Collapsed dimension state no longer suppresses visible metric-tier expansion
   keys, so metric rows can reopen under a collapsed parent without expanding the
   dimension children.

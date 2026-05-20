@@ -66,7 +66,11 @@ import {
   type LatestRequestScope,
   yieldToMainThread,
 } from '../runtime/requestLifecycle';
-import { materializeLoadedPivotTreeFromFactStoreAsync } from '../runtime/materializePivotTree';
+import {
+  materializeLoadedPivotTreeFromFactStore,
+  materializeLoadedPivotTreeFromFactStoreAsync,
+} from '../runtime/materializePivotTree';
+import { DEFAULT_RUNTIME_CHUNK_SIZE } from '../runtime/chunkedWork';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { getStableColumnKey } from '../../utils';
 
@@ -372,20 +376,34 @@ export const useExpansionEngine = ({
   const buildFetchRuntime = useCallback(
     (requestScope: LatestRequestScope): ExpansionFetchRuntime => {
       const factStore = factStoreRef.current as PivotFactStore;
+      const materializeLoadedTree = () => {
+        const loadedFactCount = factStore
+          .getFactBatches()
+          .reduce((count, batch) => count + batch.facts.length, 0);
+        if (loadedFactCount <= DEFAULT_RUNTIME_CHUNK_SIZE) {
+          return Promise.resolve(
+            materializeLoadedPivotTreeFromFactStore({
+              store: factStore,
+              layout: fetchLayout,
+              formData: fetchFormData,
+            }),
+          );
+        }
+        return materializeLoadedPivotTreeFromFactStoreAsync({
+          store: factStore,
+          layout: fetchLayout,
+          formData: fetchFormData,
+          shouldContinue: requestScope.isCurrent,
+          yieldToMain: yieldToMainThread,
+        });
+      };
       return {
         requestScope,
         instanceId: expansionInstanceId,
         fetchFormData,
         layout: fetchLayout,
         factStore,
-        materializeLoadedTree: () =>
-          materializeLoadedPivotTreeFromFactStoreAsync({
-            store: factStore,
-            layout: fetchLayout,
-            formData: fetchFormData,
-            shouldContinue: requestScope.isCurrent,
-            yieldToMain: yieldToMainThread,
-          }),
+        materializeLoadedTree,
         addWarnings,
         setLoadingKeys,
       };

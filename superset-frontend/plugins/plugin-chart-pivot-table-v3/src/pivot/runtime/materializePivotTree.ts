@@ -421,42 +421,6 @@ const createFactTreeBuilder = ({
   };
 };
 
-const buildTreeFromFacts = ({
-  facts,
-  ...params
-}: FactTreeBuilderInput & {
-  facts: PivotFact[];
-}): PivotTreeData => {
-  const builder = createFactTreeBuilder(params);
-  facts.forEach(builder.addFact);
-  return builder.finish();
-};
-
-const buildTreeFromFactsAsync = async ({
-  facts,
-  chunkSize,
-  shouldContinue,
-  yieldToMain,
-  ...params
-}: FactTreeBuilderInput &
-  ChunkedWorkOptions & {
-    facts: PivotFact[];
-  }): Promise<PivotTreeData> => {
-  const builder = createFactTreeBuilder(params);
-  for (let idx = 0; idx < facts.length; idx += 1) {
-    builder.addFact(facts[idx]);
-    // eslint-disable-next-line no-await-in-loop
-    await maybeYieldChunkedWork({
-      processed: idx + 1,
-      chunkSize,
-      shouldContinue,
-      yieldToMain,
-    });
-  }
-  assertChunkedWorkCurrent(shouldContinue);
-  return builder.finish();
-};
-
 const injectAxisSubtotalLeaves = ({
   tree,
   axis,
@@ -1117,7 +1081,9 @@ const buildTreeFromFactBatch = (
   input: Parameters<typeof buildBatchTreeProjection>[0],
 ) => {
   const projection = buildBatchTreeProjection(input);
-  return applyBatchSubtotalLeaves(buildTreeFromFacts(projection), projection);
+  const builder = createFactTreeBuilder(projection);
+  projection.facts.forEach(builder.addFact);
+  return applyBatchSubtotalLeaves(builder.finish(), projection);
 };
 
 const buildTreeFromFactBatchAsync = async (
@@ -1125,12 +1091,18 @@ const buildTreeFromFactBatchAsync = async (
 ) => {
   const { chunkSize, shouldContinue, yieldToMain } = input;
   const projection = buildBatchTreeProjection(input);
-  const tree = await buildTreeFromFactsAsync({
-    ...projection,
-    chunkSize,
-    shouldContinue,
-    yieldToMain,
-  });
+  const builder = createFactTreeBuilder(projection);
+  for (let idx = 0; idx < projection.facts.length; idx += 1) {
+    builder.addFact(projection.facts[idx]);
+    // eslint-disable-next-line no-await-in-loop
+    await maybeYieldChunkedWork({
+      processed: idx + 1,
+      chunkSize,
+      shouldContinue,
+      yieldToMain,
+    });
+  }
+  const tree = builder.finish();
   if (projection.columnSubtotalDepth !== undefined) {
     await yieldChunkedWork({ shouldContinue, yieldToMain });
   }
