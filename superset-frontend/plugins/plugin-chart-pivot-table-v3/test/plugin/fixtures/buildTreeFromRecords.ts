@@ -117,23 +117,8 @@ export const buildTreeFromRecords = (
       ensureNode('col', colPath.slice(0, i), 'Total');
     }
 
-    const cellRowPath =
-      rowPath.length > 0 && rowPath.length < rowGroupby.length
-        ? [...rowPath, SUBTOTAL_TOKEN]
-        : rowPath;
-    const cellColPath =
-      colPath.length > 0 && colPath.length < colGroupby.length
-        ? [...colPath, SUBTOTAL_TOKEN]
-        : colPath;
-    if (cellRowPath !== rowPath) {
-      ensureNode('row', cellRowPath, 'Total');
-    }
-    if (cellColPath !== colPath) {
-      ensureNode('col', cellColPath, 'Total');
-    }
-
-    const rowKey = serializePath(cellRowPath);
-    const colKey = serializePath(cellColPath);
+    const rowKey = serializePath(rowPath);
+    const colKey = serializePath(colPath);
 
     const values = metricValueKeys.reduce(
       (acc, key) => ({

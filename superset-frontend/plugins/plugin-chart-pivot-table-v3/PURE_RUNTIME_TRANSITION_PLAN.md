@@ -96,8 +96,8 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `26688` | `-6822` | `< 20000` |
-| Strict core pipeline | `12907` | `10870` | `-2037` | `< 8000` |
+| Full production `src` | `33510` | `26652` | `-6858` | `< 20000` |
+| Strict core pipeline | `12907` | `10834` | `-2073` | `< 8000` |
 
 Diagnostic scope only:
 
@@ -113,7 +113,7 @@ Core pipeline breakdown:
 | `pivot/expansion/*` | `2245` |
 | `pivot/query/*` | `1395` |
 | `pivot/layout/*` + `pivot/core/*` | `878` |
-| core domain helpers | `1549` |
+| core domain helpers | `1513` |
 | formatting/data/render-model support | `1389` |
 
 Completed structural cuts:
@@ -179,6 +179,12 @@ Completed structural cuts:
   removed.
 - Interaction chip strips now own their drop behavior directly; duplicate
   filler drop-zone components were removed.
+- Query-support metrics for metric formatting, dimension formatting, dimension
+  sorting, and databars now share one metric-reference resolver before query
+  planning adds extra metrics.
+- Test fact-tree fixtures no longer rewrite every partially loaded aggregate
+  path into a subtotal leaf; subtotal leaves are explicit fixtures or injected
+  by the materializer path.
 - Collapsed dimension state no longer suppresses visible metric-tier expansion
   keys, so metric rows can reopen under a collapsed parent without expanding the
   dimension children.

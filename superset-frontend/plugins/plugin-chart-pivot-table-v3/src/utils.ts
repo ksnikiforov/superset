@@ -551,6 +551,30 @@ const resolveMetricReferenceForQuery = (
   return resolved || metric;
 };
 
+const normalizeMetricReferenceForQuery = (
+  metric: QueryFormMetric,
+  metrics: QueryFormMetric[],
+): QueryFormMetric => {
+  const resolved = resolveMetricReferenceForQuery(metric, metrics);
+  return metrics.includes(resolved)
+    ? resolved
+    : normalizeFormattingMetricForQuery(resolved);
+};
+
+const collectMetricFormattingValuesForQuery = (
+  values: Array<PivotMetricFormattingValue | PivotDimensionFormattingValue>,
+  metrics: QueryFormMetric[],
+): QueryFormMetric[] =>
+  values.flatMap(value => {
+    if (isPivotExcelFormula(value)) {
+      return extractMetricReferencesFromExcelFormula(value.formula);
+    }
+    const metric = normalizeMetricFormattingValue(value);
+    return metric ? [normalizeMetricReferenceForQuery(metric, metrics)] : [];
+  });
+
+const isDefined = <T>(value: T | undefined): value is T => value !== undefined;
+
 const getDimensionKeyFromColumn = (
   column: QueryFormColumn,
 ): string | undefined => {
@@ -680,22 +704,6 @@ export const hasTotalSorting = (
   );
 };
 
-const normalizeDimensionFormattingMapForAxis = (
-  formatting: PivotDimensionFormattingMap | undefined,
-  columns: QueryFormColumn[],
-): PivotDimensionFormattingMap => {
-  const normalized = normalizeDimensionFormattingMap(formatting);
-  return filterDimensionSettingKeys(normalized, columns);
-};
-
-const normalizeDimensionSortingMapForAxis = (
-  sorting: PivotDimensionSortingMap | undefined,
-  columns: QueryFormColumn[],
-): PivotDimensionSortingMap => {
-  const normalized = normalizeDimensionSortingMap(sorting);
-  return filterDimensionSettingKeys(normalized, columns);
-};
-
 type DimensionSettingsTransferResult = {
   rowFormatting: PivotDimensionFormattingMap;
   colFormatting: PivotDimensionFormattingMap;
@@ -733,19 +741,19 @@ export const transferDimensionSettingsAcrossAxes = (
   );
   const hasAxisChanges = movedToRows.size > 0 || movedToCols.size > 0;
 
-  const rowFormatting = normalizeDimensionFormattingMapForAxis(
+  const rowFormatting = normalizeDimensionFormattingMapWithKeys(
     settings.rowFormatting,
     prevRows,
   );
-  const colFormatting = normalizeDimensionFormattingMapForAxis(
+  const colFormatting = normalizeDimensionFormattingMapWithKeys(
     settings.colFormatting,
     prevCols,
   );
-  const rowSorting = normalizeDimensionSortingMapForAxis(
+  const rowSorting = normalizeDimensionSortingMapWithKeys(
     settings.rowSorting,
     prevRows,
   );
-  const colSorting = normalizeDimensionSortingMapForAxis(
+  const colSorting = normalizeDimensionSortingMapWithKeys(
     settings.colSorting,
     prevCols,
   );
@@ -802,25 +810,12 @@ export const collectMetricFormattingMetricsForQuery = (
 ): QueryFormMetric[] =>
   Object.values(normalizeMetricFormattingMap(metricFormatting)).flatMap(
     formatting =>
-      METRIC_FORMATTING_FIELDS.flatMap(field => {
-        const value = formatting[field];
-        if (!value) {
-          return [];
-        }
-        if (isPivotExcelFormula(value)) {
-          return extractMetricReferencesFromExcelFormula(value.formula);
-        }
-        const metric = normalizeMetricFormattingValue(value);
-        if (!metric) {
-          return [];
-        }
-        const resolved = resolveMetricReferenceForQuery(metric, metrics);
-        return [
-          metrics.includes(resolved)
-            ? resolved
-            : normalizeFormattingMetricForQuery(resolved),
-        ];
-      }),
+      collectMetricFormattingValuesForQuery(
+        METRIC_FORMATTING_FIELDS.map(field => formatting[field]).filter(
+          isDefined,
+        ),
+        metrics,
+      ),
   );
 
 export const collectDimensionFormattingMetricsForQuery = (
@@ -831,25 +826,12 @@ export const collectDimensionFormattingMetricsForQuery = (
   Object.values(
     normalizeDimensionFormattingMapWithKeys(formatting, columns),
   ).flatMap(dimensionFormatting =>
-    DIMENSION_FORMATTING_FIELDS.flatMap(field => {
-      const value = dimensionFormatting[field];
-      if (!value) {
-        return [];
-      }
-      if (isPivotExcelFormula(value)) {
-        return extractMetricReferencesFromExcelFormula(value.formula);
-      }
-      const metric = normalizeMetricFormattingValue(value);
-      if (!metric) {
-        return [];
-      }
-      const resolved = resolveMetricReferenceForQuery(metric, metrics);
-      return [
-        metrics.includes(resolved)
-          ? resolved
-          : normalizeFormattingMetricForQuery(resolved),
-      ];
-    }),
+    collectMetricFormattingValuesForQuery(
+      DIMENSION_FORMATTING_FIELDS.map(
+        field => dimensionFormatting[field],
+      ).filter(isDefined),
+      metrics,
+    ),
   );
 
 export const collectDimensionSortingMetricsForQuery = (
@@ -860,17 +842,7 @@ export const collectDimensionSortingMetricsForQuery = (
   Object.values(normalizeDimensionSortingMapWithKeys(sorting, columns)).flatMap(
     entry =>
       entry.metric
-        ? [
-            (() => {
-              const resolved = resolveMetricReferenceForQuery(
-                entry.metric,
-                metrics,
-              );
-              return metrics.includes(resolved)
-                ? resolved
-                : normalizeFormattingMetricForQuery(resolved);
-            })(),
-          ]
+        ? [normalizeMetricReferenceForQuery(entry.metric, metrics)]
         : [],
   );
 
@@ -995,15 +967,7 @@ export const collectMetricDatabarMetricsForQuery = (
     if (config.colorMode !== 'byMetric' || !config.colorMetric) {
       return [];
     }
-    const resolved = resolveMetricReferenceForQuery(
-      config.colorMetric,
-      metrics,
-    );
-    return [
-      metrics.includes(resolved)
-        ? resolved
-        : normalizeFormattingMetricForQuery(resolved),
-    ];
+    return [normalizeMetricReferenceForQuery(config.colorMetric, metrics)];
   });
 
 export const collectMeasureLeafMetricsForQuery = (
