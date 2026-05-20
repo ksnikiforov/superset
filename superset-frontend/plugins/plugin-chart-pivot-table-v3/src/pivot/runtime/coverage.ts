@@ -138,12 +138,6 @@ const axisScopeContainsValuesToken = (scope: AxisPathScope) => {
   return paths.some(pathContainsValuesToken);
 };
 
-const batchScopePaths = ({
-  parentPath,
-  siblingValues,
-}: Extract<PivotFactStoreBatchScope, { kind: 'batch' }>) =>
-  siblingValues.map(value => [...parentPath, value]);
-
 const intersectionScopePaths = (
   scope: Extract<PivotFactStoreBatchScope, { kind: 'intersection' }>,
   axis: PivotAxis,
@@ -155,17 +149,17 @@ const isRuntimeLayoutCoverageScope = (
   if (scope.kind === 'root') {
     return true;
   }
-  if (scope.kind !== 'branch') {
+  if (scope.kind !== 'axisPaths') {
     return false;
   }
-  return scope.path.every(isMetricToken);
+  return scope.paths.every(path => path.every(isMetricToken));
 };
 
 const scopeRestrictsAxis = (
   scope: PivotFactStoreBatchScope,
   axis: PivotAxis,
 ) =>
-  (scope.kind === 'branch' || scope.kind === 'batch') && scope.axis === axis
+  scope.kind === 'axisPaths' && scope.axis === axis
     ? true
     : scope.kind === 'intersection';
 
@@ -186,20 +180,15 @@ const scopeCoversAxisPaths = (
       needScope.kind === 'paths' ? needScope.paths : needScope.ancestorPaths;
     return paths.every(path => path.length <= loadedDepth);
   }
-  if (
-    (scope.kind === 'branch' || scope.kind === 'batch') &&
-    scope.axis !== axis
-  ) {
+  if (scope.kind === 'axisPaths' && scope.axis !== axis) {
     return true;
   }
   const candidatePaths =
-    scope.kind === 'branch'
-      ? [scope.path]
-      : scope.kind === 'batch'
-        ? batchScopePaths(scope)
-        : scope.kind === 'intersection'
-          ? intersectionScopePaths(scope, axis)
-          : [];
+    scope.kind === 'axisPaths'
+      ? scope.paths
+      : scope.kind === 'intersection'
+        ? intersectionScopePaths(scope, axis)
+        : [];
   if (needScope.kind === 'scopedFull') {
     return needScope.ancestorPaths.every(ancestorPath =>
       candidatePaths.some(candidatePath =>
@@ -313,14 +302,8 @@ export const buildCoverageNeedFromFactSelector = ({
       columnScope: { kind: 'paths', paths: scope.columnPaths },
     };
   }
-  const scopedAxis =
-    scope.kind === 'branch' || scope.kind === 'batch' ? scope.axis : undefined;
-  const scopedPaths =
-    scope.kind === 'branch'
-      ? [scope.path]
-      : scope.kind === 'batch'
-        ? batchScopePaths(scope)
-        : undefined;
+  const scopedAxis = scope.kind === 'axisPaths' ? scope.axis : undefined;
+  const scopedPaths = scope.kind === 'axisPaths' ? scope.paths : undefined;
   const axisScope = scopedPaths
     ? ({ kind: 'paths', paths: scopedPaths } as const)
     : ({ kind: 'root' } as const);

@@ -296,9 +296,9 @@ describe('pivot/expansion/stateTransitions', () => {
         columnDimensions: ['month'],
       },
       scope: {
-        kind: 'branch',
+        kind: 'axisPaths',
         axis: 'row',
-        path: [],
+        paths: [[]],
       },
       valueKeys: ['sales'],
     };
@@ -348,9 +348,9 @@ describe('pivot/expansion/stateTransitions', () => {
             columnDimensions: ['month'],
           },
           scope: {
-            kind: 'branch',
+            kind: 'axisPaths',
             axis: 'col',
-            path: [],
+            paths: [[]],
           },
           valueKeys: ['sales'],
         },
@@ -460,9 +460,9 @@ describe('pivot/expansion/stateTransitions', () => {
         columnDimensions: ['month', 'day'],
       },
       scope: {
-        kind: 'branch',
+        kind: 'axisPaths',
         axis: 'col',
-        path: parsePath(xKey),
+        paths: [parsePath(xKey)],
       },
       valueKeys: ['sales'],
     };

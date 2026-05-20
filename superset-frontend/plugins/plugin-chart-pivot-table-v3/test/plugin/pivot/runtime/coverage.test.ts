@@ -39,8 +39,18 @@ import { buildLayoutContext } from '../../../../src/pivot/layout/LayoutContext';
 import { buildExpansionQuerySpecs } from '../../../../src/pivot/query/specs';
 import {
   MetricsLayoutEnum,
+  type PivotPath,
   type PivotTableQueryFormData,
 } from '../../../../src/types';
+
+const axisScope = (
+  axis: 'row' | 'col',
+  path: PivotPath,
+): PivotFactSelector['scope'] => ({
+  kind: 'axisPaths',
+  axis,
+  paths: [path],
+});
 
 describe('expansion fact coverage', () => {
   it('derives loaded expansion coverage from typed fact selectors', () => {
@@ -58,11 +68,7 @@ describe('expansion fact coverage', () => {
             rowDimensions: ['country', 'city'],
             columnDimensions: ['year'],
           },
-          scope: {
-            kind: 'branch',
-            axis: 'row',
-            path: ['France'],
-          },
+          scope: axisScope('row', ['France']),
           valueKeys: ['sales'],
         },
         {
@@ -72,11 +78,7 @@ describe('expansion fact coverage', () => {
             rowDimensions: ['country', 'city'],
             columnDimensions: ['year', 'quarter', 'month'],
           },
-          scope: {
-            kind: 'branch',
-            axis: 'row',
-            path: ['France'],
-          },
+          scope: axisScope('row', ['France']),
           valueKeys: ['sales'],
         },
       ],
@@ -201,10 +203,9 @@ describe('coverage manifest diff', () => {
         required,
         factSelectors: [
           batch({
-            kind: 'batch',
+            kind: 'axisPaths',
             axis: 'row',
-            parentPath: [],
-            siblingValues: ['Germany', 'France'],
+            paths: [['Germany'], ['France']],
           }),
         ],
       }),
@@ -222,9 +223,7 @@ describe('coverage manifest diff', () => {
     expect(
       diffCoverageManifest({
         required,
-        factSelectors: [
-          batch({ kind: 'branch', axis: 'row', path: ['Germany'] }),
-        ],
+        factSelectors: [batch(axisScope('row', ['Germany']))],
       }),
     ).toEqual(required);
   });
@@ -269,15 +268,13 @@ describe('coverage manifest diff', () => {
     expect(
       diffCoverageManifest({
         required,
-        factSelectors: [batch({ kind: 'branch', axis: 'row', path: ['USA'] })],
+        factSelectors: [batch(axisScope('row', ['USA']))],
       }),
     ).toEqual([]);
     expect(
       diffCoverageManifest({
         required,
-        factSelectors: [
-          batch({ kind: 'branch', axis: 'row', path: ['Canada'] }),
-        ],
+        factSelectors: [batch(axisScope('row', ['Canada']))],
       }),
     ).toEqual(required);
   });
@@ -290,9 +287,7 @@ describe('coverage manifest diff', () => {
     expect(
       diffCoverageManifest({
         required,
-        factSelectors: [
-          batch({ kind: 'branch', axis: 'row', path: ['USA', 'California'] }),
-        ],
+        factSelectors: [batch(axisScope('row', ['USA', 'California']))],
       }),
     ).toEqual(required);
   });
@@ -308,7 +303,7 @@ describe('coverage manifest diff', () => {
     expect(
       diffCoverageManifest({
         required,
-        factSelectors: [batch({ kind: 'branch', axis: 'row', path: ['USA'] })],
+        factSelectors: [batch(axisScope('row', ['USA']))],
       }),
     ).toEqual([]);
   });
@@ -332,10 +327,9 @@ describe('coverage manifest diff', () => {
         required,
         factSelectors: [
           batch({
-            kind: 'batch',
+            kind: 'axisPaths',
             axis: 'row',
-            parentPath: [],
-            siblingValues: ['USA', 'Canada'],
+            paths: [['USA'], ['Canada']],
           }),
         ],
       }),
@@ -351,8 +345,8 @@ describe('coverage manifest diff', () => {
       diffCoverageManifest({
         required,
         factSelectors: [
-          batch({ kind: 'branch', axis: 'row', path: ['USA'] }),
-          batch({ kind: 'branch', axis: 'row', path: ['Canada'] }),
+          batch(axisScope('row', ['USA'])),
+          batch(axisScope('row', ['Canada'])),
         ],
       }),
     ).toEqual([]);
@@ -374,7 +368,7 @@ describe('coverage manifest diff', () => {
               rowDimensions: ['country', 'city', 'store'],
               columnDimensions: ['year', 'quarter'],
             },
-            scope: { kind: 'branch', axis: 'row', path: ['USA'] },
+            scope: axisScope('row', ['USA']),
             valueKeys: ['sales'],
           },
         ],
@@ -405,7 +399,7 @@ describe('coverage manifest diff', () => {
               rowDepth: 4,
               columnDepth: 2,
             }),
-            scope: { kind: 'branch', axis: 'row', path: ['USA'] },
+            scope: axisScope('row', ['USA']),
             valueKeys: ['sales'],
           },
         ],
@@ -491,9 +485,9 @@ describe('branch fact coverage', () => {
             columnDimensions: ['shipMode'],
           },
           scope: {
-            kind: 'branch',
+            kind: 'axisPaths',
             axis: 'row',
-            path: ['A'],
+            paths: [['A']],
           },
           valueKeys: ['averageOrderValue'],
         },

@@ -157,9 +157,9 @@ test('records exact branch scope on fact-store batches', () => {
       factSelector: {
         ...spec.meta.factSelector,
         scope: {
-          kind: 'branch',
+          kind: 'axisPaths',
           axis: 'row',
-          path: ['France'],
+          paths: [['France']],
         },
       },
     },
@@ -188,9 +188,9 @@ test('records exact branch scope on fact-store batches', () => {
   store.upsertBatch(batch);
 
   expect(batch.scope).toEqual({
-    kind: 'branch',
+    kind: 'axisPaths',
     axis: 'row',
-    path: ['France'],
+    paths: [['France']],
   });
   expect(batch.coverage).toMatchObject({
     rowDepth: 2,

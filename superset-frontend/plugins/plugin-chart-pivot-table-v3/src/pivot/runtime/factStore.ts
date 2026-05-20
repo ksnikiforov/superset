@@ -17,11 +17,7 @@
  * under the License.
  */
 import { type DataRecordValue } from '@superset-ui/core';
-import {
-  type PivotAxis,
-  type PivotPath,
-  type PivotPathValue,
-} from '../../types';
+import { type PivotAxis, type PivotPath } from '../../types';
 import { serializePath } from '../core/path';
 import { stableStringify } from '../shared/stableStringify';
 import {
@@ -54,15 +50,9 @@ export type PivotFactStoreBatchScope =
       kind: 'root';
     }
   | {
-      kind: 'branch';
+      kind: 'axisPaths';
       axis: PivotAxis;
-      path: PivotPath;
-    }
-  | {
-      kind: 'batch';
-      axis: PivotAxis;
-      parentPath: PivotPath;
-      siblingValues: PivotPathValue[];
+      paths: PivotPath[];
     }
   | {
       kind: 'intersection';
@@ -136,17 +126,12 @@ const factMatchesScope = (fact: PivotFact, scope: PivotFactStoreBatchScope) => {
   switch (scope.kind) {
     case 'root':
       return true;
-    case 'branch':
-      return startsWithPath(
-        scope.axis === 'row' ? fact.rowPath : fact.columnPath,
-        scope.path,
-      );
-    case 'batch':
-      return scope.siblingValues.some(value =>
-        startsWithPath(scope.axis === 'row' ? fact.rowPath : fact.columnPath, [
-          ...scope.parentPath,
-          value,
-        ]),
+    case 'axisPaths':
+      return scope.paths.some(path =>
+        startsWithPath(
+          scope.axis === 'row' ? fact.rowPath : fact.columnPath,
+          path,
+        ),
       );
     case 'intersection':
       return (

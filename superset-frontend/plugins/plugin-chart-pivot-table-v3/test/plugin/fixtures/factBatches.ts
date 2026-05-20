@@ -134,20 +134,11 @@ const buildFactsForScope = (
 ): PivotFact[] => {
   switch (scope.kind) {
     case 'branch':
+    case 'axisPaths': {
       return facts.filter(fact =>
         scope.axis === 'row'
-          ? pathStartsWith(fact.rowPath, scope.path)
-          : pathStartsWith(fact.columnPath, scope.path),
-      );
-    case 'batch': {
-      const paths =
-        scope.siblingValues.length > 0
-          ? scope.siblingValues.map(value => [...scope.parentPath, value])
-          : [scope.parentPath];
-      return facts.filter(fact =>
-        scope.axis === 'row'
-          ? matchesAnyPath(fact.rowPath, paths)
-          : matchesAnyPath(fact.columnPath, paths),
+          ? matchesAnyPath(fact.rowPath, scope.paths)
+          : matchesAnyPath(fact.columnPath, scope.paths),
       );
     }
     case 'intersection':

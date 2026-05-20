@@ -414,10 +414,9 @@ describe('fetchBatch', () => {
     store.upsertBatch({
       coverage: preloadedSpec.meta.coverage,
       scope: {
-        kind: 'batch',
+        kind: 'axisPaths',
         axis: 'row',
-        parentPath: ['US'],
-        siblingValues: ['CA'],
+        paths: [['US', 'CA']],
       },
       valueKeys: ['m1'],
       facts: [],

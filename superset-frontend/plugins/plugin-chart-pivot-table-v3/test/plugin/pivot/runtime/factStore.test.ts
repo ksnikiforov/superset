@@ -45,6 +45,24 @@ const buildFact = (overrides: Partial<PivotFact> = {}): PivotFact => ({
   ...overrides,
 });
 
+const axisScope = (
+  axis: 'row' | 'col',
+  path: PivotFact['rowPath'],
+): PivotFactStoreBatchScope => ({
+  kind: 'axisPaths',
+  axis,
+  paths: [path],
+});
+
+const axisPathSetScope = (
+  axis: 'row' | 'col',
+  paths: PivotFact['rowPath'][],
+): PivotFactStoreBatchScope => ({
+  kind: 'axisPaths',
+  axis,
+  paths,
+});
+
 test('upserts duplicate exact facts by request/path/value key', () => {
   const store = createPivotFactStore();
 
@@ -59,11 +77,7 @@ test('upserts duplicate exact facts by request/path/value key', () => {
 test('keeps different request scopes as separate exact fact batches', () => {
   const store = createPivotFactStore();
   const firstScope: PivotFactStoreBatchScope = { kind: 'root' };
-  const secondScope: PivotFactStoreBatchScope = {
-    kind: 'branch',
-    axis: 'row',
-    path: ['USA'],
-  };
+  const secondScope = axisScope('row', ['USA']);
 
   [
     {
@@ -108,16 +122,8 @@ test('does not mark sibling branch scopes with identical coverage as loaded', ()
     rowDimensions: ['country', 'city'],
     columnDimensions: [],
   };
-  const franceScope: PivotFactStoreBatchScope = {
-    kind: 'branch',
-    axis: 'row',
-    path: ['France'],
-  };
-  const usaScope: PivotFactStoreBatchScope = {
-    kind: 'branch',
-    axis: 'row',
-    path: ['USA'],
-  };
+  const franceScope = axisScope('row', ['France']);
+  const usaScope = axisScope('row', ['USA']);
 
   store.upsertBatch({
     coverage: branchCoverage,
@@ -158,11 +164,7 @@ test('uses exact-depth root coverage for narrower branch coverage', () => {
   });
   const franceBranchSelector = {
     coverage: branchCoverage,
-    scope: {
-      kind: 'branch',
-      axis: 'row',
-      path: ['France'],
-    } as PivotFactStoreBatchScope,
+    scope: axisScope('row', ['France']),
     valueKeys: ['sales'],
   };
 
@@ -238,11 +240,7 @@ test('does not reuse root coverage for values-token branch scopes', () => {
   };
   const selectorWithMetricPath = {
     coverage: branchCoverage,
-    scope: {
-      kind: 'branch',
-      axis: 'col',
-      path: [encodeMetricKey('sales')],
-    } as PivotFactStoreBatchScope,
+    scope: axisScope('col', [encodeMetricKey('sales')]),
     valueKeys: ['sales'],
   };
 
@@ -266,11 +264,7 @@ test('does not reuse values-token branch coverage for root materialization', () 
 
   store.upsertBatch({
     coverage,
-    scope: {
-      kind: 'branch',
-      axis: 'col',
-      path: [encodeMetricKey('sales')],
-    },
+    scope: axisScope('col', [encodeMetricKey('sales')]),
     valueKeys: ['sales'],
     facts: [buildFact({ columnPath: [encodeMetricKey('sales'), 'REV-A'] })],
   });
@@ -288,11 +282,7 @@ test('keeps exact branch facts alongside broader compatible root coverage', () =
   };
   const selector = {
     coverage: branchCoverage,
-    scope: {
-      kind: 'branch',
-      axis: 'row',
-      path: ['France'],
-    } as PivotFactStoreBatchScope,
+    scope: axisScope('row', ['France']),
     valueKeys: ['sales'],
   };
   const rootFact = buildFact({
@@ -333,30 +323,17 @@ test('batch coverage can satisfy branch coverage checks', () => {
   };
   const franceSelector = {
     coverage: branchCoverage,
-    scope: {
-      kind: 'branch',
-      axis: 'row',
-      path: ['France'],
-    } as PivotFactStoreBatchScope,
+    scope: axisScope('row', ['France']),
     valueKeys: ['sales'],
   };
   const canadaSelector = {
     ...franceSelector,
-    scope: {
-      kind: 'branch',
-      axis: 'row',
-      path: ['Canada'],
-    } as PivotFactStoreBatchScope,
+    scope: axisScope('row', ['Canada']),
   };
 
   store.upsertBatch({
     coverage: branchCoverage,
-    scope: {
-      kind: 'batch',
-      axis: 'row',
-      parentPath: [],
-      siblingValues: ['France', 'USA'],
-    },
+    scope: axisPathSetScope('row', [['France'], ['USA']]),
     valueKeys: ['sales'],
     facts: [
       buildFact({
@@ -386,22 +363,13 @@ test('registers compatible coverage aliases without upserting duplicate facts', 
   };
   const franceSelector = {
     coverage: branchCoverage,
-    scope: {
-      kind: 'branch',
-      axis: 'row',
-      path: ['France'],
-    } as PivotFactStoreBatchScope,
+    scope: axisScope('row', ['France']),
     valueKeys: ['sales'],
   };
 
   store.upsertBatch({
     coverage: branchCoverage,
-    scope: {
-      kind: 'batch',
-      axis: 'row',
-      parentPath: [],
-      siblingValues: ['France', 'USA'],
-    },
+    scope: axisPathSetScope('row', [['France'], ['USA']]),
     valueKeys: ['sales'],
     facts: [
       buildFact({
@@ -434,23 +402,14 @@ test('separate exact branches can satisfy a batched coverage request', () => {
   };
   const batchSelector = {
     coverage: branchCoverage,
-    scope: {
-      kind: 'batch',
-      axis: 'row',
-      parentPath: [],
-      siblingValues: ['France', 'Canada'],
-    } as PivotFactStoreBatchScope,
+    scope: axisPathSetScope('row', [['France'], ['Canada']]),
     valueKeys: ['sales'],
   };
 
   [
     {
       coverage: branchCoverage,
-      scope: {
-        kind: 'branch',
-        axis: 'row',
-        path: ['France'],
-      },
+      scope: axisScope('row', ['France']),
       valueKeys: ['sales'],
       facts: [
         buildFact({
@@ -462,11 +421,7 @@ test('separate exact branches can satisfy a batched coverage request', () => {
     },
     {
       coverage: branchCoverage,
-      scope: {
-        kind: 'branch',
-        axis: 'row',
-        path: ['Canada'],
-      },
+      scope: axisScope('row', ['Canada']),
       valueKeys: ['sales'],
       facts: [
         buildFact({
@@ -497,21 +452,13 @@ test('does not reuse deeper aggregate facts for a shallower branch request', () 
   };
   const shallowSelector = {
     coverage: shallowCoverage,
-    scope: {
-      kind: 'branch',
-      axis: 'row',
-      path: ['France'],
-    } as PivotFactStoreBatchScope,
+    scope: axisScope('row', ['France']),
     valueKeys: ['sales'],
   };
 
   store.upsertBatch({
     coverage: deepCoverage,
-    scope: {
-      kind: 'branch',
-      axis: 'row',
-      path: ['France'],
-    },
+    scope: axisScope('row', ['France']),
     valueKeys: ['sales'],
     facts: [
       buildFact({

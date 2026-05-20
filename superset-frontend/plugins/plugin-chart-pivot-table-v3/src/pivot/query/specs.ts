@@ -900,13 +900,15 @@ export const buildExpansionQuerySpecs = (
         ),
       suffix: `|branch:${axis}:${coverageTarget.pathKey}`,
       scope: {
-        kind: 'branch',
+        kind: 'axisPaths',
         axis,
-        path: projectQueryFilterPath({
-          layout: request.layout,
-          axis,
-          path,
-        }),
+        paths: [
+          projectQueryFilterPath({
+            layout: request.layout,
+            axis,
+            path,
+          }),
+        ],
       },
     });
   }
@@ -948,10 +950,12 @@ export const buildExpansionQuerySpecs = (
         }),
       suffix: `|batch:${batch.axis}:${batch.parentPathKey}|chunk:${chunkIndex}`,
       scope: {
-        kind: 'batch',
+        kind: 'axisPaths',
         axis: batch.axis,
-        parentPath: parentDimensionPath,
-        siblingValues: batch.siblingValues,
+        paths: batch.siblingValues.map(value => [
+          ...parentDimensionPath,
+          value,
+        ]),
       },
     });
   }

@@ -1525,10 +1525,9 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
         facts: [],
         valueKeys: ['m1', 'm2'],
         scope: {
-          kind: 'batch',
+          kind: 'axisPaths',
           axis: 'col',
-          parentPath: [],
-          siblingValues: ['X', 'Y'],
+          paths: [['X'], ['Y']],
         },
       },
     ];
@@ -3353,12 +3352,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
         };
       }) => {
         const scope = spec.meta?.factSelector?.scope;
-        const path =
-          scope?.kind === 'branch'
-            ? scope.path
-            : scope?.kind === 'batch'
-              ? scope.parentPath
-              : [];
+        const path = scope?.kind === 'axisPaths' ? (scope.paths[0] ?? []) : [];
         return `${scope?.kind ?? 'unknown'}:${scope?.axis ?? 'none'}:${serializePath(
           path ?? [],
         )}:${spec.meta?.coverage?.rowDepth ?? 0}:${
