@@ -143,8 +143,10 @@ describe('PivotTableChart expansion with metrics before dimensions (depth)', () 
     'expands a %i-level row hierarchy sequentially',
     async depth => {
       fetchPivotBranchMock.mockReset();
-      fetchPivotBranchMock.mockImplementation(resolveMockBranchFetchResult());
       const { tree, groupbyRows } = buildRowsTree(depth);
+      fetchPivotBranchMock.mockImplementation(
+        resolveMockBranchFetchResult({ data: tree }),
+      );
       const { container } = render(
         <PivotTableChart
           data={tree}
@@ -204,8 +206,10 @@ describe('PivotTableChart expansion with metrics before dimensions (depth)', () 
     'expands a %i-level column hierarchy sequentially',
     async depth => {
       fetchPivotBranchMock.mockReset();
-      fetchPivotBranchMock.mockImplementation(resolveMockBranchFetchResult());
       const { tree, groupbyColumns } = buildColsTree(depth);
+      fetchPivotBranchMock.mockImplementation(
+        resolveMockBranchFetchResult({ data: tree }),
+      );
       const { container } = render(
         <PivotTableChart
           data={tree}

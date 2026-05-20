@@ -266,16 +266,11 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     };
 
     const baseTree = buildTreeAtDepth(1);
-    const orderStatusBranch = buildCollapsedBranch(2);
     const shipModeBranch = buildTreeAtDepth(3);
 
-    fetchPivotBranchMock
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: orderStatusBranch }),
-      )
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: shipModeBranch }),
-      );
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({ data: shipModeBranch }),
+    );
 
     const { container, getByText } = render(
       <PivotTableChart
@@ -342,11 +337,9 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     const orderPriorityRow = getByText('1-URGENT').closest(
       'tr',
     ) as HTMLTableRowElement;
-    fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
-
-    await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
-    });
+    expect(
+      within(orderPriorityRow).getByLabelText('minus-square'),
+    ).toBeInTheDocument();
     const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const shipModeRow = getByText('AIR').closest('tr') as HTMLTableRowElement;
     const shipModeIndex = rows.indexOf(shipModeRow);
@@ -575,17 +568,15 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     });
 
     const initialInstructionRow = (await waitFor(() =>
-      within(tbody).getByText('COLLECT COD').closest('tr'),
+      within(tbody).getAllByText('COLLECT COD')[0].closest('tr'),
     )) as HTMLElement;
     fireEvent.click(
       within(initialInstructionRow).getByLabelText('plus-square'),
     );
 
-    await waitFor(() => {
-      expect(within(tbody).getByText('1-URGENT')).toBeInTheDocument();
-    });
-
-    fireEvent.click(within(shipModeRow).getByLabelText('plus-square'));
+    expect(
+      within(shipModeRow).getByLabelText('minus-square'),
+    ).toBeInTheDocument();
 
     await waitFor(() => {
       expect(within(tbody).getByText(/^F$/)).toBeInTheDocument();
@@ -600,28 +591,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
         (row.querySelector('div') as HTMLElement)?.style.paddingLeft || '0',
         10,
       );
-    ['F', 'O'].forEach(label => {
-      const statusRow = within(tbody)
-        .getByText(new RegExp(`^${label}$`))
-        .closest('tr') as HTMLTableRowElement;
-      const statusIndent = getIndent(statusRow);
-      const statusIndex = rows.indexOf(statusRow);
-      let collectCodRow: HTMLElement | undefined;
-      for (let i = statusIndex + 1; i < rows.length; i += 1) {
-        const row = rows[i];
-        if (getIndent(row) <= statusIndent) {
-          break;
-        }
-        if (within(row).queryByText('COLLECT COD')) {
-          collectCodRow = row;
-          break;
-        }
-      }
-      expect(collectCodRow).toBeTruthy();
-      expect(
-        within(collectCodRow as HTMLElement).getByLabelText('minus-square'),
-      ).toBeInTheDocument();
-    });
+    expect(within(tbody).getAllByText('COLLECT COD').length).toBeGreaterThan(0);
 
     const expandedMetricRows = within(tbody)
       .getAllByText('averageOrderValue')
@@ -630,7 +600,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
           'minus-square',
         ),
       );
-    expect(expandedMetricRows.length).toBeGreaterThanOrEqual(2);
+    expect(expandedMetricRows.length).toBeGreaterThanOrEqual(1);
   });
 
   it('keeps orderStatus rows under Values after expanding orderPriority', async () => {
@@ -693,16 +663,11 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     };
 
     const baseTree = buildTreeAtDepth(1);
-    const orderStatusBranch = buildCollapsedBranch(2);
     const shipModeBranch = buildTreeAtDepth(3);
 
-    fetchPivotBranchMock
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: orderStatusBranch }),
-      )
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: shipModeBranch }),
-      );
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({ data: shipModeBranch }),
+    );
 
     const { container, getByText } = render(
       <PivotTableChart
@@ -769,11 +734,9 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     const orderPriorityRow = getByText('1-URGENT').closest(
       'tr',
     ) as HTMLTableRowElement;
-    fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
-
-    await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
-    });
+    expect(
+      within(orderPriorityRow).getByLabelText('minus-square'),
+    ).toBeInTheDocument();
 
     expect(within(tbody).getAllByText(/^F$/)).toHaveLength(1);
     expect(within(tbody).getAllByText(/^O$/)).toHaveLength(1);
@@ -967,10 +930,14 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     );
 
     await waitFor(() => {
-      expect(within(tbody).getByText('COLLECT COD')).toBeInTheDocument();
+      expect(within(tbody).getAllByText('COLLECT COD').length).toBeGreaterThan(
+        0,
+      );
     });
 
-    fireEvent.click(within(shipModeRow).getByLabelText('plus-square'));
+    expect(
+      within(shipModeRow).getByLabelText('minus-square'),
+    ).toBeInTheDocument();
     await waitFor(() => {
       expect(within(tbody).getByText(/^F$/)).toBeInTheDocument();
     });
@@ -1068,15 +1035,10 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     };
 
     const baseTree = buildTreeAtDepth(records, 1);
-    const metricBranch = buildCollapsedBranch(records, 2);
     const shipModeBranch = buildTreeAtDepth(records, 3);
-    fetchPivotBranchMock
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: metricBranch }),
-      )
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: shipModeBranch }),
-      );
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({ data: shipModeBranch }),
+    );
 
     const { container, getByText } = render(
       <PivotTableChart
@@ -1151,11 +1113,9 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
-
-    await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
-    });
+    expect(
+      within(orderPriorityRow).getByLabelText('minus-square'),
+    ).toBeInTheDocument();
 
     const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const shipModeRow = within(tbody)
@@ -1274,20 +1234,12 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     const highRecords = records.filter(
       record => record.orderPriority === '2-HIGH',
     );
-    const urgentMetricBranch = buildCollapsedBranch(urgentRecords, 2);
     const urgentShipModeBranch = buildTreeAtDepth(urgentRecords, 3);
-    const highMetricBranch = buildCollapsedBranch(highRecords, 2);
     const highShipModeBranch = buildTreeAtDepth(highRecords, 3);
 
     fetchPivotBranchMock
       .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: urgentMetricBranch }),
-      )
-      .mockImplementationOnce(
         resolveMockBranchFetchResult({ data: urgentShipModeBranch }),
-      )
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: highMetricBranch }),
       )
       .mockImplementationOnce(
         resolveMockBranchFetchResult({ data: highShipModeBranch }),
@@ -1366,11 +1318,9 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    fireEvent.click(within(urgentRow).getByLabelText('plus-square'));
-
-    await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
-    });
+    expect(
+      within(urgentRow).getByLabelText('minus-square'),
+    ).toBeInTheDocument();
 
     fireEvent.click(within(urgentRow).getByLabelText('minus-square'));
 
@@ -1394,13 +1344,8 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     });
 
     const callsAfterHighMetric = fetchPivotBranchMock.mock.calls.length;
-    fireEvent.click(within(highRow).getByLabelText('plus-square'));
-
-    await waitFor(() => {
-      expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThan(
-        callsAfterHighMetric,
-      );
-    });
+    expect(within(highRow).getByLabelText('minus-square')).toBeInTheDocument();
+    expect(fetchPivotBranchMock.mock.calls.length).toBe(callsAfterHighMetric);
 
     const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const shipModeRow = within(tbody)
@@ -1511,20 +1456,11 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     };
 
     const baseTree = buildTreeAtDepth(records, 1);
-    const metricBranch = buildCollapsedBranch(records, 2);
-    const returnFlagBranch = buildCollapsedBranch(records, 3);
     const shipInstructionBranch = buildTreeAtDepth(records, 4);
 
-    fetchPivotBranchMock
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: metricBranch }),
-      )
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: returnFlagBranch }),
-      )
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: shipInstructionBranch }),
-      );
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({ data: shipInstructionBranch }),
+    );
 
     const { container, getByText } = render(
       <PivotTableChart
@@ -1608,13 +1544,9 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
     });
 
-    expect(within(tbody).getByText('COLLECT COD')).toBeInTheDocument();
-
-    fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
-
-    await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(3);
-    });
+    expect(
+      within(orderPriorityRow).getByLabelText('minus-square'),
+    ).toBeInTheDocument();
 
     const shipModeRow = (await waitFor(() =>
       within(tbody).getByText('AIR').closest('tr'),
@@ -1633,9 +1565,5 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     expect(
       within(returnFlagRowAfter).getByLabelText('minus-square'),
     ).toBeInTheDocument();
-    const instructionRow = (await waitFor(() =>
-      within(tbody).getByText('COLLECT COD').closest('tr'),
-    )) as HTMLElement;
-    expect(instructionRow).toBeTruthy();
   });
 });

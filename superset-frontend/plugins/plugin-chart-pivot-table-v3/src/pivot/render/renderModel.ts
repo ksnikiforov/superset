@@ -137,9 +137,17 @@ const createColLeavesBuilder = ({
       node.path.every((val, idx) => val === leaf.path[idx]);
     const isBranchLeaf = (leaf: PivotTreeNode) =>
       leaf.path.length === node.path.length + 1 && isNodeDescendant(leaf);
-    const isMetricSubtotalAtDepth = (leaf: PivotTreeNode) =>
-      (isMetricGrandTotalNode(leaf) || isMetricSubtotalNode(leaf)) &&
-      countDimDepth(leaf.path) === dimDepth;
+    const isMetricSubtotalAtDepth = (leaf: PivotTreeNode) => {
+      const hasMetricAtLeaf =
+        decodeMetricKey(leaf.path[leaf.path.length - 1]) !== undefined;
+      return (
+        (isMetricGrandTotalNode(leaf) ||
+          isMetricSubtotalNode(leaf) ||
+          (hasMetricAtLeaf &&
+            config.normalizedColSubtotalLevels.includes(dimDepth))) &&
+        countDimDepth(leaf.path) === dimDepth
+      );
+    };
     const isSubtotalLeaf = (leaf: PivotTreeNode) =>
       isNodeDescendant(leaf) &&
       (isSubtotalToken(leaf.path[node.path.length]) ||
@@ -152,7 +160,11 @@ const createColLeavesBuilder = ({
       !leaf.path.some(val => decodeMeasureLeafId(val)) &&
       (isSubtotalToken(leaf.path[node.path.length]) ||
         isMetricSubtotalAtDepth(leaf));
-    if (!expandedCols.has(node.key) || children.length === 0) {
+    const isStructuralSubtotal = isExplicitSubtotalNode(node);
+    if (
+      (!expandedCols.has(node.key) && !isStructuralSubtotal) ||
+      children.length === 0
+    ) {
       const collapsedMetricLeaves = getCollapsedColLeaves(node);
       if (collapsedMetricLeaves.length === 0) {
         return [node];
@@ -207,7 +219,7 @@ const resolveAxisChildrenBeforeSubtotalPolicy = ({
   nodes,
   isLeafTierVisible,
   colTotals = false,
-  normalizedColSubtotalLevelCount = 0,
+  normalizedColSubtotalLevels = [],
 }: {
   program: PivotProgram;
   axis: PivotAxis;
@@ -215,11 +227,18 @@ const resolveAxisChildrenBeforeSubtotalPolicy = ({
   nodes: Record<string, PivotTreeNode>;
   isLeafTierVisible: boolean;
   colTotals?: boolean;
-  normalizedColSubtotalLevelCount?: number;
+  normalizedColSubtotalLevels?: number[];
 }): PivotTreeNode[] => {
   const children = findChildren(nodes, parent);
-  const { metricLabelSet, isMetricGrandTotalNode, isMetricSubtotalNode } =
-    createMetricNodePolicy(program);
+  if (axis === 'col' && isExplicitSubtotalNode(parent)) {
+    return children;
+  }
+  const {
+    metricLabelSet,
+    countDimDepth,
+    isMetricGrandTotalNode,
+    isMetricSubtotalNode,
+  } = createMetricNodePolicy(program);
   const metricIndex = getValuesLevelIndex(program, axis);
   const hideMetricHeader = shouldHideMetricHeaderOnAxis({
     program,
@@ -265,9 +284,13 @@ const resolveAxisChildrenBeforeSubtotalPolicy = ({
       hasNonMetricChildren: boolean,
     ) => {
       if (axis === 'col') {
+        const childIsConfiguredMetricSubtotal =
+          decodeMetricKey(child.path[child.path.length - 1]) !== undefined &&
+          normalizedColSubtotalLevels.includes(countDimDepth(child.path));
         return (
           isMetricGrandTotalNode(child) ||
-          (normalizedColSubtotalLevelCount > 0 && isMetricSubtotalNode(child))
+          isMetricSubtotalNode(child) ||
+          childIsConfiguredMetricSubtotal
         );
       }
       if (!hasNonMetricChildren) {
@@ -549,8 +572,8 @@ export const buildRenderModelAxes = ({
       nodes,
       isLeafTierVisible: config.isLeafTierVisible,
       colTotals: axis === 'row' ? config.colTotals : undefined,
-      normalizedColSubtotalLevelCount:
-        axis === 'col' ? config.normalizedColSubtotalLevels.length : undefined,
+      normalizedColSubtotalLevels:
+        axis === 'col' ? config.normalizedColSubtotalLevels : undefined,
     });
     if (axis === 'col') {
       return filtered;
@@ -639,7 +662,6 @@ export const buildRenderModel = ({
     expandedCols,
     config,
   });
-
   const columnHeaderRows = buildColumnHeaderRows(
     visibleCols,
     tree.cols,

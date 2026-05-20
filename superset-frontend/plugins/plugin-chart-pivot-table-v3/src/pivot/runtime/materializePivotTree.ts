@@ -81,7 +81,24 @@ type MaterializePivotTreeInput = {
 
 const emptyPivotTree = (): PivotTreeData => ({ rows: {}, cols: {}, cells: {} });
 
-const mergeTreeValueMaps = <T extends { values?: Record<string, unknown> }>(
+const mergeValues = <T extends { isSubtotal?: boolean }>(
+  existingValues: Record<string, unknown> | undefined,
+  incomingValues: Record<string, unknown> | undefined,
+  existing: T,
+  incoming: T,
+) => {
+  if (!incomingValues || Object.keys(incomingValues).length === 0) {
+    return existingValues;
+  }
+  if (incoming.isSubtotal) {
+    return { ...incomingValues, ...(existingValues || {}) };
+  }
+  return { ...(existingValues || {}), ...incomingValues };
+};
+
+const mergeTreeValueMaps = <
+  T extends { values?: Record<string, unknown>; isSubtotal?: boolean },
+>(
   left?: Record<string, T>,
   right?: Record<string, T>,
 ) => {
@@ -92,10 +109,7 @@ const mergeTreeValueMaps = <T extends { values?: Record<string, unknown> }>(
       result[key] = item;
       return;
     }
-    const values =
-      item.values && Object.keys(item.values).length > 0
-        ? { ...(existing.values || {}), ...item.values }
-        : existing.values;
+    const values = mergeValues(existing.values, item.values, existing, item);
     result[key] = {
       ...existing,
       ...item,
@@ -116,10 +130,7 @@ const mergeTreeCells = (
       result[key] = cell;
       return;
     }
-    const values =
-      cell.values && Object.keys(cell.values).length > 0
-        ? { ...(existing.values || {}), ...cell.values }
-        : existing.values;
+    const values = mergeValues(existing.values, cell.values, existing, cell);
     result[key] = {
       ...existing,
       ...cell,

@@ -28,6 +28,7 @@ import {
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
+import { buildMockBranchFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
@@ -150,9 +151,17 @@ describe('PivotTableChart concurrent expands', () => {
 
     const deferredA = createDeferred<FetchPivotBranchResult>();
     const deferredB = createDeferred<FetchPivotBranchResult>();
+    let paramsA: Parameters<typeof fetchPivotBranch>[0] | undefined;
+    let paramsB: Parameters<typeof fetchPivotBranch>[0] | undefined;
     fetchPivotBranchMock
-      .mockImplementationOnce(() => deferredA.promise)
-      .mockImplementationOnce(() => deferredB.promise);
+      .mockImplementationOnce(params => {
+        paramsA = params;
+        return deferredA.promise;
+      })
+      .mockImplementationOnce(params => {
+        paramsB = params;
+        return deferredB.promise;
+      });
 
     const { container } = renderChart(baseTree);
 
@@ -192,8 +201,10 @@ describe('PivotTableChart concurrent expands', () => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
     });
 
-    deferredB.resolve({ data: branchB, factBatches: [] });
-    deferredA.resolve({ data: branchA, factBatches: [] });
+    expect(paramsA).toBeDefined();
+    expect(paramsB).toBeDefined();
+    deferredB.resolve(buildMockBranchFetchResult(paramsB!, { data: branchB }));
+    deferredA.resolve(buildMockBranchFetchResult(paramsA!, { data: branchA }));
 
     await waitFor(() => {
       const latest = getPivotTable(container);
@@ -219,9 +230,17 @@ describe('PivotTableChart concurrent expands', () => {
 
     const deferredA = createDeferred<FetchPivotBranchResult>();
     const deferredB = createDeferred<FetchPivotBranchResult>();
+    let paramsA: Parameters<typeof fetchPivotBranch>[0] | undefined;
+    let paramsB: Parameters<typeof fetchPivotBranch>[0] | undefined;
     fetchPivotBranchMock
-      .mockImplementationOnce(() => deferredA.promise)
-      .mockImplementationOnce(() => deferredB.promise);
+      .mockImplementationOnce(params => {
+        paramsA = params;
+        return deferredA.promise;
+      })
+      .mockImplementationOnce(params => {
+        paramsB = params;
+        return deferredB.promise;
+      });
 
     const { container } = renderChart(baseTree);
 
@@ -260,7 +279,8 @@ describe('PivotTableChart concurrent expands', () => {
       expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
 
-    deferredA.resolve({ data: branchA, factBatches: [] });
+    expect(paramsA).toBeDefined();
+    deferredA.resolve(buildMockBranchFetchResult(paramsA!, { data: branchA }));
 
     await waitFor(() => {
       const latest = getPivotTable(container);
@@ -272,7 +292,8 @@ describe('PivotTableChart concurrent expands', () => {
       expect(scoped.queryByText('Z')).not.toBeInTheDocument();
     });
 
-    deferredB.resolve({ data: branchB, factBatches: [] });
+    expect(paramsB).toBeDefined();
+    deferredB.resolve(buildMockBranchFetchResult(paramsB!, { data: branchB }));
 
     await waitFor(() => {
       const latest = getPivotTable(container);

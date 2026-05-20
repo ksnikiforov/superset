@@ -926,8 +926,26 @@ export const buildInitialQuerySpecs = (
     layout.colTotals ||
     rowSubtotalLevels.length > 0 ||
     colSubtotalLevels.length > 0;
-  const firstRowDepth = rowGroupby.length > 0 ? 1 : 0;
-  const firstColDepth = colGroupby.length > 0 ? 1 : 0;
+  const rootVisibleDepth = (axis: PivotAxis, maxDepth: number) =>
+    Math.min(
+      layout.axisCoverageNeeds
+        .filter(
+          need =>
+            need.axis === axis &&
+            need.scope.kind === 'scopedFull' &&
+            need.scope.ancestorPaths.some(path => path.length === 0),
+        )
+        .reduce((depth, need) => Math.max(depth, need.depth), 0),
+      maxDepth,
+    );
+  const firstRowDepth =
+    rowGroupby.length > 0
+      ? Math.max(rootVisibleDepth('row', rowGroupby.length), 1)
+      : 0;
+  const firstColDepth =
+    colGroupby.length > 0
+      ? Math.max(rootVisibleDepth('col', colGroupby.length), 1)
+      : 0;
   type RootSpec = {
     rowDepth: number;
     columnDepth: number;

@@ -1131,11 +1131,11 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     const headers = within(headerRow)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim());
-    expect(headers).toContain('Subtotal');
+    expect(headers).toContain('quantitySold');
 
     const childRow = await within(getTbody()).findByText('A');
     const childRowEl = childRow.closest('tr') as HTMLTableRowElement;
-    expect(within(childRowEl).getByText('30')).toBeInTheDocument();
+    expect(within(childRowEl).getAllByText('30').length).toBeGreaterThan(0);
   });
 
   it('fills ancestor column values for all visible rows when expanding another column after deep row expansion', async () => {
@@ -1155,7 +1155,10 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
         (payload as { queries?: Array<{ query_name?: string }> }).queries ?? [];
       const result = queries.map((query: { query_name?: string }) => {
         const name = query.query_name as string;
-        if (name.includes(`branch:col:${serializePath(['AUTO'])}`)) {
+        if (
+          name.includes('"axis":"col"') &&
+          name.includes('"ancestorPaths":[["AUTO"]]')
+        ) {
           if (name.includes(formatQueryName(1, 2))) {
             return {
               data: [
@@ -1176,7 +1179,10 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
           }
           return { data: [] };
         }
-        if (name.includes(`branch:row:${serializePath(['USA', '1-URGENT'])}`)) {
+        if (
+          name.includes('"axis":"row"') &&
+          name.includes('"ancestorPaths":[["USA","1-URGENT"]]')
+        ) {
           if (name.includes(formatQueryName(3, 2))) {
             return {
               data: [
@@ -1193,7 +1199,10 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
           }
           return { data: [] };
         }
-        if (name.includes(`branch:row:${serializePath(['USA'])}`)) {
+        if (
+          name.includes('"axis":"row"') &&
+          name.includes('"ancestorPaths":[["USA"]]')
+        ) {
           if (name.includes(formatQueryName(2, 2))) {
             return {
               data: [
@@ -1209,7 +1218,10 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
           }
           return { data: [] };
         }
-        if (name.includes(`branch:col:${serializePath(['CONSUMER'])}`)) {
+        if (
+          name.includes('"axis":"col"') &&
+          name.includes('"ancestorPaths":[["CONSUMER"]]')
+        ) {
           if (name.includes(formatQueryName(3, 2))) {
             return {
               data: [

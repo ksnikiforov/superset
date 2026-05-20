@@ -60,9 +60,9 @@ describe('query naming (contracts)', () => {
     expect(
       specs.every(
         spec =>
-          spec.meta.factSelector.scope.kind === 'axisPaths' &&
+          spec.meta.factSelector.scope.kind === 'scopedFull' &&
           spec.meta.factSelector.scope.axis === 'row' &&
-          spec.meta.factSelector.scope.paths[0]?.[0] === dividerValue,
+          spec.meta.factSelector.scope.ancestorPaths[0]?.[0] === dividerValue,
       ),
     ).toBe(true);
   });
@@ -78,8 +78,8 @@ describe('query naming (contracts)', () => {
     expect(
       specs.every(
         spec =>
-          spec.meta.factSelector.scope.kind === 'axisPaths' &&
-          spec.meta.factSelector.scope.paths[0]?.[0] === null,
+          spec.meta.factSelector.scope.kind === 'scopedFull' &&
+          spec.meta.factSelector.scope.ancestorPaths[0]?.[0] === null,
       ),
     ).toBe(true);
   });
@@ -95,8 +95,8 @@ describe('query naming (contracts)', () => {
     expect(
       specs.every(
         spec =>
-          spec.meta.factSelector.scope.kind === 'axisPaths' &&
-          spec.meta.factSelector.scope.paths[0]?.[0] === undefined,
+          spec.meta.factSelector.scope.kind === 'scopedFull' &&
+          spec.meta.factSelector.scope.ancestorPaths[0]?.[0] === undefined,
       ),
     ).toBe(true);
   });

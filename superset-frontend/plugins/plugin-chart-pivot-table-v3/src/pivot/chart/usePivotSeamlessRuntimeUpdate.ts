@@ -264,6 +264,9 @@ export const usePivotSeamlessRuntimeUpdate = (
         applySeamlessUpdate(action.runtimeLayout, uiSelectedFilters);
         return;
       }
+      requestLifecycle.invalidate();
+      setLoading(false);
+      setError(undefined);
       commitUiRuntimeLayout(action.runtimeLayout);
       persistRuntimeState(action.runtimeLayout, uiSelectedFilters);
       seamlessSyncRef.current = action.syncSnapshot;
@@ -274,6 +277,7 @@ export const usePivotSeamlessRuntimeUpdate = (
       dimensionKeys,
       metricKeys,
       persistRuntimeState,
+      requestLifecycle,
       seamlessSyncRef,
       uiSelectedFilters,
       uiRuntimeLayoutRef,

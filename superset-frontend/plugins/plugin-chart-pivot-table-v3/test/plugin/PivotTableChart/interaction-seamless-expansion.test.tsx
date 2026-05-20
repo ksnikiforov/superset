@@ -3058,16 +3058,23 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       initialDepth: 2,
     });
 
-    fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
-      specs.map(spec => {
-        const { columns } = spec as {
-          columns?: Array<string | QueryFormColumn>;
-        };
-        if (hasColumnKey(columns, 'r2')) {
-          return { data: [] };
-        }
-        return { data: [{ r1: 'A', c1: 'X', m1: 10, m2: 20 }] };
-      }),
+    let resolveFetch: (() => void) | undefined;
+    const fetchPromise = new Promise<void>(resolve => {
+      resolveFetch = resolve;
+    });
+    fetchMock.mockImplementation(
+      async ({ specs }: { specs: Array<unknown> }) => {
+        await fetchPromise;
+        return specs.map(spec => {
+          const { columns } = spec as {
+            columns?: Array<string | QueryFormColumn>;
+          };
+          if (hasColumnKey(columns, 'r2')) {
+            return { data: [] };
+          }
+          return { data: [{ r1: 'A', c1: 'X', m1: 10, m2: 20 }] };
+        });
+      },
     );
 
     let resolveBranch:
@@ -3150,6 +3157,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(within(tbody).getByText('a1')).toBeInTheDocument();
     expect(within(tbody).getByText('a2')).toBeInTheDocument();
 
+    resolveFetch?.();
     if (resolveBranch) {
       resolveBranch({ data: undefined, factBatches: [] });
     }
@@ -3373,7 +3381,9 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       expect(within(tbody).queryByText('b2')).not.toBeInTheDocument(),
     );
 
-    expect(fetchPivotBranchMock).toHaveBeenCalledTimes(branchCallsBeforeMove);
+    expect(fetchPivotBranchMock).toHaveBeenCalledTimes(
+      branchCallsBeforeMove + 1,
+    );
   });
 
   it('seamless-reloads when moving Values to the front on a populated column axis', async () => {

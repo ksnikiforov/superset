@@ -27,6 +27,10 @@ import { METRICS_PLACEHOLDER } from '../../../src/pivot/core/tokens';
 import { fetchPivotExpansion as fetchPivotBranch } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
+import {
+  buildMockBranchFetchResult,
+  getMockExpansionRequestPath,
+} from '../fixtures/factBatches';
 
 jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
@@ -117,9 +121,11 @@ describe('PivotTableChart expansion with metrics at the row end', () => {
     );
     expect(branchTree.rows[serializePath(['AIR', '1-5'])]).toBeDefined();
 
-    fetchPivotBranchMock.mockImplementation(({ path }) => {
-      if (path?.[0] === 'AIR') {
-        return Promise.resolve({ data: branchTree, factBatches: [] });
+    fetchPivotBranchMock.mockImplementation(params => {
+      if (getMockExpansionRequestPath(params)[0] === 'AIR') {
+        return Promise.resolve(
+          buildMockBranchFetchResult(params, { data: branchTree }),
+        );
       }
       return Promise.resolve({ data: undefined, factBatches: [] });
     });
@@ -190,7 +196,7 @@ describe('PivotTableChart expansion with metrics at the row end', () => {
       expect(fetchPivotBranchMock).toHaveBeenCalled();
     });
     const lastCall = fetchPivotBranchMock.mock.calls.at(-1)?.[0];
-    expect(lastCall?.path).toEqual(['AIR']);
+    expect(lastCall && getMockExpansionRequestPath(lastCall)).toEqual(['AIR']);
     await waitForPivotReady();
 
     await waitFor(() => {

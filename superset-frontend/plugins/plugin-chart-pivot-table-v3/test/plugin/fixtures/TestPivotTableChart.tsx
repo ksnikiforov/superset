@@ -345,9 +345,9 @@ export const buildPreloadedBranchFactBatches = (
             facts: buildFactsForCoverage(tree, coverage),
             valueKeys,
             scope: {
-              kind: 'axisPaths',
+              kind: 'scopedFull',
               axis,
-              paths: [toDimensionalPath(path)],
+              ancestorPaths: [toDimensionalPath(path)],
             },
           });
         });
@@ -407,9 +407,9 @@ export const buildPreloadedRenderedBranchFactBatches = (
             facts: buildFactsForCoverage(tree, coverage),
             valueKeys,
             scope: {
-              kind: 'axisPaths',
+              kind: 'scopedFull',
               axis,
-              paths: [toDimensionalPath(node.path)],
+              ancestorPaths: [toDimensionalPath(node.path)],
             },
           });
         });

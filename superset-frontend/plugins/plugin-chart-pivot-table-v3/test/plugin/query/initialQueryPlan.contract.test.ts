@@ -53,7 +53,7 @@ describe('buildInitialQuerySpecs (contracts)', () => {
     ).toBe(false);
   });
 
-  it('keeps auto-expand intent in the manifest, not the bootstrap query plan', () => {
+  it('uses root scoped auto-expand coverage in the bootstrap query plan', () => {
     const formData = buildFormData({
       groupbyRows: ['r1', 'r2'],
       groupbyColumns: ['c1'],
@@ -88,10 +88,7 @@ describe('buildInitialQuerySpecs (contracts)', () => {
           spec.meta.factSelector.coverage.rowDepth,
           spec.meta.factSelector.coverage.columnDepth,
         ]),
-    ).not.toContainEqual([2, 1]);
-    expect(
-      specs.every(spec => spec.meta.factSelector.coverage.rowDepth <= 1),
-    ).toBe(true);
+    ).toContainEqual([2, 1]);
     expect(layout.axisCoverageNeeds).toContainEqual({
       axis: 'row',
       depth: 2,

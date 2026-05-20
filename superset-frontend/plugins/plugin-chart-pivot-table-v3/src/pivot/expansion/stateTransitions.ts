@@ -225,7 +225,7 @@ export const resolveExpansionToggleDecision = ({
   }
 
   const nextManualExpanded = new Set(manualExpanded);
-  addAncestors(node.path, nextManualExpanded, expanded);
+  addAncestors(node.path, nextManualExpanded);
   const nextManualCollapsed = new Set(manualCollapsed);
   nextManualCollapsed.delete(node.key);
   return {

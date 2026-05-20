@@ -94,11 +94,12 @@ const toFactPath = (path: PivotPath): PivotPath =>
 const buildFactsForCoverage = (
   tree: PivotTreeData | undefined,
   coverage: PivotFactCoverage,
+  specValueKeys: string[],
 ): PivotFact[] => {
   if (!tree) {
     return [];
   }
-  return Object.values(tree.cells).flatMap(cell => {
+  const cellFacts = Object.values(tree.cells).flatMap(cell => {
     const row = tree.rows[cell.rowKey];
     const col = tree.cols[cell.colKey];
     if (!row || !col) {
@@ -119,13 +120,54 @@ const buildFactsForCoverage = (
       value,
     }));
   });
+  if (cellFacts.length > 0) {
+    return cellFacts;
+  }
+  const rowPaths =
+    coverage.rowDepth === 0
+      ? [[]]
+      : Object.values(tree.rows)
+          .map(node => toFactPath(node.path))
+          .filter(path => path.length >= coverage.rowDepth)
+          .map(path => path.slice(0, coverage.rowDepth));
+  const columnPaths =
+    coverage.columnDepth === 0
+      ? [[]]
+      : Object.values(tree.cols)
+          .map(node => toFactPath(node.path))
+          .filter(path => path.length >= coverage.columnDepth)
+          .map(path => path.slice(0, coverage.columnDepth));
+  const loadedFactKeys = new Set(
+    cellFacts.map(fact =>
+      JSON.stringify([fact.rowPath, fact.columnPath, fact.valueKey]),
+    ),
+  );
+  const structuralFacts = rowPaths.flatMap(rowPath =>
+    columnPaths.flatMap(columnPath =>
+      specValueKeys.map(valueKey => ({
+        rowPath,
+        columnPath,
+        valueKey,
+        value: undefined,
+      })),
+    ),
+  );
+  return [
+    ...cellFacts,
+    ...structuralFacts.filter(
+      fact =>
+        !loadedFactKeys.has(
+          JSON.stringify([fact.rowPath, fact.columnPath, fact.valueKey]),
+        ),
+    ),
+  ];
 };
 
 const pathStartsWith = (path: PivotPath, prefix: PivotPath) =>
   prefix.every((value, index) => path[index] === value);
 
 const matchesAnyPath = (path: PivotPath, prefixes: PivotPath[]) =>
-  prefixes.some(prefix => pathStartsWith(path, prefix));
+  prefixes.some(prefix => pathStartsWith(path, toFactPath(prefix)));
 
 const buildFactsForScope = (
   facts: PivotFact[],
@@ -133,11 +175,18 @@ const buildFactsForScope = (
 ): PivotFact[] => {
   switch (scope.kind) {
     case 'branch':
-    case 'axisPaths': {
+    case 'axisPaths':
+    case 'scopedFull': {
       return facts.filter(fact =>
         scope.axis === 'row'
-          ? matchesAnyPath(fact.rowPath, scope.paths)
-          : matchesAnyPath(fact.columnPath, scope.paths),
+          ? matchesAnyPath(
+              fact.rowPath,
+              scope.kind === 'scopedFull' ? scope.ancestorPaths : scope.paths,
+            )
+          : matchesAnyPath(
+              fact.columnPath,
+              scope.kind === 'scopedFull' ? scope.ancestorPaths : scope.paths,
+            ),
       );
     }
     case 'intersection':
@@ -155,7 +204,11 @@ const buildFactsForSpec = (
   spec: PlannedQuerySpec,
   data?: PivotTreeData,
 ): PivotFact[] => {
-  const facts = buildFactsForCoverage(data, spec.meta.factSelector.coverage);
+  const facts = buildFactsForCoverage(
+    data,
+    spec.meta.factSelector.coverage,
+    spec.meta.factSelector.valueKeys,
+  );
   return buildFactsForScope(facts, spec.meta.factSelector.scope);
 };
 

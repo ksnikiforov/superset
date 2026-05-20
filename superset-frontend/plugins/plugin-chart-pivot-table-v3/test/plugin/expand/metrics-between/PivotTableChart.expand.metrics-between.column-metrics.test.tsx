@@ -395,9 +395,7 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
       2,
     );
 
-    fetchPivotBranchMock
-      .mockImplementationOnce(resolveBranchData(metricBranch))
-      .mockImplementationOnce(resolveBranchData(col1Branch));
+    fetchPivotBranchMock.mockImplementationOnce(resolveBranchData(col1Branch));
 
     const { container, findByText } = render(
       <PivotTableChart
@@ -445,21 +443,11 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
-    expect(await findByText('C3-A')).toBeInTheDocument();
+    expect(await findByText('C2-A')).toBeInTheDocument();
 
     const collapseMetricCell = within(thead)
       .getByText('measure1')
       .closest('th') as HTMLElement;
-    fireEvent.click(within(collapseMetricCell).getByLabelText('minus-square'));
-
-    const col1Cell = within(thead)
-      .getByText('C1-A')
-      .closest('th') as HTMLElement;
-    fireEvent.click(within(col1Cell).getByLabelText('plus-square'));
-
-    await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
-    });
     expect(await findByText('C2-A')).toBeInTheDocument();
     expect(within(thead).queryByText('C3-A')).not.toBeInTheDocument();
   });

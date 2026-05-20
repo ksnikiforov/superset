@@ -36,7 +36,7 @@ const baseLayout = (overrides: Partial<PivotRuntimeLayout> = {}) =>
   }) as PivotRuntimeLayout;
 
 describe('interaction drag layout helpers', () => {
-  it('inserts a new dimension before the value chip by default', () => {
+  it('appends a new dimension by default without moving the value chip', () => {
     const layout = baseLayout({
       rows: ['a', 'b'],
       valuePlacement: { axis: 'row', index: 1 },
@@ -46,8 +46,8 @@ describe('interaction drag layout helpers', () => {
       targetAxis: 'row',
       metricsAvailable: true,
     });
-    expect(next.rows).toEqual(['a', 'c', 'b']);
-    expect(next.valuePlacement).toEqual({ axis: 'row', index: 2 });
+    expect(next.rows).toEqual(['a', 'b', 'c']);
+    expect(next.valuePlacement).toEqual({ axis: 'row', index: 1 });
   });
 
   it('allows dropping a dimension after the last chip when value is first', () => {

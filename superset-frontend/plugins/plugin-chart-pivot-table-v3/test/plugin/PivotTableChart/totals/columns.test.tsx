@@ -1689,8 +1689,24 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       1,
       0,
     );
+    const rowTotals = buildTreeFromRecords(
+      [
+        {
+          c1: 'A',
+          c2: 'B',
+          c3: 'C',
+          measure1: 1,
+          measure2: 2,
+        },
+      ],
+      metrics,
+      ['r1'],
+      ['c1', 'c2', 'c3'],
+      0,
+      3,
+    );
     const tree = applyMetricAxis(
-      mergeTrees(detail, totals),
+      mergeTrees(mergeTrees(detail, totals), rowTotals),
       metrics,
       MetricsLayoutEnum.COLUMNS,
       ['r1'],

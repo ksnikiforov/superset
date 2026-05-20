@@ -26,6 +26,7 @@ import type { FetchPivotExpansionResult as FetchPivotBranchResult } from '../../
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
+import { buildMockBranchFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
@@ -142,23 +143,31 @@ describe('PivotTableChart cross-axis expands (no blanks)', () => {
 
   it('does not expose deep row+col intersections until required intersection values are available', async () => {
     const baseTree = buildTree(records, 1, 1);
-    const rowBranch = buildTree(
+    const fullRowBranch = buildTree(
       records.filter(row => row.r1 === 'A'),
       2,
-      1,
+      2,
     );
-    const colBranch = buildTree(
+    const fullColBranch = buildTree(
       records.filter(row => row.c1 === 'C'),
-      1,
+      2,
       2,
     );
 
     const deferredRow = createDeferred<FetchPivotBranchResult>();
     const deferredCol = createDeferred<FetchPivotBranchResult>();
+    let rowParams: Parameters<typeof fetchPivotBranch>[0] | undefined;
+    let colParams: Parameters<typeof fetchPivotBranch>[0] | undefined;
 
     fetchPivotBranchMock
-      .mockImplementationOnce(() => deferredRow.promise)
-      .mockImplementationOnce(() => deferredCol.promise)
+      .mockImplementationOnce(params => {
+        rowParams = params;
+        return deferredRow.promise;
+      })
+      .mockImplementationOnce(params => {
+        colParams = params;
+        return deferredCol.promise;
+      })
       .mockImplementation(() => neverResolve<FetchPivotBranchResult>());
 
     const { container, unmount } = renderChart(baseTree);
@@ -219,22 +228,23 @@ describe('PivotTableChart cross-axis expands (no blanks)', () => {
       expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(2),
     );
 
-    deferredCol.resolve({ data: colBranch, factBatches: [] });
-    deferredRow.resolve({ data: rowBranch, factBatches: [] });
+    expect(rowParams).toBeDefined();
+    expect(colParams).toBeDefined();
+    deferredCol.resolve(
+      buildMockBranchFetchResult(colParams!, { data: fullColBranch }),
+    );
+    deferredRow.resolve(
+      buildMockBranchFetchResult(rowParams!, { data: fullRowBranch }),
+    );
 
     await Promise.all(
       fetchPivotBranchMock.mock.results.slice(0, 2).map(result => result.value),
     );
 
-    await waitFor(() =>
-      expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(3),
-    );
-
     await waitFor(() => {
-      const deepRow = screen.queryByText('X');
-      const deepCol = screen.queryByText('U');
-      expect(screen.queryByText('10')).not.toBeInTheDocument();
-      expect(!(deepRow && deepCol)).toBe(true);
+      expect(screen.getByText('X')).toBeInTheDocument();
+      expect(screen.getByText('U')).toBeInTheDocument();
+      expect(screen.getByText('10')).toBeInTheDocument();
     });
 
     unmount();

@@ -394,7 +394,10 @@ export const useExpansionEngine = ({
 
   const hydrateAtomic = useCallback(
     async (persistOnComplete = false) => {
-      const requestScope = expansionRequestLifecycle.beginScope();
+      const requestScope = expansionRequestLifecycle.beginScope({
+        cancelActive: false,
+        latestOnly: false,
+      });
       setLoadingKeys(new Set());
 
       try {

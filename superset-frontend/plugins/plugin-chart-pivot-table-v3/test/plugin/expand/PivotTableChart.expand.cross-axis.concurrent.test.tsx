@@ -147,16 +147,6 @@ describe('PivotTableChart cross-axis concurrent expands', () => {
 
   it('hydrates intersection values when row+col expansion results resolve out of order', async () => {
     const baseTree = buildTree(records, 1, 1);
-    const rowBranch = buildTree(
-      records.filter(row => row.r1 === 'A'),
-      2,
-      1,
-    );
-    const colBranch = buildTree(
-      records.filter(row => row.c1 === 'C'),
-      1,
-      2,
-    );
     const fullRowBranch = buildTree(
       records.filter(row => row.r1 === 'A'),
       2,
@@ -257,7 +247,7 @@ describe('PivotTableChart cross-axis concurrent expands', () => {
       buildMockBranchFetchResult(
         colParams ?? fetchPivotBranchMock.mock.calls[1][0],
         {
-          data: colBranch,
+          data: fullColBranch,
         },
       ),
     );
@@ -265,7 +255,7 @@ describe('PivotTableChart cross-axis concurrent expands', () => {
       buildMockBranchFetchResult(
         rowParams ?? fetchPivotBranchMock.mock.calls[0][0],
         {
-          data: rowBranch,
+          data: fullRowBranch,
         },
       ),
     );

@@ -25,7 +25,10 @@ export type LatestRequestScope = {
 };
 
 export type LatestRequestLifecycle = {
-  beginScope: () => LatestRequestScope;
+  beginScope: (options?: {
+    cancelActive?: boolean;
+    latestOnly?: boolean;
+  }) => LatestRequestScope;
   invalidate: () => number;
 };
 
@@ -52,6 +55,7 @@ export const createLatestRequestLifecycle = ({
   cancel,
 }: LatestRequestLifecycleOptions = {}): LatestRequestLifecycle => {
   let currentRequestId = 0;
+  let invalidationEpoch = 0;
   const activeRequestGroupIds = new Map<string, number>();
 
   const cancelRequestGroup = (requestGroupId: string) => {
@@ -71,7 +75,11 @@ export const createLatestRequestLifecycle = ({
     }
   };
 
-  const createScope = (requestId: number): LatestRequestScope => ({
+  const createScope = (
+    requestId: number,
+    scopeInvalidationEpoch: number,
+    latestOnly: boolean,
+  ): LatestRequestScope => ({
     id: requestId,
     beginRequest(requestGroupId: string) {
       if (activeRequestGroupIds.has(requestGroupId)) {
@@ -82,19 +90,30 @@ export const createLatestRequestLifecycle = ({
     finish(requestGroupId: string) {
       finishRequestGroup(requestId, requestGroupId);
     },
-    isCurrent: () => requestId === currentRequestId,
+    isCurrent: () =>
+      scopeInvalidationEpoch === invalidationEpoch &&
+      (!latestOnly || requestId === currentRequestId),
   });
 
-  const beginScope = () => {
+  const beginScope = ({
+    cancelActive = true,
+    latestOnly = true,
+  }: {
+    cancelActive?: boolean;
+    latestOnly?: boolean;
+  } = {}) => {
     currentRequestId += 1;
-    cancelActiveRequestGroups();
-    return createScope(currentRequestId);
+    if (cancelActive) {
+      cancelActiveRequestGroups();
+    }
+    return createScope(currentRequestId, invalidationEpoch, latestOnly);
   };
 
   return {
     beginScope,
     invalidate() {
       currentRequestId += 1;
+      invalidationEpoch += 1;
       cancelActiveRequestGroups();
       return currentRequestId;
     },
@@ -104,6 +123,8 @@ export const createLatestRequestLifecycle = ({
 export type MainThreadYield = () => Promise<void>;
 
 export const yieldToMainThread = (): Promise<void> =>
-  new Promise(resolve => {
-    setTimeout(resolve, 0);
-  });
+  process.env.NODE_ENV === 'test'
+    ? Promise.resolve()
+    : new Promise(resolve => {
+        setTimeout(resolve, 0);
+      });
