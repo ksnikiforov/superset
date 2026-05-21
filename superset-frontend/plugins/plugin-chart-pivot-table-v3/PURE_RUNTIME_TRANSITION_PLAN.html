@@ -1,0 +1,1185 @@
+<!--
+Licensed to the Apache Software Foundation (ASF) under one
+or more contributor license agreements.  See the NOTICE file
+distributed with this work for additional information
+regarding copyright ownership.  The ASF licenses this file
+to you under the Apache License, Version 2.0 (the
+"License"); you may not use this file except in compliance
+with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an
+"AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+KIND, either express or implied.  See the License for the
+specific language governing permissions and limitations
+under the License.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pivot v3 Pure Runtime Transition</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f8fa;
+        --surface: #ffffff;
+        --surface-soft: #f1f4f7;
+        --text: #17202a;
+        --muted: #5f6b7a;
+        --line: #d9e0e7;
+        --blue: #1f6feb;
+        --blue-soft: #e8f1ff;
+        --amber: #9a6700;
+        --amber-soft: #fff4ce;
+        --red: #b42318;
+        --red-soft: #ffe9e7;
+        --green: #1a7f37;
+        --green-soft: #e8f5ec;
+        --violet: #6f42c1;
+        --violet-soft: #f1e9ff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.45;
+      }
+
+      main {
+        width: min(1400px, calc(100% - 48px));
+        margin: 0 auto;
+        padding: 32px 0 48px;
+      }
+
+      header {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 24px;
+      }
+
+      h1,
+      h2 {
+        margin: 0;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        font-size: 30px;
+        line-height: 1.15;
+      }
+
+      h2 {
+        font-size: 19px;
+        margin-top: 30px;
+        margin-bottom: 12px;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        padding: 16px;
+        margin-bottom: 18px;
+      }
+
+      .panel-grid {
+        display: grid;
+        grid-template-columns: 1fr 1.1fr;
+        gap: 18px;
+        align-items: start;
+      }
+
+      .panel h2 {
+        margin-top: 0;
+      }
+
+      .pipeline {
+        margin: 0;
+        padding: 14px;
+        overflow-x: auto;
+        border-radius: 8px;
+        background: #0f172a;
+        color: #e2e8f0;
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .plain-list,
+      .ordered-list {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--muted);
+      }
+
+      .plain-list li,
+      .ordered-list li {
+        margin: 6px 0;
+      }
+
+      .details-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+
+      .detail-card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        padding: 14px;
+      }
+
+      .detail-card h3 {
+        margin: 0 0 10px;
+        font-size: 14px;
+      }
+
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin: 20px 0 28px;
+      }
+
+      .metric {
+        min-height: 92px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+        padding: 14px 16px;
+      }
+
+      .metric-label {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .metric-value {
+        display: block;
+        margin-top: 8px;
+        font-size: 24px;
+        font-weight: 700;
+      }
+
+      .metric-note {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 1080px;
+      }
+
+      th,
+      td {
+        padding: 11px 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+        font-size: 13px;
+      }
+
+      th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--surface-soft);
+        color: #334155;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .num {
+        text-align: right;
+        white-space: nowrap;
+      }
+
+      .item {
+        min-width: 210px;
+        font-weight: 650;
+      }
+
+      .criteria {
+        min-width: 300px;
+      }
+
+      .problem {
+        min-width: 300px;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .status-progress {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .status-not-done,
+      .track-failing,
+      .track-gap,
+      .track-above {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .status-done,
+      .track-guarded {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .track-watch,
+      .track-review,
+      .track-not-run {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .track {
+        background: var(--violet-soft);
+        color: var(--violet);
+      }
+
+      .done-row td {
+        color: var(--muted);
+        text-decoration: line-through;
+        text-decoration-thickness: 1px;
+      }
+
+      .done-row .badge {
+        text-decoration: line-through;
+      }
+
+      .targets {
+        display: grid;
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+
+      .target-row {
+        display: grid;
+        grid-template-columns: 200px 1fr;
+        gap: 12px;
+        align-items: start;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .target-name {
+        padding-top: 9px;
+        color: var(--text);
+      }
+
+      .target-scale {
+        position: relative;
+        height: 26px;
+      }
+
+      .target-track {
+        position: absolute;
+        top: 8px;
+        right: 0;
+        left: 0;
+        height: 8px;
+        border-radius: 999px;
+        background: #e5e7eb;
+      }
+
+      .target-over {
+        position: absolute;
+        top: 0;
+        right: 0;
+        height: 100%;
+        border-radius: 999px;
+        background: rgba(180, 35, 24, 0.12);
+      }
+
+      .target-line {
+        position: absolute;
+        top: 1px;
+        width: 2px;
+        height: 22px;
+        transform: translateX(-1px);
+        border-radius: 999px;
+      }
+
+      .target-current {
+        background: var(--blue);
+      }
+
+      .target-start {
+        background: #64748b;
+      }
+
+      .target-threshold {
+        background: var(--red);
+      }
+
+      .target-range {
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .target-values {
+        grid-column: 2;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 14px;
+        margin-top: -4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .target-values span {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        white-space: nowrap;
+      }
+
+      .target-values span::before {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #64748b;
+        content: "";
+      }
+
+      .target-values .value-current::before {
+        background: var(--blue);
+      }
+
+      .target-values .value-target::before {
+        background: var(--red);
+      }
+
+      code {
+        padding: 1px 4px;
+        border-radius: 4px;
+        background: var(--surface-soft);
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-size: 0.93em;
+      }
+
+      @media (max-width: 900px) {
+        main {
+          width: min(100% - 24px, 1400px);
+          padding-top: 20px;
+        }
+
+        .summary {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .panel-grid,
+        .details-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .target-row {
+          grid-template-columns: 1fr;
+          gap: 6px;
+        }
+
+        .target-values {
+          grid-column: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Pivot v3 Pure Runtime Transition</h1>
+        <p>
+          Main tracker for the current transition plan. Active work is first;
+          completed work is archived at the bottom of the progress table.
+        </p>
+      </header>
+
+      <section class="panel">
+        <div class="panel-grid">
+          <div>
+            <h2>Goal</h2>
+            <p>
+              Finish the transition to a pure pivot runtime with fewer authority
+              layers and a smaller core engine. Only fetches, fact-store
+              mutation, and persistence should have side effects. Tree nodes and
+              rendered cells are projections, not canonical state.
+            </p>
+          </div>
+          <div>
+            <h2>Target Pipeline</h2>
+            <pre class="pipeline">form data + UI intent
+  -&gt; compilePivotProgram
+  -&gt; build required visible coverage
+  -&gt; diff against PivotFactStore coverage
+  -&gt; plan transport batches for missing coverage
+  -&gt; fetch DB aggregate facts
+  -&gt; ingest exact fact batches into PivotFactStore
+  -&gt; materializePivotTree
+  -&gt; render/export</pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="summary" aria-label="Summary">
+        <div class="metric">
+          <span class="metric-label">Active tasks</span>
+          <span class="metric-value">11</span>
+          <span class="metric-note">8 in progress, 3 not done</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Completed tasks</span>
+          <span class="metric-value">6</span>
+          <span class="metric-note">Archived in the table</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Plugin tests</span>
+          <span class="metric-value">1 failing</span>
+          <span class="metric-note">Query-context signature test</span>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Next best move</span>
+          <span class="metric-value">Fix tests</span>
+          <span class="metric-note">Then reduce scheduler state</span>
+        </div>
+      </section>
+
+      <h2>Line Targets</h2>
+      <div class="targets" aria-label="Line target position">
+        <div class="target-row">
+          <strong class="target-name">Full production src</strong>
+          <div>
+            <div
+              class="target-scale"
+              aria-label="Fixed scale from 0 to 35000 lines; start 33510; target 20000; current 26528"
+            >
+              <div class="target-track">
+                <span class="target-over" style="left: 57.1%"></span>
+              </div>
+              <span
+                class="target-line target-threshold"
+                style="left: 57.1%"
+              ></span>
+              <span class="target-line target-current" style="left: 75.8%"></span>
+              <span class="target-line target-start" style="left: 95.7%"></span>
+            </div>
+            <div class="target-range">
+              <span>0</span>
+              <span>fixed max 35,000</span>
+            </div>
+          </div>
+          <div class="target-values">
+            <span>start 33,510</span>
+            <span class="value-current">current 26,528</span>
+            <span class="value-target">target &lt;20,000</span>
+          </div>
+        </div>
+        <div class="target-row">
+          <strong class="target-name">Strict core pipeline</strong>
+          <div>
+            <div
+              class="target-scale"
+              aria-label="Fixed scale from 0 to 13000 lines; start 12907; target 8000; current 10564"
+            >
+              <div class="target-track">
+                <span class="target-over" style="left: 61.5%"></span>
+              </div>
+              <span
+                class="target-line target-threshold"
+                style="left: 61.5%"
+              ></span>
+              <span class="target-line target-current" style="left: 81.3%"></span>
+              <span class="target-line target-start" style="left: 99.3%"></span>
+            </div>
+            <div class="target-range">
+              <span>0</span>
+              <span>fixed max 13,000</span>
+            </div>
+          </div>
+          <div class="target-values">
+            <span>start 12,907</span>
+            <span class="value-current">current 10,564</span>
+            <span class="value-target">target &lt;8,000</span>
+          </div>
+        </div>
+        <div class="target-row">
+          <strong class="target-name">Diagnostic core dirs</strong>
+          <div>
+            <div
+              class="target-scale"
+              aria-label="Fixed scale from 0 to 9000 lines; start 8698; current 7660; no hard threshold"
+            >
+              <div class="target-track"></div>
+              <span class="target-line target-current" style="left: 85.1%"></span>
+              <span class="target-line target-start" style="left: 96.6%"></span>
+            </div>
+            <div class="target-range">
+              <span>0</span>
+              <span>fixed max 9,000</span>
+            </div>
+          </div>
+          <div class="target-values">
+            <span>start 8,698</span>
+            <span class="value-current">current 7,660</span>
+            <span>watch drift</span>
+          </div>
+        </div>
+      </div>
+
+      <h2>Current Metrics</h2>
+      <div class="details-grid">
+        <div class="detail-card">
+          <h3>Baseline</h3>
+          <p><code>7088db374448845ef6e71cf74817aa53efbc5fc1</code></p>
+        </div>
+        <div class="detail-card">
+          <h3>Latest Slice Delta</h3>
+          <p>
+            Measured from <code>e5cfa7f0ee928a8c36e98e1486f75cb0eff6edd8</code>:
+            <strong>+129</strong> production <code>src</code> lines
+            (<code>+1273</code> / <code>-1144</code>). The next runtime slice
+            should be deletion-positive.
+          </p>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Scope</th>
+              <th>Baseline Lines</th>
+              <th>Current Lines</th>
+              <th>Delta</th>
+              <th>Target</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="item">Full production src</td>
+              <td class="num">33,510</td>
+              <td class="num">26,528</td>
+              <td class="num">-6,982</td>
+              <td>&lt;20,000</td>
+            </tr>
+            <tr>
+              <td class="item">Strict core pipeline</td>
+              <td class="num">12,907</td>
+              <td class="num">10,564</td>
+              <td class="num">-2,343</td>
+              <td>&lt;8,000</td>
+            </tr>
+            <tr>
+              <td class="item">Core pipeline dirs diagnostic</td>
+              <td class="num">8,698</td>
+              <td class="num">7,660</td>
+              <td class="num">-1,038</td>
+              <td>Lower over time</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Progress Tracker</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Status</th>
+              <th>Current Problem</th>
+              <th>Impact</th>
+              <th>Difficulty</th>
+              <th>Confidence</th>
+              <th>Ease</th>
+              <th>ICE</th>
+              <th>Success Criteria</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="item">Query-context-scoped fact matching</td>
+              <td><span class="badge status-progress">In progress</span></td>
+              <td class="problem">
+                The structure exists, but the suite is red because adhoc filter
+                signature shape is inconsistent.
+              </td>
+              <td class="num">10</td>
+              <td>Easy-medium</td>
+              <td class="num">8</td>
+              <td class="num">7</td>
+              <td class="num">560</td>
+              <td class="criteria">
+                Filtered, unfiltered, and time-offset fact batches cannot
+                satisfy each other, and the upstream signature test passes with
+                the intended filter shape.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Fix failing upstream query-context signature test</td>
+              <td><span class="badge status-not-done">Not done</span></td>
+              <td class="problem">
+                <code>buildPivotFactQueryContextKey</code> preserves Superset
+                adhoc filter shape, while the test expects normalized
+                <code>{ col, op, val }</code>.
+              </td>
+              <td class="num">9</td>
+              <td>Easy</td>
+              <td class="num">9</td>
+              <td class="num">9</td>
+              <td class="num">729</td>
+              <td class="criteria">
+                The expected signature is intentionally updated or the code
+                normalizes adhoc filters; <code>seamlessRuntimeUpdate.test.ts</code>
+                passes.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Keep plugin test suite green</td>
+              <td><span class="badge status-not-done">Not done</span></td>
+              <td class="problem">
+                Current checkout has <code>1</code> failing test out of
+                <code>701</code>.
+              </td>
+              <td class="num">10</td>
+              <td>Easy after signature fix</td>
+              <td class="num">8</td>
+              <td class="num">8</td>
+              <td class="num">640</td>
+              <td class="criteria">
+                <code>npm test plugins/plugin-chart-pivot-table-v3</code>
+                passes with <code>0</code> failed suites/tests.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Reduce expansion scheduler state in useExpansionEngine.ts</td>
+              <td><span class="badge status-progress">In progress</span></td>
+              <td class="problem">
+                Manifest decides loading, but the hook still owns too much
+                request, loading, persistence, and commit orchestration.
+              </td>
+              <td class="num">9</td>
+              <td>Medium</td>
+              <td class="num">8</td>
+              <td class="num">5</td>
+              <td class="num">360</td>
+              <td class="criteria">
+                Hook delegates fetch execution/lifecycle decisions to a smaller
+                manifest executor and loses meaningful local state/branches.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Remove duplicated row/column hydration orchestration</td>
+              <td><span class="badge status-progress">In progress</span></td>
+              <td class="problem">
+                Row and column paths still require parallel handling in
+                hydration/reinitialization logic.
+              </td>
+              <td class="num">9</td>
+              <td>Medium-hard</td>
+              <td class="num">7</td>
+              <td class="num">4</td>
+              <td class="num">252</td>
+              <td class="criteria">
+                One shared hydration execution path handles both axes without
+                duplicated row/column lifecycle code.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Separate materializer tree construction from subtotal injection</td>
+              <td><span class="badge status-progress">In progress</span></td>
+              <td class="problem">
+                <code>materializePivotTree.ts</code> builds semantic nodes and
+                injects subtotal leaves in the same flow.
+              </td>
+              <td class="num">8</td>
+              <td>Hard</td>
+              <td class="num">7</td>
+              <td class="num">3</td>
+              <td class="num">168</td>
+              <td class="criteria">
+                Fact-tree construction can run without subtotal injection;
+                subtotal behavior is isolated and covered by focused tests.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Separate materializer tree construction from measure-axis projection</td>
+              <td><span class="badge status-progress">In progress</span></td>
+              <td class="problem">
+                Measure-axis projection, hidden leaf behavior, and single-metric
+                behavior are interleaved with tree materialization.
+              </td>
+              <td class="num">9</td>
+              <td>Hard</td>
+              <td class="num">6</td>
+              <td class="num">3</td>
+              <td class="num">162</td>
+              <td class="criteria">
+                Measure-axis projection has one tested owner; materialization no
+                longer duplicates or repairs measure-tier behavior elsewhere.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Separate semantic materialization from display labeling</td>
+              <td><span class="badge status-progress">In progress</span></td>
+              <td class="problem">
+                Materialization still formats/labels some nodes while building
+                semantic tree shape.
+              </td>
+              <td class="num">7</td>
+              <td>Medium</td>
+              <td class="num">7</td>
+              <td class="num">5</td>
+              <td class="num">245</td>
+              <td class="criteria">
+                Semantic tree construction is independent from display labels
+                except for explicitly documented, tested projection boundaries.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Remove metric/header/subtotal inference from renderModel.ts</td>
+              <td><span class="badge status-progress">In progress</span></td>
+              <td class="problem">
+                Render model still infers metric, subtotal, and collapsed-header
+                structure instead of only traversing materialized semantics.
+              </td>
+              <td class="num">9</td>
+              <td>Hard</td>
+              <td class="num">6</td>
+              <td class="num">3</td>
+              <td class="num">162</td>
+              <td class="criteria">
+                Render model no longer invents metric/subtotal/header nodes;
+                tests prove behavior comes from materialized tree structure.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Make render/export pure projections over materialized tree</td>
+              <td><span class="badge status-not-done">Not done</span></td>
+              <td class="problem">
+                Render and export still have separate structural assumptions and
+                repair-like behavior.
+              </td>
+              <td class="num">9</td>
+              <td>Hard</td>
+              <td class="num">5</td>
+              <td class="num">3</td>
+              <td class="num">135</td>
+              <td class="criteria">
+                Render and export consume the same materialized semantic tree
+                with no divergent structural reconstruction.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Shrink PivotTableChart.tsx runtime coordination</td>
+              <td><span class="badge status-progress">In progress</span></td>
+              <td class="problem">
+                Chart still coordinates seamless runtime sync, expansion, layout
+                state, filtering, and materialization boundaries.
+              </td>
+              <td class="num">7</td>
+              <td>Medium-hard</td>
+              <td class="num">7</td>
+              <td class="num">4</td>
+              <td class="num">196</td>
+              <td class="criteria">
+                Chart mostly wires hooks/props; runtime decisions live in
+                runtime, expansion, materialization, or interaction modules.
+              </td>
+            </tr>
+            <tr class="done-row">
+              <td class="item">Compiled pivot program owns layout semantics</td>
+              <td><span class="badge status-done">Done</span></td>
+              <td class="problem">
+                Previous risk was multiple places interpreting pivot layout
+                semantics independently.
+              </td>
+              <td class="num">10</td>
+              <td>Done</td>
+              <td class="num">9</td>
+              <td class="num">10</td>
+              <td class="num">900</td>
+              <td class="criteria">
+                Layout semantics flow through <code>compilePivotProgram</code>;
+                no equivalent parallel semantic compiler remains.
+              </td>
+            </tr>
+            <tr class="done-row">
+              <td class="item">Initial root coverage lives in coverage layer</td>
+              <td><span class="badge status-done">Done</span></td>
+              <td class="problem">
+                Previous root-load behavior was partly embedded in query
+                planning.
+              </td>
+              <td class="num">9</td>
+              <td>Done</td>
+              <td class="num">9</td>
+              <td class="num">10</td>
+              <td class="num">810</td>
+              <td class="criteria">
+                Initial query planning consumes coverage needs from the coverage
+                layer.
+              </td>
+            </tr>
+            <tr class="done-row">
+              <td class="item">Pre-expansion compiles into manifest coverage</td>
+              <td><span class="badge status-done">Done</span></td>
+              <td class="problem">
+                Previous pre-expand behavior could act like a separate loading
+                model.
+              </td>
+              <td class="num">9</td>
+              <td>Done</td>
+              <td class="num">9</td>
+              <td class="num">10</td>
+              <td class="num">810</td>
+              <td class="criteria">
+                Configured pre-expand levels produce manifest coverage needs
+                like manual expansion.
+              </td>
+            </tr>
+            <tr class="done-row">
+              <td class="item">Manual/persisted expansion hydration is manifest-planned</td>
+              <td><span class="badge status-done">Done</span></td>
+              <td class="problem">
+                Previous hydration risk was deriving fetch needs from tree
+                shape.
+              </td>
+              <td class="num">10</td>
+              <td>Done</td>
+              <td class="num">9</td>
+              <td class="num">10</td>
+              <td class="num">900</td>
+              <td class="criteria">
+                Hydration derives required coverage from explicit intent plus
+                configured needs, then diffs through manifest coverage.
+              </td>
+            </tr>
+            <tr class="done-row">
+              <td class="item">Fact store owns loaded coverage</td>
+              <td><span class="badge status-done">Done</span></td>
+              <td class="problem">
+                Previous loaded state could be inferred from tree shape or chart
+                state.
+              </td>
+              <td class="num">10</td>
+              <td>Done</td>
+              <td class="num">9</td>
+              <td class="num">10</td>
+              <td class="num">900</td>
+              <td class="criteria">
+                Loaded state is represented by fact batches/selectors; planning
+                checks fact-store coverage.
+              </td>
+            </tr>
+            <tr class="done-row">
+              <td class="item">Update transition-plan metrics</td>
+              <td><span class="badge status-done">Done</span></td>
+              <td class="problem">
+                Plan line counts must stay current so progress accounting is
+                not misleading.
+              </td>
+              <td class="num">4</td>
+              <td>Easy</td>
+              <td class="num">10</td>
+              <td class="num">10</td>
+              <td class="num">400</td>
+              <td class="criteria">
+                The plan reflects measured current full <code>src</code>,
+                strict core, diagnostic core dirs, and latest-slice delta.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Constraints And Gates</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Constraint</th>
+              <th>Tracking State</th>
+              <th>Current Problem</th>
+              <th>Current</th>
+              <th>Target</th>
+              <th>Passing Criteria</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="item">Full production src size</td>
+              <td><span class="badge track-above">Above target</span></td>
+              <td class="problem">
+                Source is smaller than baseline but still above the transition
+                target.
+              </td>
+              <td>26,528 lines</td>
+              <td>&lt;20,000 lines</td>
+              <td class="criteria">
+                Final transition state is below target without moving production
+                authority into test fixtures or compatibility adapters.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Strict core pipeline size</td>
+              <td><span class="badge track-above">Above target</span></td>
+              <td class="problem">
+                Core still contains too much scheduler/materializer/render-policy
+                code.
+              </td>
+              <td>10,564 lines</td>
+              <td>&lt;8,000 lines</td>
+              <td class="criteria">
+                Runtime, expansion, query, layout/core, domain helper, and
+                support scope total is below target.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Diagnostic core dirs size</td>
+              <td><span class="badge track-watch">Watch</span></td>
+              <td class="problem">
+                Core pipeline dirs are below baseline but still useful as a
+                drift signal.
+              </td>
+              <td>7,660 lines</td>
+              <td>Lower over time</td>
+              <td class="criteria">
+                <code>pivot/runtime</code>, <code>pivot/expansion</code>,
+                <code>pivot/query</code>, <code>pivot/layout</code>, and
+                <code>pivot/core</code> do not grow without deleting a larger
+                authority surface.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Plugin test suite</td>
+              <td><span class="badge track-failing">Failing</span></td>
+              <td class="problem">
+                Current run has one failing query-context signature test.
+              </td>
+              <td>1 failing test</td>
+              <td>0 failing tests</td>
+              <td class="criteria">
+                <code>npm test plugins/plugin-chart-pivot-table-v3</code>
+                passes.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Hidden/not-expanded layers do not fetch</td>
+              <td><span class="badge track-guarded">Guarded</span></td>
+              <td class="problem">
+                Must remain true while scheduler and materializer code are
+                reduced.
+              </td>
+              <td>Guarded by tests</td>
+              <td>Always true</td>
+              <td class="criteria">
+                Adding a hidden trailing dimension or collapsed layer does not
+                create a query need.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Semantic layout changes are query-backed</td>
+              <td><span class="badge track-guarded">Guarded</span></td>
+              <td class="problem">
+                Local projection from old facts must not reappear during cleanup.
+              </td>
+              <td>Guarded by tests</td>
+              <td>Always true</td>
+              <td class="criteria">
+                Semantic layout changes fetch or reuse tested fact-store
+                coverage; they are not projected from stale tree shape.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Interactions stay live during requests/materialization</td>
+              <td><span class="badge track-guarded">Guarded</span></td>
+              <td class="problem">
+                Async fetch/materialization boundaries must survive further
+                deletion.
+              </td>
+              <td>Guarded by chart tests</td>
+              <td>Always true</td>
+              <td class="criteria">
+                Interaction tests pass while expansion/seamless requests and
+                async materialization are in progress.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Render/export do not repair semantics</td>
+              <td><span class="badge track-gap">Gap</span></td>
+              <td class="problem">
+                Render still contains structural inference and export has
+                separate assumptions.
+              </td>
+              <td>Partially true</td>
+              <td>Always true</td>
+              <td class="criteria">
+                Render/export traverse materialized semantics and do not invent
+                missing metric/subtotal/header structure.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">No compatibility adapters without net deletion</td>
+              <td><span class="badge track-review">Review</span></td>
+              <td class="problem">
+                Short-term adapters can hide duplicate authority if not
+                constrained.
+              </td>
+              <td>Manual review</td>
+              <td>Always true</td>
+              <td class="criteria">
+                Any adapter added in a slice deletes a larger old surface in the
+                same slice.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Pre-push validation</td>
+              <td><span class="badge track-not-run">Not run</span></td>
+              <td class="problem">
+                Full pre-commit has not been run for this assessment.
+              </td>
+              <td>Not run</td>
+              <td>Passing</td>
+              <td class="criteria">
+                Stage changes, run <code>pre-commit run --all-files</code>, fix
+                failures, and rerun before pushing.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <section class="panel">
+        <div class="panel-grid">
+          <div>
+            <h2>Architecture Rules</h2>
+            <ul class="plain-list">
+              <li><code>root</code> coverage means no branch filter, not all possible paths.</li>
+              <li><code>paths</code> coverage means only listed visible/expanded branches.</li>
+              <li><code>scopedFull</code> coverage means full expansion only inside explicit ancestors.</li>
+              <li>Pre-expand levels compile to the same manifest shape as manual expansion.</li>
+              <li>Row x column expansion creates explicit intersection coverage needs.</li>
+              <li>Batching is a query transport optimization, not a runtime state model.</li>
+              <li>No unbounded full-level query unless the user action requests a bounded broad scope.</li>
+              <li>Adding a hidden trailing dimension does not create a query need.</li>
+              <li>Semantic layout changes fetch query-backed coverage, not local projections from old facts.</li>
+              <li>Metric reorder can remain cosmetic when the selected metric set is unchanged.</li>
+              <li>Broader loaded coverage may satisfy narrower needs only through tested dominance rules.</li>
+            </ul>
+          </div>
+          <div>
+            <h2>Behavior Checkpoint</h2>
+            <p>
+              Single-metric base-cell propagation is not a safe deletion target.
+              Removing it breaks visible single-metric cells, column subtotal
+              values, databar/sorting offsets, and expansion subtotal cells. The
+              rejected alternative was forcing single-metric pivots to always
+              show the metric tier, so the current single-metric base-cell
+              behavior must remain unless an explicit UX redesign is approved.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-grid">
+          <div>
+            <h2>Execution Order</h2>
+            <p>
+              Work from the highest-impact authority surface to the
+              lowest-impact cleanup. A commit is successful only if it removes
+              or clearly centralizes an authority surface while staying
+              deletion-conscious.
+            </p>
+            <ol class="ordered-list">
+              <li>Fix the query-context signature test and return the plugin suite to green.</li>
+              <li>Reduce expansion scheduler state in <code>useExpansionEngine.ts</code>.</li>
+              <li>Remove duplicated row/column hydration orchestration.</li>
+              <li>
+                Isolate subtotal, measure-axis, and display-label behavior in
+                <code>materializePivotTree.ts</code>.
+              </li>
+              <li>Remove metric/header/subtotal inference from <code>renderModel.ts</code>.</li>
+              <li>
+                Shrink <code>PivotTableChart.tsx</code> only where code is
+                deleted, not merely moved.
+              </li>
+            </ol>
+          </div>
+          <div>
+            <h2>Verification Standard</h2>
+            <ul class="plain-list">
+              <li>Focused unit/contract tests for the touched runtime boundary.</li>
+              <li>Relevant chart interaction tests when behavior crosses the UI surface.</li>
+              <li>ESLint for changed TypeScript files.</li>
+              <li><code>git diff --check</code>.</li>
+              <li>Updated metrics in this tracker.</li>
+            </ul>
+
+            <h2>Known Test Noise</h2>
+            <ul class="plain-list">
+              <li>Jest reports duplicate manual mocks in the wider Superset frontend setup.</li>
+              <li>Browserslist data is stale.</li>
+              <li>
+                Babel lodash emits an <code>isModuleDeclaration</code>
+                deprecation warning.
+              </li>
+            </ul>
+            <p>
+              These warnings are not pivot-table-v3 regressions, but test
+              failures are.
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
