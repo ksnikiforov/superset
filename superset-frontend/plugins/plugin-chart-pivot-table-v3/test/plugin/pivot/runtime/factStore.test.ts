@@ -17,6 +17,7 @@
  * under the License.
  */
 import {
+  buildPivotFactQueryContextKey,
   createPivotFactStore,
   type PivotFact,
   type PivotFactSelector,
@@ -26,6 +27,7 @@ import {
 import { type PivotFactCoverage } from '../../../../src/pivot/runtime/types';
 import { encodeMetricKey } from '../../../../src/pivot/core/tokens';
 import { factSelectorsCoverSelector } from '../../../../src/pivot/runtime/coverage';
+import { type PivotTableQueryFormData } from '../../../../src/types';
 
 const coverage: PivotFactCoverage = {
   rowDepth: 1,
@@ -47,6 +49,9 @@ const buildFact = (overrides: Partial<PivotFact> = {}): PivotFact => ({
   value: 10,
   ...overrides,
 });
+
+const buildQueryContextKey = (formData: Partial<PivotTableQueryFormData>) =>
+  buildPivotFactQueryContextKey(formData as PivotTableQueryFormData);
 
 const hasCompatibleCoverage = (
   store: Pick<PivotFactStore, 'getCoverageSelectors'>,
@@ -569,4 +574,46 @@ test('tracks loaded coverage even when the query returns no facts', () => {
   });
 
   expect(hasCompatibleCoverage(store, selector)).toBe(true);
+});
+
+test('scopes fact batches and coverage selectors by query context', () => {
+  const store = createPivotFactStore();
+  const unfilteredQueryContextKey = buildQueryContextKey({
+    time_range: 'No filter',
+  });
+  const filteredQueryContextKey = buildQueryContextKey({
+    adhoc_filters: [
+      {
+        clause: 'WHERE',
+        comparator: 'France',
+        expressionType: 'SIMPLE',
+        operator: '==',
+        subject: 'country',
+      },
+    ],
+    time_range: 'No filter',
+  });
+  const timeOffsetQueryContextKey = buildQueryContextKey({
+    time_offsets: ['1 year ago'],
+    time_range: 'No filter',
+  });
+
+  store.upsertBatch({
+    ...selector,
+    queryContextKey: unfilteredQueryContextKey,
+    facts: [buildFact({ value: 1 })],
+  });
+  store.upsertBatch({
+    ...selector,
+    queryContextKey: filteredQueryContextKey,
+    facts: [buildFact({ value: 2 })],
+  });
+
+  expect(store.getFactBatches(unfilteredQueryContextKey)[0].facts).toEqual([
+    buildFact({ value: 1 }),
+  ]);
+  expect(store.getFactBatches(filteredQueryContextKey)[0].facts).toEqual([
+    buildFact({ value: 2 }),
+  ]);
+  expect(store.getCoverageSelectors(timeOffsetQueryContextKey)).toEqual([]);
 });

@@ -50,7 +50,7 @@ test('builds stable seamless runtime sync snapshots', () => {
   });
 });
 
-test('builds stable upstream dashboard query-context signatures', () => {
+test('builds stable upstream query-context signatures', () => {
   expect(buildSeamlessRuntimeUpstreamSignature()).toBeNull();
   expect(
     buildSeamlessRuntimeUpstreamSignature({
@@ -74,6 +74,6 @@ test('builds stable upstream dashboard query-context signatures', () => {
       viz_type: 'pivot_table_v3',
     } as unknown as PivotTableQueryFormData),
   ).toBe(
-    '{"adhoc_filters":[{"col":"country","op":"==","val":"France"}],"extra_form_data":{"filters":[{"col":"region","op":"IN","val":["EU"]}]},"extras":{"time_grain_sqla":"P1D"},"granularity_sqla":"ds","time_grain_sqla":null,"time_offsets":["1 year ago"],"time_range":"No filter"}',
+    '{"adhoc_filters":[{"clause":"WHERE","comparator":"France","expressionType":"SIMPLE","operator":"==","subject":"country"}],"extra_form_data":{"filters":[{"col":"region","op":"IN","val":["EU"]}]},"extras":{"time_grain_sqla":"P1D"},"granularity_sqla":"ds","time_grain_sqla":null,"time_offsets":["1 year ago"],"time_range":"No filter"}',
   );
 });

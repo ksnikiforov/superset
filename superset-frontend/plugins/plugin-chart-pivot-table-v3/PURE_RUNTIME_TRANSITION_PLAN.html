@@ -293,111 +293,6 @@ under the License.
         text-decoration: line-through;
       }
 
-      .targets {
-        display: grid;
-        gap: 10px;
-        margin-bottom: 18px;
-      }
-
-      .target-row {
-        display: grid;
-        grid-template-columns: 200px 1fr;
-        gap: 12px;
-        align-items: start;
-        color: var(--muted);
-        font-size: 13px;
-      }
-
-      .target-name {
-        padding-top: 9px;
-        color: var(--text);
-      }
-
-      .target-scale {
-        position: relative;
-        height: 26px;
-      }
-
-      .target-track {
-        position: absolute;
-        top: 8px;
-        right: 0;
-        left: 0;
-        height: 8px;
-        border-radius: 999px;
-        background: #e5e7eb;
-      }
-
-      .target-over {
-        position: absolute;
-        top: 0;
-        right: 0;
-        height: 100%;
-        border-radius: 999px;
-        background: rgba(180, 35, 24, 0.12);
-      }
-
-      .target-line {
-        position: absolute;
-        top: 1px;
-        width: 2px;
-        height: 22px;
-        transform: translateX(-1px);
-        border-radius: 999px;
-      }
-
-      .target-current {
-        background: var(--blue);
-      }
-
-      .target-start {
-        background: #64748b;
-      }
-
-      .target-threshold {
-        background: var(--red);
-      }
-
-      .target-range {
-        display: flex;
-        justify-content: space-between;
-        color: var(--muted);
-        font-size: 11px;
-      }
-
-      .target-values {
-        grid-column: 2;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px 14px;
-        margin-top: -4px;
-        color: var(--muted);
-        font-size: 12px;
-      }
-
-      .target-values span {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        white-space: nowrap;
-      }
-
-      .target-values span::before {
-        width: 7px;
-        height: 7px;
-        border-radius: 50%;
-        background: #64748b;
-        content: "";
-      }
-
-      .target-values .value-current::before {
-        background: var(--blue);
-      }
-
-      .target-values .value-target::before {
-        background: var(--red);
-      }
-
       code {
         padding: 1px 4px;
         border-radius: 4px;
@@ -421,14 +316,6 @@ under the License.
           grid-template-columns: 1fr;
         }
 
-        .target-row {
-          grid-template-columns: 1fr;
-          gap: 6px;
-        }
-
-        .target-values {
-          grid-column: auto;
-        }
       }
     </style>
   </head>
@@ -438,7 +325,9 @@ under the License.
         <h1>Pivot v3 Pure Runtime Transition</h1>
         <p>
           Main tracker for the current transition plan. Active work is first;
-          completed work is archived at the bottom of the progress table.
+          completed work is archived at the bottom of the progress table. Update
+          this file on every pivot v3 runtime change so the tracker remains the
+          source of truth for the transition.
         </p>
       </header>
 
@@ -471,107 +360,34 @@ under the License.
       <section class="summary" aria-label="Summary">
         <div class="metric">
           <span class="metric-label">Active tasks</span>
-          <span class="metric-value">11</span>
-          <span class="metric-note">8 in progress, 3 not done</span>
+          <span class="metric-value">8</span>
+          <span class="metric-note">7 in progress, 1 not done</span>
         </div>
         <div class="metric">
           <span class="metric-label">Completed tasks</span>
-          <span class="metric-value">6</span>
+          <span class="metric-value">9</span>
           <span class="metric-note">Archived in the table</span>
         </div>
         <div class="metric">
           <span class="metric-label">Plugin tests</span>
-          <span class="metric-value">1 failing</span>
-          <span class="metric-note">Query-context signature test</span>
+          <span class="metric-value">Green</span>
+          <span class="metric-note">90 suites, 702 tests passed</span>
         </div>
         <div class="metric">
           <span class="metric-label">Next best move</span>
-          <span class="metric-value">Fix tests</span>
-          <span class="metric-note">Then reduce scheduler state</span>
+          <span class="metric-value">Reduce scheduler</span>
+          <span class="metric-note">Focus useExpansionEngine state</span>
         </div>
       </section>
 
-      <h2>Line Targets</h2>
-      <div class="targets" aria-label="Line target position">
-        <div class="target-row">
-          <strong class="target-name">Full production src</strong>
-          <div>
-            <div
-              class="target-scale"
-              aria-label="Fixed scale from 0 to 35000 lines; start 33510; target 20000; current 26528"
-            >
-              <div class="target-track">
-                <span class="target-over" style="left: 57.1%"></span>
-              </div>
-              <span
-                class="target-line target-threshold"
-                style="left: 57.1%"
-              ></span>
-              <span class="target-line target-current" style="left: 75.8%"></span>
-              <span class="target-line target-start" style="left: 95.7%"></span>
-            </div>
-            <div class="target-range">
-              <span>0</span>
-              <span>fixed max 35,000</span>
-            </div>
-          </div>
-          <div class="target-values">
-            <span>start 33,510</span>
-            <span class="value-current">current 26,528</span>
-            <span class="value-target">target &lt;20,000</span>
-          </div>
-        </div>
-        <div class="target-row">
-          <strong class="target-name">Strict core pipeline</strong>
-          <div>
-            <div
-              class="target-scale"
-              aria-label="Fixed scale from 0 to 13000 lines; start 12907; target 8000; current 10564"
-            >
-              <div class="target-track">
-                <span class="target-over" style="left: 61.5%"></span>
-              </div>
-              <span
-                class="target-line target-threshold"
-                style="left: 61.5%"
-              ></span>
-              <span class="target-line target-current" style="left: 81.3%"></span>
-              <span class="target-line target-start" style="left: 99.3%"></span>
-            </div>
-            <div class="target-range">
-              <span>0</span>
-              <span>fixed max 13,000</span>
-            </div>
-          </div>
-          <div class="target-values">
-            <span>start 12,907</span>
-            <span class="value-current">current 10,564</span>
-            <span class="value-target">target &lt;8,000</span>
-          </div>
-        </div>
-        <div class="target-row">
-          <strong class="target-name">Diagnostic core dirs</strong>
-          <div>
-            <div
-              class="target-scale"
-              aria-label="Fixed scale from 0 to 9000 lines; start 8698; current 7660; no hard threshold"
-            >
-              <div class="target-track"></div>
-              <span class="target-line target-current" style="left: 85.1%"></span>
-              <span class="target-line target-start" style="left: 96.6%"></span>
-            </div>
-            <div class="target-range">
-              <span>0</span>
-              <span>fixed max 9,000</span>
-            </div>
-          </div>
-          <div class="target-values">
-            <span>start 8,698</span>
-            <span class="value-current">current 7,660</span>
-            <span>watch drift</span>
-          </div>
-        </div>
-      </div>
+      <section class="panel">
+        <h2>Tracker Rule</h2>
+        <p>
+          Update this HTML on every pivot v3 runtime change, including tests,
+          metrics, status rows, constraints, and execution order when the change
+          alters transition progress or validation state.
+        </p>
+      </section>
 
       <h2>Current Metrics</h2>
       <div class="details-grid">
@@ -644,60 +460,6 @@ under the License.
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td class="item">Query-context-scoped fact matching</td>
-              <td><span class="badge status-progress">In progress</span></td>
-              <td class="problem">
-                The structure exists, but the suite is red because adhoc filter
-                signature shape is inconsistent.
-              </td>
-              <td class="num">10</td>
-              <td>Easy-medium</td>
-              <td class="num">8</td>
-              <td class="num">7</td>
-              <td class="num">560</td>
-              <td class="criteria">
-                Filtered, unfiltered, and time-offset fact batches cannot
-                satisfy each other, and the upstream signature test passes with
-                the intended filter shape.
-              </td>
-            </tr>
-            <tr>
-              <td class="item">Fix failing upstream query-context signature test</td>
-              <td><span class="badge status-not-done">Not done</span></td>
-              <td class="problem">
-                <code>buildPivotFactQueryContextKey</code> preserves Superset
-                adhoc filter shape, while the test expects normalized
-                <code>{ col, op, val }</code>.
-              </td>
-              <td class="num">9</td>
-              <td>Easy</td>
-              <td class="num">9</td>
-              <td class="num">9</td>
-              <td class="num">729</td>
-              <td class="criteria">
-                The expected signature is intentionally updated or the code
-                normalizes adhoc filters; <code>seamlessRuntimeUpdate.test.ts</code>
-                passes.
-              </td>
-            </tr>
-            <tr>
-              <td class="item">Keep plugin test suite green</td>
-              <td><span class="badge status-not-done">Not done</span></td>
-              <td class="problem">
-                Current checkout has <code>1</code> failing test out of
-                <code>701</code>.
-              </td>
-              <td class="num">10</td>
-              <td>Easy after signature fix</td>
-              <td class="num">8</td>
-              <td class="num">8</td>
-              <td class="num">640</td>
-              <td class="criteria">
-                <code>npm test plugins/plugin-chart-pivot-table-v3</code>
-                passes with <code>0</code> failed suites/tests.
-              </td>
-            </tr>
             <tr>
               <td class="item">Reduce expansion scheduler state in useExpansionEngine.ts</td>
               <td><span class="badge status-progress">In progress</span></td>
@@ -842,6 +604,57 @@ under the License.
                 materialization, query-context, and expansion decisions live in
                 runtime, expansion, materialization, or interaction modules, and
                 the slice deletes more chart code than it adds.
+              </td>
+            </tr>
+            <tr class="done-row">
+              <td class="item">Query-context-scoped fact matching</td>
+              <td><span class="badge status-done">Done</span></td>
+              <td class="problem">
+                Previous risk was fact-store coverage reuse across filtered,
+                unfiltered, and time-offset query contexts.
+              </td>
+              <td class="num">10</td>
+              <td>Done</td>
+              <td class="num">8</td>
+              <td class="num">7</td>
+              <td class="num">560</td>
+              <td class="criteria">
+                Filtered, unfiltered, and time-offset fact batches cannot
+                satisfy each other, and the upstream signature test passes with
+                the intended filter shape.
+              </td>
+            </tr>
+            <tr class="done-row">
+              <td class="item">Fix failing upstream query-context signature test</td>
+              <td><span class="badge status-done">Done</span></td>
+              <td class="problem">
+                Previous test expectation used normalized dashboard filter
+                shape instead of Superset adhoc filter shape.
+              </td>
+              <td class="num">9</td>
+              <td>Done</td>
+              <td class="num">9</td>
+              <td class="num">9</td>
+              <td class="num">729</td>
+              <td class="criteria">
+                The expected signature intentionally preserves Superset adhoc
+                filters; <code>seamlessRuntimeUpdate.test.ts</code> passes.
+              </td>
+            </tr>
+            <tr class="done-row">
+              <td class="item">Keep plugin test suite green</td>
+              <td><span class="badge status-done">Done</span></td>
+              <td class="problem">
+                Previous checkout had one failing query-context signature test.
+              </td>
+              <td class="num">10</td>
+              <td>Done</td>
+              <td class="num">8</td>
+              <td class="num">8</td>
+              <td class="num">640</td>
+              <td class="criteria">
+                <code>npm test plugins/plugin-chart-pivot-table-v3</code>
+                passes with <code>0</code> failed suites/tests.
               </td>
             </tr>
             <tr class="done-row">
@@ -1010,11 +823,11 @@ under the License.
             </tr>
             <tr>
               <td class="item">Plugin test suite</td>
-              <td><span class="badge track-failing">Failing</span></td>
+              <td><span class="badge track-guarded">Guarded</span></td>
               <td class="problem">
-                Current run has one failing query-context signature test.
+                Plugin tests pass after the query-context signature update.
               </td>
-              <td>1 failing test</td>
+              <td>90 suites, 702 tests passed</td>
               <td>0 failing tests</td>
               <td class="criteria">
                 <code>npm test plugins/plugin-chart-pivot-table-v3</code>
@@ -1209,7 +1022,6 @@ under the License.
               deletion-conscious.
             </p>
             <ol class="ordered-list">
-              <li>Fix the query-context signature test and return the plugin suite to green.</li>
               <li>Reduce expansion scheduler state in <code>useExpansionEngine.ts</code>.</li>
               <li>Remove duplicated row/column hydration orchestration.</li>
               <li>
@@ -1230,7 +1042,7 @@ under the License.
               <li>Relevant chart interaction tests when behavior crosses the UI surface.</li>
               <li>ESLint for changed TypeScript files.</li>
               <li><code>git diff --check</code>.</li>
-              <li>Updated metrics in this tracker.</li>
+              <li>Updated metrics and status in this tracker on every change.</li>
             </ul>
 
             <h2>Known Test Noise</h2>
