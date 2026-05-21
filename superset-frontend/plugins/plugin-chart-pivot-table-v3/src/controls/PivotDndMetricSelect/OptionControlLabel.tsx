@@ -16,9 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { css, styled, useTheme } from '@apache-superset/core/theme';
+import { t } from '@apache-superset/core/translation';
 import { MouseEvent, ReactNode, useRef } from 'react';
 import { DropTargetMonitor, useDrag, useDrop } from 'react-dnd';
-import { css, styled, t, useTheme } from '@superset-ui/core';
 import { Icons, InfoTooltip, Tooltip } from '@superset-ui/core/components';
 import {
   AdhocMetric,

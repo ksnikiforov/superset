@@ -16,6 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { t } from '@apache-superset/core/translation';
+import { useTheme, styled } from '@apache-superset/core/theme';
 import { ReactNode, useMemo, useRef } from 'react';
 import {
   useDrag,
@@ -24,13 +26,7 @@ import {
   DragSourceMonitor,
 } from 'react-dnd';
 import { Tooltip } from '@superset-ui/core/components';
-import {
-  type AdhocColumn,
-  styled,
-  isAdhocColumn,
-  t,
-  useTheme,
-} from '@superset-ui/core';
+import { type AdhocColumn, isAdhocColumn } from '@superset-ui/core';
 import { ColumnMeta } from '@superset-ui/chart-controls';
 import {
   DragContainer,

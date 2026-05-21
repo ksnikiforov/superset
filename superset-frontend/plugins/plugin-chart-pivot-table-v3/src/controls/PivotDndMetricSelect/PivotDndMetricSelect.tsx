@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { t, tn } from '@apache-superset/core/translation';
 import {
   type ComponentProps,
   useCallback,
@@ -28,15 +29,13 @@ import { useDragLayer } from 'react-dnd';
 import { nanoid } from 'nanoid';
 import {
   ensureIsArray,
-  GenericDataType,
   getMetricLabel,
   isAdhocMetricSimple,
   isSavedMetric,
   Metric,
   QueryFormMetric,
-  t,
-  tn,
 } from '@superset-ui/core';
+import { GenericDataType } from '@apache-superset/core/common';
 import {
   Input,
   InputNumber,

@@ -2,7 +2,7 @@ I am creating a new pivot table chart in superset. The details of implementation
 Read the whole document and the the relevant code.
 I want the following changes to the code of the plugin
 
-1) When there are 2 and more metrics, the metrics layer is always expanded and shown. Here the case without totals is described:
+1. When there are 2 and more metrics, the metrics layer is always expanded and shown. Here the case without totals is described:
    So, lets say the state is:
 
 - rows: group, product, values
@@ -17,7 +17,7 @@ I want the following changes to the code of the plugin
 So the product level is skipped, but is expandable from group.
 When expanded the levels will look like this
 
-* [-] group
+- [-] group
   - product
     - measure1
     - measure2
@@ -26,17 +26,17 @@ If the measures value is placed inbetween, then the measures become expandable
 rows: group, Values, product
 So before the expand it will look like this
 
-* group
+- group
   - [+] measure1
   - [+] measure2
     with both being expandable
     And on expand like this
-* group
+- group
   - [-] measure1
     - product
   - [+] measure2
 
-2) Now what do we do with totals. Here only the case with one column is examined. Measures are on rows.
+2. Now what do we do with totals. Here only the case with one column is examined. Measures are on rows.
    Earlier one of the requirements was no subototals for rows (well, there are subtotals, but they are basically baked in). This requirement is now lifted and we are doing proper row subototals. Here is how they should behave.
    First, the subtotals are opt-in. By default the row subototals are turned on. and appear as they appear now in the row that is of higher hierarchy.
    So for scenario with one measure like this
@@ -56,8 +56,8 @@ Now there should be an option: show subtotals at the top/bottom of the group. Wh
   - Bikes Total # here will be subtotals for the upper group
 - Grand total # row grand total
 
- When hierarchy becomes more complex here is how it should be handled (only one measure, subtotals at the bottom)
- rows: group, product, product_parts, values
+When hierarchy becomes more complex here is how it should be handled (only one measure, subtotals at the bottom)
+rows: group, product, product_parts, values
 
 - Rows
   - [-] Bikes # no values here
@@ -77,7 +77,6 @@ Here is an example with subtotals enabled
 - columns:
 - measures: measure1, measure2
 - Rows
-
   - [-] Bikes # no values here
     - [+] bike product 1 # no values here
       - bike part 1
@@ -92,44 +91,45 @@ Here is an example with subtotals enabled
     - [+] bike product 3
   - Bikes measure1 # total of group here. Note, such totals are bold.
   - Bikes measure2
+
 - Total measure1
 - Total measure2
 
- Here is a fully expanede example in table form with subtotals active (hierarchy sturcutre)
+Here is a fully expanede example in table form with subtotals active (hierarchy sturcutre)
 
-| Rows           |                |                |       |          |    |
-| -------------- | -------------- | -------------- | ----- | -------- | -- |
-|                | Bikes          |                |       |          |    |
-|                |                | Bike1          |       |          |    |
-|                |                |                | Part1 |          |    |
-|                |                |                |       | measure1 | 1  |
-|                |                |                |       | measure2 | 5  |
-|                |                |                | Part2 |          |    |
-|                |                |                |       | measure1 | 2  |
-|                |                |                |       | measure2 | 1  |
-|                |                |                | Part3 |          |    |
-|                |                |                |       | measure1 | 3  |
-|                |                |                |       | measure2 | 3  |
-|                |                | Bike1 measure1 |       |          | 6  |
-|                |                | Bike1 measure2 |       |          | 9  |
-|                |                | Bike2          |       |          |    |
-|                |                |                | Part1 |          |    |
-|                |                |                |       | measure1 | 4  |
-|                |                |                |       | measure2 | 4  |
-|                |                |                | Part2 |          |    |
-|                |                |                |       | measure1 | 4  |
-|                |                |                |       | measure2 | 4  |
-|                |                |                | Part3 |          |    |
-|                |                |                |       | measure1 | 1  |
-|                |                |                |       | measure2 | 2  |
-|                |                | Bike2 measure1 |       |          | 9  |
-|                |                | Bike2 measure2 |       |          | 10 |
-|                | Bikes measure1 |                |       |          | 15 |
-|                | Bikes measure2 |                |       |          | 19 |
-| Total measure1 |                |                |       |          | 15 |
-| Total measure2 |                |                |       |          | 19 |
+| Rows           |                |                |       |          |     |
+| -------------- | -------------- | -------------- | ----- | -------- | --- |
+|                | Bikes          |                |       |          |     |
+|                |                | Bike1          |       |          |     |
+|                |                |                | Part1 |          |     |
+|                |                |                |       | measure1 | 1   |
+|                |                |                |       | measure2 | 5   |
+|                |                |                | Part2 |          |     |
+|                |                |                |       | measure1 | 2   |
+|                |                |                |       | measure2 | 1   |
+|                |                |                | Part3 |          |     |
+|                |                |                |       | measure1 | 3   |
+|                |                |                |       | measure2 | 3   |
+|                |                | Bike1 measure1 |       |          | 6   |
+|                |                | Bike1 measure2 |       |          | 9   |
+|                |                | Bike2          |       |          |     |
+|                |                |                | Part1 |          |     |
+|                |                |                |       | measure1 | 4   |
+|                |                |                |       | measure2 | 4   |
+|                |                |                | Part2 |          |     |
+|                |                |                |       | measure1 | 4   |
+|                |                |                |       | measure2 | 4   |
+|                |                |                | Part3 |          |     |
+|                |                |                |       | measure1 | 1   |
+|                |                |                |       | measure2 | 2   |
+|                |                | Bike2 measure1 |       |          | 9   |
+|                |                | Bike2 measure2 |       |          | 10  |
+|                | Bikes measure1 |                |       |          | 15  |
+|                | Bikes measure2 |                |       |          | 19  |
+| Total measure1 |                |                |       |          | 15  |
+| Total measure2 |                |                |       |          | 19  |
 
-3) And this leaves the case when measures are on columns. Here is how to deal with that. Lets consider this case:
+3. And this leaves the case when measures are on columns. Here is how to deal with that. Lets consider this case:
 
 - rows:
 - columns: group, product, values

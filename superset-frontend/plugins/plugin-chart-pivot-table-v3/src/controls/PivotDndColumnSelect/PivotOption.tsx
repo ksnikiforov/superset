@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { css, styled, useTheme } from '@apache-superset/core/theme';
+import { t } from '@apache-superset/core/translation';
 import { MouseEvent, ReactNode, useCallback } from 'react';
-import { css, styled, t, useTheme } from '@superset-ui/core';
 import { Icons, InfoTooltip } from '@superset-ui/core/components';
 import {
   CaretContainer,

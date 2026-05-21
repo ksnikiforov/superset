@@ -94,7 +94,9 @@ export const compileExcelFormula = (
     1,
     1 + (metricReferences.length > 0 ? metricReferences.length : 0),
   );
-  const rowData: FormulaCellValue[] = new Array(maxColumn).fill(0);
+  const rowData: FormulaCellValue[] = Array.from({ length: maxColumn }).fill(
+    0,
+  ) as FormulaCellValue[];
 
   const parser = new FormulaParser({
     onCell: ({ row, col }) => {

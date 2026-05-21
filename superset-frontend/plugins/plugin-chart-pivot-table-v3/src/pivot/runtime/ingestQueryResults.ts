@@ -276,6 +276,33 @@ const factStoreBatchFromIngested = ({
   facts,
 });
 
+async function upsertFactBatchIntoStoreAsync({
+  store,
+  batch,
+  chunkSize,
+  shouldContinue,
+  yieldToMain,
+}: {
+  store: PivotFactStore;
+  batch: PivotFactStoreBatch;
+} & ChunkedWorkOptions): Promise<void> {
+  if (batch.facts.length === 0) {
+    store.upsertBatch(batch);
+    // eslint-disable-next-line no-await-in-loop
+    await yieldChunkedWork({ shouldContinue, yieldToMain });
+    return;
+  }
+  const resolvedChunkSize = chunkSize ?? batch.facts.length;
+  for (let start = 0; start < batch.facts.length; start += resolvedChunkSize) {
+    store.upsertBatch({
+      ...batch,
+      facts: batch.facts.slice(start, start + resolvedChunkSize),
+    });
+    // eslint-disable-next-line no-await-in-loop
+    await yieldChunkedWork({ shouldContinue, yieldToMain });
+  }
+}
+
 export const upsertQueryResultsIntoFactStoreAsync = async <
   T extends QueryResultWithData,
 >({
@@ -361,33 +388,6 @@ export const fetchPlannedQuerySpecs = async ({
     });
   }
   return { results };
-};
-
-const upsertFactBatchIntoStoreAsync = async ({
-  store,
-  batch,
-  chunkSize,
-  shouldContinue,
-  yieldToMain,
-}: {
-  store: PivotFactStore;
-  batch: PivotFactStoreBatch;
-} & ChunkedWorkOptions): Promise<void> => {
-  if (batch.facts.length === 0) {
-    store.upsertBatch(batch);
-    // eslint-disable-next-line no-await-in-loop
-    await yieldChunkedWork({ shouldContinue, yieldToMain });
-    return;
-  }
-  const resolvedChunkSize = chunkSize ?? batch.facts.length;
-  for (let start = 0; start < batch.facts.length; start += resolvedChunkSize) {
-    store.upsertBatch({
-      ...batch,
-      facts: batch.facts.slice(start, start + resolvedChunkSize),
-    });
-    // eslint-disable-next-line no-await-in-loop
-    await yieldChunkedWork({ shouldContinue, yieldToMain });
-  }
 };
 
 export const buildInitialRuntimeFromSpecResults = ({

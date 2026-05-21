@@ -16,6 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { t } from '@apache-superset/core/translation';
+import { styled } from '@apache-superset/core/theme';
 import {
   memo,
   ReactNode,
@@ -33,8 +35,6 @@ import {
   getColumnLabel,
   QueryFormColumn,
   QueryFormMetric,
-  t,
-  styled,
 } from '@superset-ui/core';
 import {
   Button,

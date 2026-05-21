@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import { supersetTheme } from '@superset-ui/core';
+import { supersetTheme } from '@apache-superset/core/theme';
 import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
 import PivotTableChart, {
   buildPreloadedTreeFactBatches,

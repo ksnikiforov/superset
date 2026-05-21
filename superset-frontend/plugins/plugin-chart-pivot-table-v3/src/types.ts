@@ -31,8 +31,8 @@ import {
   SupersetTheme,
   TimeFormatter,
   TimeGranularity,
-  GenericDataType,
 } from '@superset-ui/core';
+import { GenericDataType } from '@apache-superset/core/common';
 import { type PivotFactStoreBatch } from './pivot/runtime/factStore';
 
 export type PivotAxis = 'row' | 'col';

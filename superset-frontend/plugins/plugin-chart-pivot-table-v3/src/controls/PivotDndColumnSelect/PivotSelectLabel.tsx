@@ -25,7 +25,7 @@ import {
   useMemo,
 } from 'react';
 import { useDrop, DropTargetMonitor } from 'react-dnd';
-import { t } from '@superset-ui/core';
+import { t } from '@apache-superset/core/translation';
 import { ControlHeader } from '@superset-ui/chart-controls';
 import { Icons } from '@superset-ui/core/components/Icons';
 import {

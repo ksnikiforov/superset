@@ -20,9 +20,9 @@ import {
   CurrencyFormatter,
   type Currency,
   DataRecordValue,
-  GenericDataType,
   getNumberFormatter,
 } from '@superset-ui/core';
+import { GenericDataType } from '@apache-superset/core/common';
 import { PivotTreeNode } from '../types';
 import { decodeMetricKey, isSubtotalToken } from './core/tokens';
 import { serializePath } from './core/path';

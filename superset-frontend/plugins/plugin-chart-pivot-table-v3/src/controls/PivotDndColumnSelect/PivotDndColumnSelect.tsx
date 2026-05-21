@@ -16,6 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { t, tn } from '@apache-superset/core/translation';
+import { styled } from '@apache-superset/core/theme';
 import {
   type ComponentProps,
   ReactNode,
@@ -32,11 +34,8 @@ import {
   ensureIsArray,
   getColumnLabel,
   Metric,
-  tn,
   QueryFormColumn,
   QueryFormMetric,
-  styled,
-  t,
   isAdhocColumn,
 } from '@superset-ui/core';
 import {

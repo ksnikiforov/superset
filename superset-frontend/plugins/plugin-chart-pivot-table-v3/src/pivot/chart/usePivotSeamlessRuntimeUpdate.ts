@@ -26,11 +26,8 @@ import {
 } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
 import { isEqual } from 'lodash';
-import {
-  t,
-  type DataRecordValue,
-  type QueryFormColumn,
-} from '@superset-ui/core';
+import { t } from '@apache-superset/core/translation';
+import { type DataRecordValue, type QueryFormColumn } from '@superset-ui/core';
 import {
   type PivotAxis,
   type PivotRuntimeLayout,

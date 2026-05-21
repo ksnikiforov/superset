@@ -20,7 +20,6 @@ import {
   type BinaryQueryObjectFilterClause,
   type DataRecordValue,
   type ExtraFormData,
-  GenericDataType,
   getColumnLabel,
   type QueryFormColumn,
   type QueryFormMetric,
@@ -29,6 +28,7 @@ import {
   type SetQueryObjectFilterClause,
   type UnaryQueryObjectFilterClause,
 } from '@superset-ui/core';
+import { GenericDataType } from '@apache-superset/core/common';
 import {
   type MeasureHierarchy,
   type MetricFormattingScope,

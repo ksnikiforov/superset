@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { t } from '@apache-superset/core/translation';
 import {
   type CSSProperties,
   type ReactNode,
@@ -29,10 +30,8 @@ import {
   getNumberFormatter,
   NumberFormats,
   safeHtmlSpan,
-  styled,
-  supersetTheme,
-  t,
 } from '@superset-ui/core';
+import { supersetTheme, styled } from '@apache-superset/core/theme';
 import {
   type DimensionFormattingField,
   type DimensionFormattingScope,

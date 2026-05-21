@@ -124,9 +124,9 @@ export const getStablePrefixLength = (prev: string[], next: string[]) => {
 export const isSameLayout = (left?: string[], right?: string[]) =>
   Boolean(
     left &&
-      right &&
-      left.length === right.length &&
-      left.every((value, idx) => value === right[idx]),
+    right &&
+    left.length === right.length &&
+    left.every((value, idx) => value === right[idx]),
   );
 
 export type PivotLayoutKeyState = {

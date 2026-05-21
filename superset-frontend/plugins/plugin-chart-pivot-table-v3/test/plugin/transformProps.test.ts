@@ -17,7 +17,9 @@
  * under the License.
  */
 
-import { ChartProps, GenericDataType, supersetTheme } from '@superset-ui/core';
+import { GenericDataType } from '@apache-superset/core/common';
+import { supersetTheme } from '@apache-superset/core/theme';
+import { ChartProps } from '@superset-ui/core';
 import transformProps from '../../src/transformProps';
 import { MetricsLayoutEnum, PivotTableQueryFormData } from '../../src/types';
 import { encodeMetricKey } from '../../src/pivot/core/tokens';
@@ -698,7 +700,9 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     });
 
     const result = transformProps(
-      chartProps as ChartProps<PivotTableQueryFormData>,
+      Object.assign(chartProps, {
+        chartId: 0,
+      }) as ChartProps<PivotTableQueryFormData>,
     );
 
     expect(result.formData.slice_id).toBe(0);

@@ -34,8 +34,10 @@ import {
   PlusSquareOutlined,
   UpOutlined,
 } from '@ant-design/icons';
-import { styled, t } from '@superset-ui/core';
-import { Alert, Button, Loading } from '@superset-ui/core/components';
+import { t } from '@apache-superset/core/translation';
+import { styled } from '@apache-superset/core/theme';
+import { Alert } from '@apache-superset/core/components';
+import { Button, Loading } from '@superset-ui/core/components';
 import {
   type PivotTreeData,
   type PivotTreeNode,

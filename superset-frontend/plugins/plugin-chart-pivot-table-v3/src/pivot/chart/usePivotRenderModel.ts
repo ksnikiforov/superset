@@ -17,11 +17,8 @@
  * under the License.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  DataRecordValue,
-  GenericDataType,
-  getColumnLabel,
-} from '@superset-ui/core';
+import { DataRecordValue, getColumnLabel } from '@superset-ui/core';
+import { GenericDataType } from '@apache-superset/core/common';
 import {
   type PivotSortMode,
   type PivotSortOrder,

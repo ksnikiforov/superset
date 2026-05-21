@@ -22,9 +22,9 @@ import {
   Metric,
   QueryFormColumn,
   QueryFormMetric,
-  supersetTheme,
   DataRecordValue,
 } from '@superset-ui/core';
+import { supersetTheme } from '@apache-superset/core/theme';
 import {
   METRIC_FORMATTING_FIELDS,
   DIMENSION_FORMATTING_FIELDS,

@@ -19,12 +19,12 @@
 import {
   type BinaryQueryObjectFilterClause,
   type DataRecordValue,
-  GenericDataType,
   getColumnLabel,
   type QueryFormColumn,
   type QueryObjectFilterClause,
   type UnaryQueryObjectFilterClause,
 } from '@superset-ui/core';
+import { GenericDataType } from '@apache-superset/core/common';
 import { type PivotPath } from '../../types';
 
 const isNullish = (value: PivotPath[number]) =>

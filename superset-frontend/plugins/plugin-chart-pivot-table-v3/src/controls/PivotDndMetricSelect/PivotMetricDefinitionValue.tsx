@@ -16,6 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { t } from '@apache-superset/core/translation';
+import { useTheme, styled } from '@apache-superset/core/theme';
 import {
   ReactNode,
   type ComponentProps,
@@ -31,9 +33,6 @@ import {
   isAdhocMetricSQL,
   Metric,
   QueryFormMetric,
-  styled,
-  t,
-  useTheme,
 } from '@superset-ui/core';
 import {
   Button,
@@ -201,7 +200,7 @@ const hashString = (input: string): string => {
   for (let i = 0; i < input.length; i += 1) {
     hash = (hash * 33) ^ input.charCodeAt(i);
   }
-  return (hash >>> 0).toString(36);
+  return (hash < 0 ? hash + 0x100000000 : hash).toString(36);
 };
 
 const formatExcelFormulaLabel = (formula: string): string => {
@@ -1096,9 +1095,9 @@ export const MetricFormattingControl = ({
   }, []);
   const hasFormatting = Boolean(
     formatting.backgroundColor ||
-      formatting.textColor ||
-      formatting.d3Format ||
-      databar.type,
+    formatting.textColor ||
+    formatting.d3Format ||
+    databar.type,
   );
   const handleDatabarTypeChange = useCallback(
     (value: string) => {

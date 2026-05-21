@@ -21,12 +21,12 @@ import {
   Column,
   DataRecordValue,
   ensureIsArray,
-  GenericDataType,
   getTimeFormatter,
   getMetricLabel,
   SMART_DATE_ID,
   TimeFormats,
 } from '@superset-ui/core';
+import { GenericDataType } from '@apache-superset/core/common';
 import {
   MetricsLayoutEnum,
   PivotTableProps,
@@ -70,12 +70,13 @@ export default function transformProps(
     filterState,
     datasource,
     rawDatasource,
-    chartId,
     appSection,
     emitCrossFilters,
     theme,
     ownState,
   } = chartProps;
+  const chartId = (chartProps as ChartProps & { chartId?: number | string })
+    .chartId;
   const { setDataMask = () => {}, onContextMenu, setControlValue } = hooks;
   const baseFormData = rawFormDataCamel as PivotTableQueryFormData;
   const rawFormData = rawFormDataBase as PivotTableQueryFormData;

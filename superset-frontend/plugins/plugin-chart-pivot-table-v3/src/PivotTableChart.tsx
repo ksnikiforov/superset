@@ -16,16 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { t } from '@apache-superset/core/translation';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   AppSection,
   DataRecordValue,
   ensureIsArray,
   getColumnLabel,
-  supersetTheme,
   type JsonObject,
-  t,
 } from '@superset-ui/core';
+import { supersetTheme } from '@apache-superset/core/theme';
 import { type PivotTableProps, PivotRuntimeLayout } from './types';
 import { useExpansionEngine } from './pivot/expansion/useExpansionEngine';
 import { usePivotLayout } from './pivot/chart/usePivotLayout';

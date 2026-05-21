@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { t } from '@apache-superset/core/translation';
 import {
   type BaseControlConfig,
   ControlPanelConfig,
@@ -33,10 +34,9 @@ import {
   type QueryFormColumn,
   isQueryFormColumn,
   SMART_DATE_ID,
-  supersetTheme,
-  t,
   validateNonEmpty,
 } from '@superset-ui/core';
+import { supersetTheme } from '@apache-superset/core/theme';
 import { Checkbox, Space, Typography } from '@superset-ui/core/components';
 import { CheckboxChangeEvent } from '@superset-ui/core/components/Checkbox/types';
 import {

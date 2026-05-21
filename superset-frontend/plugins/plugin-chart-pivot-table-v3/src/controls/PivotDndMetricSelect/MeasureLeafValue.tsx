@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { useTheme } from '@apache-superset/core/theme';
 import { useCallback, useMemo } from 'react';
-import { Metric, useTheme } from '@superset-ui/core';
+import { Metric } from '@superset-ui/core';
 import { ColumnMeta } from '@superset-ui/chart-controls';
 import {
   MeasureLeafSpec,

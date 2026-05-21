@@ -30,7 +30,7 @@ To keep the table “snappy” while still avoiding blanks/flicker, we distingui
 - **Apply (staging)**: merge deltas into an internal/staging tree as responses arrive (order-independent).
 - **Reveal (commit)**: update the visible tree/expansion state only when it is safe (no blanks, no collapse flicker).
 
-This document focuses on *Reveal* rules; it does not require sequential fetching unless explicitly stated.
+This document focuses on _Reveal_ rules; it does not require sequential fetching unless explicitly stated.
 
 ## Expansion drivers (must both be supported)
 
@@ -44,13 +44,13 @@ The user expands **one layer at a time** (ordered operations). For this mode:
 
 Example (rows step, then columns step):
 
-1) **Rows step**:
-   - Compute what is required to safely reveal the next row layer under the *current* visible column depth.
+1. **Rows step**:
+   - Compute what is required to safely reveal the next row layer under the _current_ visible column depth.
    - Fetch in parallel, stage deltas as they arrive.
    - Reveal atomically when satisfied.
 
-2) **Columns step**:
-   - Now visible row depth has changed; recompute requirements for the next column layer under the *new* visible row depth.
+2. **Columns step**:
+   - Now visible row depth has changed; recompute requirements for the next column layer under the _new_ visible row depth.
    - Fetch in parallel, stage deltas, reveal atomically when satisfied.
 
 ### B) Auto-expand (known target)
@@ -70,7 +70,7 @@ This spec covers transactions used for **cross-axis manual actions** (row+col). 
 
 On a user expand click:
 
-- If there is an **in-flight expand** on the *other axis*, the implementation **MUST** start or extend a transaction.
+- If there is an **in-flight expand** on the _other axis_, the implementation **MUST** start or extend a transaction.
 - If there was a click on the other axis within the **coalescing window** (`COALESCE_WINDOW_MS = 50`), the implementation **MUST** start or extend a transaction even if the first request already resolved.
 
 Rationale: cross-axis expands can require intersection cells that are not present in earlier responses fetched at a smaller opposite-axis depth.

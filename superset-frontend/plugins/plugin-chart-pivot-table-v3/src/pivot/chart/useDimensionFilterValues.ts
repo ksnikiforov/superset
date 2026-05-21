@@ -19,11 +19,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   type DataRecordValue,
-  GenericDataType,
   getColumnLabel,
   type QueryFormColumn,
   type QueryObjectFilterClause,
 } from '@superset-ui/core';
+import { GenericDataType } from '@apache-superset/core/common';
 import { isEqual } from 'lodash';
 import { type PivotTableQueryFormData } from '../../types';
 import { getStableColumnKey } from '../../utils';

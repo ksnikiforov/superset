@@ -262,11 +262,7 @@ describe('pivot/expansion/planner', () => {
     });
 
     expect(fetchPathKeys(plan)).toEqual([caKey, nyKey, txKey]);
-    expect(plan.map(target => target.pathKey)).toEqual([
-      caKey,
-      nyKey,
-      txKey,
-    ]);
+    expect(plan.map(target => target.pathKey)).toEqual([caKey, nyKey, txKey]);
   });
 
   it('does not let typed metric branch coverage satisfy sibling metrics', () => {
