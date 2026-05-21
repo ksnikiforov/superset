@@ -54,6 +54,11 @@ type PivotExpansionCoverageDepths = {
   columnDepth: number;
 };
 
+const PIVOT_EXPANSION_AXES: PivotAxis[] = ['row', 'col'];
+
+const oppositeAxis = (axis: PivotAxis): PivotAxis =>
+  axis === 'row' ? 'col' : 'row';
+
 export type ExpansionCoverageTarget = {
   axis: PivotAxis;
   pathKey: string;
@@ -521,33 +526,29 @@ export const planHydrationIteration = ({
   queryContextKey?: string;
   tree?: PivotTreeData;
 }) => {
-  const visibleRowDepth = depthForExpansionKeys({
-    axis: 'row',
-    expanded: desired.row,
-    axisCoverageNeeds,
-    program,
-  });
-  const visibleColDepth = depthForExpansionKeys({
-    axis: 'col',
-    expanded: desired.col,
-    axisCoverageNeeds,
-    program,
-  });
-  const rowPathKeys = Array.from(desired.row).filter(key => key !== rootKey);
-  const columnPathKeys = Array.from(desired.col).filter(key => key !== rootKey);
-  const hasNonRootRows = rowPathKeys.length > 0;
-  const hasNonRootCols = columnPathKeys.length > 0;
-  const rowExpansionKeys =
-    hasNonRootCols && !hasNonRootRows ? new Set<string>() : desired.row;
-  const colExpansionKeys =
-    hasNonRootRows && !hasNonRootCols ? new Set<string>() : desired.col;
+  const coverageDepths = Object.fromEntries(
+    PIVOT_EXPANSION_AXES.map(axis => [
+      axis === 'row' ? 'rowDepth' : 'columnDepth',
+      depthForExpansionKeys({
+        axis,
+        expanded: desired[axis],
+        axisCoverageNeeds,
+        program,
+      }),
+    ]),
+  ) as PivotExpansionCoverageDepths;
+  const pathKeysByAxis = Object.fromEntries(
+    PIVOT_EXPANSION_AXES.map(axis => [
+      axis,
+      Array.from(desired[axis]).filter(key => key !== rootKey),
+    ]),
+  ) as Record<PivotAxis, string[]>;
   const directCoverageTargets = selectMissingCoverageTargets({
     targets: axisCoverageNeeds.map(need =>
       buildAxisCoverageNeedTarget({
         need,
         program,
-        rowDepth: visibleRowDepth,
-        columnDepth: visibleColDepth,
+        ...coverageDepths,
       }),
     ),
     factSelectors,
@@ -559,50 +560,39 @@ export const planHydrationIteration = ({
       factSelectorFromTarget(target, queryContextKey),
     ),
   ];
-  const coverageDepths = {
-    rowDepth: visibleRowDepth,
-    columnDepth: visibleColDepth,
-  };
-  const rowTargets = dropRedundantAncestorExpansionTargets({
-    targets: selectMissingCoverageTargets({
-      targets: planExpansionForAxis({
-        axis: 'row',
-        program,
-        expandedKeys: rowExpansionKeys,
-        coverage: coverageDepths,
+  const axisTargets = PIVOT_EXPANSION_AXES.flatMap(axis =>
+    dropRedundantAncestorExpansionTargets({
+      targets: selectMissingCoverageTargets({
+        targets: planExpansionForAxis({
+          axis,
+          program,
+          expandedKeys:
+            pathKeysByAxis[axis].length === 0 &&
+            pathKeysByAxis[oppositeAxis(axis)].length > 0
+              ? new Set<string>()
+              : desired[axis],
+          coverage: coverageDepths,
+        }),
+        factSelectors: factSelectorsWithPlannedCoverage,
+        queryContextKey,
       }),
-      factSelectors: factSelectorsWithPlannedCoverage,
-      queryContextKey,
+      ...coverageDepths,
     }),
-    ...coverageDepths,
-  });
-  const colTargets = dropRedundantAncestorExpansionTargets({
-    targets: selectMissingCoverageTargets({
-      targets: planExpansionForAxis({
-        axis: 'col',
-        program,
-        expandedKeys: colExpansionKeys,
-        coverage: coverageDepths,
-      }),
-      factSelectors: factSelectorsWithPlannedCoverage,
-      queryContextKey,
-    }),
-    ...coverageDepths,
-  });
+  );
 
   const shouldCheckIntersection =
-    visibleRowDepth > 0 &&
-    visibleColDepth > 0 &&
-    rowPathKeys.length > 0 &&
-    columnPathKeys.length > 0 &&
-    rowPathKeys.length * columnPathKeys.length > 1;
+    coverageDepths.rowDepth > 0 &&
+    coverageDepths.columnDepth > 0 &&
+    pathKeysByAxis.row.length > 0 &&
+    pathKeysByAxis.col.length > 0 &&
+    pathKeysByAxis.row.length * pathKeysByAxis.col.length > 1;
   const intersectionCoverageTarget = shouldCheckIntersection
     ? buildIntersectionCoverageTarget({
         program,
-        rowDepth: visibleRowDepth,
-        columnDepth: visibleColDepth,
-        rowPathKeys,
-        columnPathKeys,
+        rowDepth: coverageDepths.rowDepth,
+        columnDepth: coverageDepths.columnDepth,
+        rowPathKeys: pathKeysByAxis.row,
+        columnPathKeys: pathKeysByAxis.col,
       })
     : undefined;
   const intersectionTargets =
@@ -616,8 +606,7 @@ export const planHydrationIteration = ({
       : [];
   const targets = [
     ...directCoverageTargets,
-    ...rowTargets,
-    ...colTargets,
+    ...axisTargets,
     ...intersectionTargets,
   ];
 

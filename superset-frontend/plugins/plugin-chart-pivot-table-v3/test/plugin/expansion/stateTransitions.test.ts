@@ -97,7 +97,7 @@ describe('pivot/expansion/stateTransitions', () => {
     return { tree, aKey, xKey };
   };
 
-  it('resolves open expansion toggles as collapse decisions', () => {
+  test('resolves open expansion toggles as collapse decisions', () => {
     const node = makeNode('row', ['A'], true);
     const decision = resolveExpansionToggleDecision({
       node,
@@ -109,7 +109,7 @@ describe('pivot/expansion/stateTransitions', () => {
     expect(decision).toEqual({ kind: 'collapse' });
   });
 
-  it('resolves ordinary expansion toggles as manifest expansion decisions', () => {
+  test('resolves ordinary expansion toggles as manifest expansion decisions', () => {
     const node = makeNode('row', ['A'], true);
     const decision = resolveExpansionToggleDecision({
       node,
@@ -125,7 +125,7 @@ describe('pivot/expansion/stateTransitions', () => {
     });
   });
 
-  it('resolves expansion toggles with ancestor and manual state', () => {
+  test('resolves expansion toggles with ancestor and manual state', () => {
     const parentKey = serializePath(['A']);
     const node = makeNode('row', ['A', 'B'], true);
     const manualExpanded = new Set(['manual']);
@@ -149,7 +149,7 @@ describe('pivot/expansion/stateTransitions', () => {
     expect([...manualCollapsed].sort()).toEqual([node.key, 'other'].sort());
   });
 
-  it('resolves collapsed expansion state by pruning descendants', () => {
+  test('resolves collapsed expansion state by pruning descendants', () => {
     const parent = makeNode('row', ['A'], true);
     const child = makeNode('row', ['A', 'B'], true);
     const grandchild = makeNode('row', ['A', 'B', 'C'], false);
@@ -176,7 +176,7 @@ describe('pivot/expansion/stateTransitions', () => {
     );
   });
 
-  it('drops stale metric-pattern expansion keys after metric depth changes', () => {
+  test('drops stale metric-pattern expansion keys after metric depth changes', () => {
     const metricToken = encodeMetricKey('m1');
     const staleMetricFirstKey = serializePath([metricToken, 'A']);
     const aKey = serializePath(['A']);
@@ -206,7 +206,7 @@ describe('pivot/expansion/stateTransitions', () => {
     expect(result).toEqual(new Set([rootKey, aKey]));
   });
 
-  it('applies collapsed metric keys and stale metric-pattern cleanup together', () => {
+  test('applies collapsed metric keys and stale metric-pattern cleanup together', () => {
     const metricToken = encodeMetricKey('m1');
     const staleMetricFirstKey = serializePath([metricToken, 'A']);
     const aKey = serializePath(['A']);
@@ -236,7 +236,7 @@ describe('pivot/expansion/stateTransitions', () => {
     expect(result).toEqual(new Set([rootKey, aKey]));
   });
 
-  it('duplicates skipped-dimension metric expansion under newly loaded prefixes', () => {
+  test('duplicates skipped-dimension metric expansion under newly loaded prefixes', () => {
     const metricToken = encodeMetricKey('m1');
     const parentKey = serializePath(['A']);
     const collapsedMetricKey = serializePath(['A', metricToken]);
@@ -270,7 +270,7 @@ describe('pivot/expansion/stateTransitions', () => {
     );
   });
 
-  it('resolves visible measure-leaf metric nodes before render', () => {
+  test('resolves visible measure-leaf metric nodes before render', () => {
     const metricToken = encodeMetricKey('m1');
     const aKey = serializePath(['A']);
     const aMetricKey = serializePath(['A', metricToken]);
@@ -300,7 +300,7 @@ describe('pivot/expansion/stateTransitions', () => {
     expect(result).toEqual(new Set([rootKey, aKey, aMetricKey]));
   });
 
-  it('plans fetch targets for expanded nodes', () => {
+  test('plans fetch targets for expanded nodes', () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
     const loadedRootCoverage: PivotFactSelector = {
       coverage: {
@@ -347,7 +347,7 @@ describe('pivot/expansion/stateTransitions', () => {
     ]);
   });
 
-  it('plans both visible axes through manifest coverage', () => {
+  test('plans both visible axes through manifest coverage', () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
     const plan = planHydrationIteration({
       tree,
@@ -396,7 +396,7 @@ describe('pivot/expansion/stateTransitions', () => {
     ]);
   });
 
-  it('suppresses redundant singleton intersection fetches', () => {
+  test('suppresses redundant singleton intersection fetches', () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: false });
     const plan = planHydrationIteration({
       tree,
@@ -419,7 +419,7 @@ describe('pivot/expansion/stateTransitions', () => {
     ]);
   });
 
-  it('does not fetch the opposite root branch for one-axis expansion', () => {
+  test('does not fetch the opposite root branch for one-axis expansion', () => {
     const { tree, xKey } = buildTree({ includeIntersectionCell: true });
     const loadedBootstrapCoverage: PivotFactSelector = {
       coverage: {
@@ -458,7 +458,46 @@ describe('pivot/expansion/stateTransitions', () => {
     ]);
   });
 
-  it('does not fetch the opposite root branch after the expanded branch is loaded', () => {
+  test('does not fetch the opposite root branch for row-only expansion', () => {
+    const { tree, aKey } = buildTree({ includeIntersectionCell: true });
+    const loadedBootstrapCoverage: PivotFactSelector = {
+      coverage: {
+        rowDepth: 1,
+        columnDepth: 1,
+        rowDimensions: ['country'],
+        columnDimensions: ['month'],
+      },
+      scope: { kind: 'root' },
+      valueKeys: ['sales'],
+    };
+    const plan = planHydrationIteration({
+      tree,
+      desired: {
+        row: new Set([rootKey, aKey]),
+        col: new Set([rootKey]),
+      },
+      factSelectors: [loadedBootstrapCoverage],
+      program: testProgram,
+    });
+
+    expect(plan.kind).toBe('fetch');
+    if (plan.kind !== 'fetch') {
+      throw new Error('Expected a fetch plan');
+    }
+    expect(
+      plan.targets.map(target => ({
+        axis: target.axis,
+        pathKey: target.pathKey,
+      })),
+    ).toEqual([
+      {
+        axis: 'row',
+        pathKey: aKey,
+      },
+    ]);
+  });
+
+  test('does not fetch the opposite root branch after the expanded branch is loaded', () => {
     const { tree, xKey } = buildTree({ includeIntersectionCell: true });
     const loadedBootstrapCoverage: PivotFactSelector = {
       coverage: {
@@ -497,7 +536,7 @@ describe('pivot/expansion/stateTransitions', () => {
     expect(plan.kind).toBe('complete');
   });
 
-  it('does not plan intersection fetches before both axis nodes are loaded', () => {
+  test('does not plan intersection fetches before both axis nodes are loaded', () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: false });
     delete tree.rows[aKey];
 
@@ -523,7 +562,7 @@ describe('pivot/expansion/stateTransitions', () => {
     );
   });
 
-  it('fetches expanded row branches when only stale metric variants exist', () => {
+  test('fetches expanded row branches when only stale metric variants exist', () => {
     const metricToken = encodeMetricKey('m1');
     const aKey = serializePath(['A']);
     const aMetricKey = serializePath(['A', metricToken]);
@@ -567,7 +606,7 @@ describe('pivot/expansion/stateTransitions', () => {
     expect(plan.kind).toBe('fetch');
   });
 
-  it('fetches expanded row branches when only subtotal+metric descendants exist at same base depth', () => {
+  test('fetches expanded row branches when only subtotal+metric descendants exist at same base depth', () => {
     const metricToken = encodeMetricKey('m1');
     const aKey = serializePath(['A']);
     const subtotalKey = serializePath(['A', SUBTOTAL_TOKEN]);
