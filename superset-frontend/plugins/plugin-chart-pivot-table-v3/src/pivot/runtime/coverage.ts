@@ -113,11 +113,9 @@ export const buildInitialRootCoverageNeeds = ({
   needsTotals: boolean;
   valueKeys: string[];
 }): PivotCoverageNeed[] => {
-  const dimensionCount = (axis: PivotAxis) =>
-    axis === 'row'
-      ? program.rowDimensions.length
-      : program.columnDimensions.length;
-  const rootDepth = (axis: PivotAxis) =>
+  const rowCount = program.rowDimensions.length;
+  const columnCount = program.columnDimensions.length;
+  const rootDepth = (axis: PivotAxis, maxDepth: number) =>
     Math.min(
       axisCoverageNeeds
         .filter(
@@ -127,10 +125,10 @@ export const buildInitialRootCoverageNeeds = ({
             need.scope.ancestorPaths.some(path => path.length === 0),
         )
         .reduce((depth, need) => Math.max(depth, need.depth), 0),
-      dimensionCount(axis),
+      maxDepth,
     );
-  const rowDepth = dimensionCount('row') ? rootDepth('row') || 1 : 0;
-  const columnDepth = dimensionCount('col') ? rootDepth('col') || 1 : 0;
+  const rowDepth = rowCount ? rootDepth('row', rowCount) || 1 : 0;
+  const columnDepth = columnCount ? rootDepth('col', columnCount) || 1 : 0;
   const depths = new Set<string>();
   const add = (nextRowDepth: number, nextColumnDepth: number) =>
     depths.add(`${nextRowDepth}|${nextColumnDepth}`);
@@ -142,10 +140,10 @@ export const buildInitialRootCoverageNeeds = ({
     if (rowDepth > 0 && columnDepth > 0) {
       add(rowDepth, columnDepth);
     }
-    if (dimensionCount('row')) {
+    if (rowCount) {
       add(rowDepth, 0);
     }
-    if (dimensionCount('col')) {
+    if (columnCount) {
       add(0, columnDepth);
     }
   }

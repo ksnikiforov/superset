@@ -96,22 +96,22 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `26703` | `-6807` | `< 20000` |
-| Strict core pipeline | `12907` | `10556` | `-2351` | `< 8000` |
+| Full production `src` | `33510` | `26400` | `-7110` | `< 20000` |
+| Strict core pipeline | `12907` | `10474` | `-2433` | `< 8000` |
 
 Diagnostic scope only:
 
 | Scope | Baseline lines | Current lines | Delta |
 | --- | ---: | ---: | ---: |
-| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7777` | `-921` |
+| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7605` | `-1093` |
 
 Core pipeline breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3466` |
-| `pivot/expansion/*` | `1971` |
-| `pivot/query/*` | `1372` |
+| `pivot/runtime/*` | `3389` |
+| `pivot/expansion/*` | `1957` |
+| `pivot/query/*` | `1381` |
 | `pivot/layout/*` + `pivot/core/*` | `878` |
 | core domain helpers | `1549` |
 | formatting/data/render-model support | `1311` |
@@ -252,6 +252,11 @@ Completed structural cuts:
   context-scoped selectors and `diffCoverageManifest`.
 - Query ingestion, expansion hydration, and materialization now read only the
   active query context's fact selectors/batches.
+- Seamless runtime helper exports for coverage checks, fact-batch
+  materialization, prop sync, persistence sync, and update-effect planning were
+  deleted. The hook now commits metric-order-only changes locally from committed
+  fact batches and leaves persisted-filter updates to the dedicated persisted
+  filter effect.
 - Measure-leaf query coverage remains leaf-scoped for offsets and support
   metrics, while the materializer preserves configured sibling leaf headers for
   loaded metrics and only projects expanded child branches when that leaf's
@@ -272,21 +277,19 @@ Completed structural cuts:
   of carrying the initial-load branch list directly.
 
 Latest source delta for this multi-commit slice, measured from
-`e5cfa7f0ee928a8c36e98e1486f75cb0eff6edd8`: `+304` production
-`src` lines (`+926` / `-622`). This slice is not complete under the
-source-reduction criterion until the same loading-authority surface is made
-net deletion-positive.
+`e5cfa7f0ee928a8c36e98e1486f75cb0eff6edd8`: `-23` production
+`src` lines (`+950` / `-973`). This slice is deletion-positive under the
+source-reduction criterion.
 
 Coverage-manifest loading authority status: structurally implemented for root
 bootstrap, configured pre-expansion, persisted/manual expansion, expansion
 reinitialization, seamless runtime sync, and query-context-scoped fact-store
-matching. It is not complete by the agreed plan criteria until the production
-source count for this slice is lower than it was at
-`e5cfa7f0ee928a8c36e98e1486f75cb0eff6edd8`.
+matching. It is complete by the agreed loading-authority criteria; remaining
+work belongs to the broader pure runtime transition.
 
 Completion checklist for the loading-authority plan:
 
-- [ ] Source code line count is lower than before the slice.
+- [x] Source code line count is lower than before the slice.
 - [x] `query/specs.ts` has less initial-load special branching.
 - [x] `stateModel.ts` no longer derives fetch needs from tree scans.
 - [x] `stateTransitions.ts` no longer has a separate hydration planner

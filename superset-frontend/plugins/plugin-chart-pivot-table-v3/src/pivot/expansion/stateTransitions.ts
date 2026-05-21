@@ -23,11 +23,7 @@ import {
   type PivotTreeNode,
 } from '../../types';
 import { parsePath, serializePath } from '../core/path';
-import {
-  buildExpandedKeysForCoverageNeeds,
-  createExpansionMetricPolicy,
-  getAxisDimensionCount,
-} from './planner';
+import { buildExpandedKeysForCoverageNeeds } from './planner';
 import {
   buildDesiredExpandedKeys,
   pruneExpandedToStablePrefix,
@@ -35,9 +31,13 @@ import {
 } from './stateModel';
 import { rootKey } from '../viewModel';
 import { type PivotAxisCoverageNeed } from '../runtime/coverage';
-import { getValuesLevelIndex } from '../runtime/projection';
+import {
+  getAxisDimensionCount,
+  getValuesLevelIndex,
+} from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 import { isMetricTokenForKeys } from '../core/tokens';
+import { createMetricNodePolicy } from '../metricsTotals';
 
 export const PIVOT_AXES: PivotAxis[] = ['row', 'col'];
 
@@ -265,7 +265,7 @@ export const resolveExpandedForMetrics = ({
 }) => {
   const nodes = axis === 'row' ? tree.rows : tree.cols;
   const metricIndex = getValuesLevelIndex(program, axis);
-  const { metricLabelSet } = createExpansionMetricPolicy(program);
+  const { metricLabelSet } = createMetricNodePolicy(program);
   const resolved = expandMetricPatternExpansions({
     expanded,
     nodes,
@@ -314,7 +314,7 @@ type ExpansionReinitAxis = {
 };
 
 const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
-  const { metricLabelSet, countDimDepth } = createExpansionMetricPolicy(
+  const { metricLabelSet, countDimDepth } = createMetricNodePolicy(
     config.program,
   );
   const shouldPrune = config.reset || config.changed;

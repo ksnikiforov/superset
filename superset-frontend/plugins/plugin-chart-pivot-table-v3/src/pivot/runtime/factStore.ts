@@ -128,17 +128,11 @@ const buildPivotFactKey = (selector: PivotFactSelector, fact: PivotFact) =>
   ]);
 
 const normalizeSelector = ({
-  coverage,
-  materialization,
-  queryContextKey,
-  scope,
-  valueKeys,
-}: PivotFactSelector): PivotFactSelector => ({
-  coverage,
-  materialization,
-  queryContextKey,
-  scope,
-  valueKeys: normalizeFactValueKeys(valueKeys),
+  facts: _facts,
+  ...selector
+}: PivotFactStoreBatch): PivotFactSelector => ({
+  ...selector,
+  valueKeys: normalizeFactValueKeys(selector.valueKeys),
 });
 
 const startsWithPath = (path: PivotPath, prefix: PivotPath) =>

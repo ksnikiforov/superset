@@ -24,11 +24,7 @@ import {
   type PivotTreeNode,
 } from '../../types';
 import { parsePath, serializePath } from '../core/path';
-import {
-  decodeMetricKey,
-  isMetricTokenForKeys,
-  isSubtotalToken,
-} from '../core/tokens';
+import { decodeMetricKey, isSubtotalToken } from '../core/tokens';
 import {
   diffCoverageManifest,
   normalizeFactValueKeys,
@@ -43,6 +39,7 @@ import {
 } from '../runtime/factStore';
 import {
   canRequestAxisExpansion,
+  getAxisDimensionCount,
   isValuesFirstOnAxis,
   type PivotAxisProjection,
   resolveAxisProjection,
@@ -231,7 +228,7 @@ export const buildAxisExpansionCoverageTarget = ({
   };
 };
 
-export const buildAxisCoverageNeedTarget = ({
+const buildAxisCoverageNeedTarget = ({
   need,
   program,
   rowDepth: visibleRowDepth,
@@ -241,25 +238,25 @@ export const buildAxisCoverageNeedTarget = ({
   program: PivotProgram;
   rowDepth: number;
   columnDepth: number;
-}): ExpansionCoverageTarget => {
-  const rowDepth = need.axis === 'row' ? need.depth : visibleRowDepth;
-  const columnDepth = need.axis === 'col' ? need.depth : visibleColDepth;
-  return {
-    axis: need.axis,
-    pathKey: serializePath(pathsFromAxisScope(need.scope)[0] ?? []),
-    need: {
-      rowDepth,
-      columnDepth,
-      rowDimensions: program.rowDimensions.slice(0, rowDepth),
-      columnDimensions: program.columnDimensions.slice(0, columnDepth),
-      valueKeys: buildFactValueKeys({
-        metricKeys: program.metricKeys,
-      }),
-      rowScope: need.axis === 'row' ? need.scope : { kind: 'root' },
-      columnScope: need.axis === 'col' ? need.scope : { kind: 'root' },
-    },
-  };
-};
+}): ExpansionCoverageTarget => ({
+  axis: need.axis,
+  pathKey: serializePath(pathsFromAxisScope(need.scope)[0] ?? []),
+  need: {
+    rowDepth: need.axis === 'row' ? need.depth : visibleRowDepth,
+    columnDepth: need.axis === 'col' ? need.depth : visibleColDepth,
+    rowDimensions: program.rowDimensions.slice(
+      0,
+      need.axis === 'row' ? need.depth : visibleRowDepth,
+    ),
+    columnDimensions: program.columnDimensions.slice(
+      0,
+      need.axis === 'col' ? need.depth : visibleColDepth,
+    ),
+    valueKeys: buildFactValueKeys({ metricKeys: program.metricKeys }),
+    rowScope: need.axis === 'row' ? need.scope : { kind: 'root' },
+    columnScope: need.axis === 'col' ? need.scope : { kind: 'root' },
+  },
+});
 
 export const buildIntersectionCoverageTarget = ({
   program,
@@ -307,18 +304,6 @@ export const buildIntersectionCoverageTarget = ({
   },
 });
 
-export const getAxisDimensionCount = (program: PivotProgram, axis: PivotAxis) =>
-  (axis === 'row' ? program.rowDimensions : program.columnDimensions).length;
-
-export const createExpansionMetricPolicy = (program: PivotProgram) => {
-  const metricNodePolicy = createMetricNodePolicy(program);
-  return {
-    metricLabelSet: metricNodePolicy.metricLabelSet,
-    countDimDepth: (path: PivotTreeNode['path']) =>
-      metricNodePolicy.countDimDepth(path.filter(val => !isSubtotalToken(val))),
-  };
-};
-
 const pathStartsWith = (path: PivotPath, prefix: PivotPath) =>
   prefix.every((value, index) => path[index] === value);
 
@@ -340,8 +325,7 @@ export const buildExpandedKeysForCoverageNeeds = ({
   program: PivotProgram;
 }) => {
   const nodes = axis === 'row' ? tree.rows : tree.cols;
-  const { metricLabelSet, countDimDepth } =
-    createExpansionMetricPolicy(program);
+  const { metricLabelSet, countDimDepth } = createMetricNodePolicy(program);
   const expanded = new Set<string>([rootKey]);
   axisCoverageNeeds.forEach(need => {
     if (need.axis !== axis) {
@@ -369,7 +353,9 @@ export const buildExpandedKeysForCoverageNeeds = ({
         const isMetricNode = decodedMetric
           ? metricLabelSet.has(decodedMetric)
           : false;
-        const depth = countDimDepth(node.path);
+        const depth = countDimDepth(
+          node.path.filter(val => !isSubtotalToken(val)),
+        );
         if (
           depth > 0 &&
           (isMetricNode ? depth < need.depth : depth <= need.depth)
@@ -501,16 +487,20 @@ const depthForExpansionKeys = ({
   expanded: Set<string>;
   program: PivotProgram;
 }) => {
-  const { countDimDepth } = createExpansionMetricPolicy(program);
+  const { countDimDepth } = createMetricNodePolicy(program);
   const dimensionCount = getAxisDimensionCount(program, axis);
-  const configuredDepth = axisCoverageNeeds
-    .filter(need => need.axis === axis)
-    .reduce((max, need) => Math.max(max, need.depth), 0);
+  const configuredDepth = axisCoverageNeeds.reduce(
+    (max, need) => (need.axis === axis ? Math.max(max, need.depth) : max),
+    0,
+  );
   const expansionDepth = Array.from(expanded).reduce((max, key) => {
     if (key === rootKey) {
       return Math.max(max, dimensionCount > 0 ? 1 : 0);
     }
-    return Math.max(max, countDimDepth(parsePath(key)) + 1);
+    return Math.max(
+      max,
+      countDimDepth(parsePath(key).filter(val => !isSubtotalToken(val))) + 1,
+    );
   }, 0);
   return Math.min(dimensionCount, Math.max(configuredDepth, expansionDepth));
 };

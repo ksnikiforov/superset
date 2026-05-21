@@ -33,13 +33,8 @@ import {
   type SetDataMaskHook,
 } from '@superset-ui/core';
 import { type PivotRuntimeLayout } from '../../types';
-import { buildRuntimeSelectionSyncState } from '../filters';
-import {
-  isSameRuntimeLayout,
-  prepareRuntimeLayoutPropSync,
-  prepareRuntimeStatePersistence,
-  shouldSyncPersistedSelectedFilters,
-} from '../runtime/seamlessRuntimeUpdate';
+import { buildRuntimeSelectionSyncState, hasSelectedFilters } from '../filters';
+import { isSameRuntimeLayout } from '../runtime/seamlessRuntimeUpdate';
 import { useSyncRef } from '../shared/useSyncRef';
 
 type RuntimeSelection = Record<string, DataRecordValue[]>;
@@ -137,25 +132,19 @@ export const usePivotRuntimeLayoutState = ({
       filters: RuntimeSelection,
       options: { commit?: boolean } = {},
     ) => {
-      const persistencePlan = prepareRuntimeStatePersistence({
-        layout,
-        selection: filters,
-        isDashboardRuntimeSync,
-        lastPersistedRuntimeLayout: lastPersistedRuntimeLayoutRef.current,
-        lastPersistedSelection: lastPersistedSelectionRef.current,
-        upstreamDashboardQueryContextSignature,
-      });
-      if (persistencePlan.persistedRuntimeLayout) {
-        lastPersistedRuntimeLayoutRef.current =
-          persistencePlan.persistedRuntimeLayout;
+      if (
+        isDashboardRuntimeSync &&
+        !isSameRuntimeLayout(lastPersistedRuntimeLayoutRef.current, layout)
+      ) {
+        lastPersistedRuntimeLayoutRef.current = layout;
         persistedRuntimeLayoutSyncRef.current = true;
       }
-      if (persistencePlan.localSyncDashboardQueryContext !== undefined) {
+      if (isDashboardRuntimeSync) {
         lastLocalSyncDashboardQueryContextRef.current =
-          persistencePlan.localSyncDashboardQueryContext;
+          upstreamDashboardQueryContextSignature;
       }
-      if (persistencePlan.persistedSelection) {
-        lastPersistedSelectionRef.current = persistencePlan.persistedSelection;
+      if (!isEqual(lastPersistedSelectionRef.current, filters)) {
+        lastPersistedSelectionRef.current = filters;
         pendingPersistedSelectionSyncRef.current = true;
       }
       if (options.commit !== false) {
@@ -166,7 +155,10 @@ export const usePivotRuntimeLayoutState = ({
         setControlValue('pivotSelectedFilters', filters);
       }
       if (shouldPersistOwnState) {
-        const nextOwnState = mergeOwnState(persistencePlan.ownStatePatch);
+        const nextOwnState = mergeOwnState({
+          pivotRuntimeLayout: layout,
+          pivotSelectedFilters: filters,
+        });
         setDataMask({ ownState: { ...nextOwnState } });
       }
     },
@@ -182,23 +174,24 @@ export const usePivotRuntimeLayoutState = ({
   );
 
   useEffect(() => {
-    const propSync = prepareRuntimeLayoutPropSync({
-      isDashboardRuntimeSync,
-      pendingPersistedRuntimeLayoutSync: persistedRuntimeLayoutSyncRef.current,
-      hasPendingRuntimeLayout: !isSameRuntimeLayout(
-        uiRuntimeLayoutRef.current,
-        committedRuntimeLayoutRef.current,
-      ),
-      runtimeLayout,
-      lastPersistedRuntimeLayout: lastPersistedRuntimeLayoutRef.current,
-    });
-    if (propSync.shouldSyncCommittedRuntimeLayout) {
+    const hasPendingRuntimeLayout = !isSameRuntimeLayout(
+      uiRuntimeLayoutRef.current,
+      committedRuntimeLayoutRef.current,
+    );
+    const shouldSyncLayout =
+      !(isDashboardRuntimeSync && persistedRuntimeLayoutSyncRef.current) &&
+      !hasPendingRuntimeLayout;
+    if (shouldSyncLayout) {
       commitRuntimeLayout(runtimeLayout);
     }
-    if (propSync.hasPersistedRuntimeLayoutSyncSettled) {
+    if (
+      isDashboardRuntimeSync &&
+      persistedRuntimeLayoutSyncRef.current &&
+      isSameRuntimeLayout(runtimeLayout, lastPersistedRuntimeLayoutRef.current)
+    ) {
       persistedRuntimeLayoutSyncRef.current = false;
     }
-    if (propSync.shouldSyncUiRuntimeLayout) {
+    if (shouldSyncLayout) {
       updateUiRuntimeLayout(runtimeLayout);
     }
   }, [
@@ -218,14 +211,15 @@ export const usePivotRuntimeLayoutState = ({
       pendingPersistedSelectionSyncRef.current = false;
     }
     if (
-      shouldSyncPersistedSelectedFilters({
-        pendingPersistedSelectionSync: pendingPersistedSelectionSyncRef.current,
-        persistedSelectedFilters,
-        committedFilters,
-        uiSelectedFilters,
-        suppressStalePersistedFilterRestore:
-          suppressStalePersistedFilterRestoreRef.current,
-      })
+      !pendingPersistedSelectionSyncRef.current &&
+      (!isEqual(persistedSelectedFilters, committedFilters) ||
+        !isEqual(persistedSelectedFilters, uiSelectedFilters)) &&
+      !hasSelectedFilters(uiSelectedFilters) &&
+      !hasSelectedFilters(committedFilters) &&
+      !(
+        suppressStalePersistedFilterRestoreRef.current &&
+        hasSelectedFilters(persistedSelectedFilters)
+      )
     ) {
       setCommittedFilters(persistedSelectedFilters);
       setUiSelectedFilters(persistedSelectedFilters);

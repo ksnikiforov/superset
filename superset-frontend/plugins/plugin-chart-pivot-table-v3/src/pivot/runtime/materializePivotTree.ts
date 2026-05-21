@@ -656,8 +656,6 @@ const applyMeasureAxis = ({
     const key = serializePath(path);
     if (nodes[key]) {
       const existing = nodes[key];
-      // A base tree node can be terminal before we inject metric/leaf tiers.
-      // Promote it to an internal node when a deeper hierarchy is added.
       if (
         promoteExistingNodes &&
         path.length < fullDepth &&
@@ -1235,6 +1233,9 @@ const materializeInputFromPlanGroup = (
 const columnRefKey = (column: QueryFormColumn) =>
   typeof column === 'string' ? column : getColumnLabel(column);
 
+const sameColumnRef = (left: QueryFormColumn, right?: QueryFormColumn) =>
+  right !== undefined && columnRefKey(left) === columnRefKey(right);
+
 const coverageMatchesProgramAxis = ({
   coverageDimensions,
   programDimensions,
@@ -1246,12 +1247,9 @@ const coverageMatchesProgramAxis = ({
   materialization: PivotFactStoreBatch['materialization'];
   axis: PivotAxis;
 }) => {
-  const dimensionMatches = (left: QueryFormColumn, right: QueryFormColumn) =>
-    columnRefKey(left) === columnRefKey(right);
-
   if (materialization?.valueAxis !== axis) {
     return coverageDimensions.every((dimension, index) =>
-      dimensionMatches(dimension, programDimensions[index]),
+      sameColumnRef(dimension, programDimensions[index]),
     );
   }
 
@@ -1259,11 +1257,12 @@ const coverageMatchesProgramAxis = ({
     Math.max(materialization.valueInsertIndex, 0),
     programDimensions.length,
   );
-  const prefix = coverageDimensions.slice(0, insertIndex);
   if (
-    !prefix.every((dimension, index) =>
-      dimensionMatches(dimension, programDimensions[index]),
-    )
+    !coverageDimensions
+      .slice(0, insertIndex)
+      .every((dimension, index) =>
+        sameColumnRef(dimension, programDimensions[index]),
+      )
   ) {
     return false;
   }
@@ -1272,13 +1271,10 @@ const coverageMatchesProgramAxis = ({
   return coverageDimensions.slice(insertIndex).every(dimension => {
     const matchedIndex = programDimensions.findIndex(
       (programDimension, index) =>
-        index >= programIndex && dimensionMatches(dimension, programDimension),
+        index >= programIndex && sameColumnRef(dimension, programDimension),
     );
-    if (matchedIndex < 0) {
-      return false;
-    }
     programIndex = matchedIndex + 1;
-    return true;
+    return matchedIndex >= 0;
   });
 };
 
@@ -1287,13 +1283,9 @@ const coverageMatchesProgram = (
   program: PivotProgram,
 ) => {
   const { coverage, materialization } = batch;
-  if (
-    coverage.rowDepth > program.rowDimensions.length ||
-    coverage.columnDepth > program.columnDimensions.length
-  ) {
-    return false;
-  }
   return (
+    coverage.rowDepth <= program.rowDimensions.length &&
+    coverage.columnDepth <= program.columnDimensions.length &&
     coverageMatchesProgramAxis({
       coverageDimensions: coverage.rowDimensions,
       programDimensions: program.rowDimensions,

@@ -21,16 +21,13 @@ import { isEqual } from 'lodash';
 import {
   type PivotRuntimeLayout,
   type PivotTableQueryFormData,
-  type PivotTreeData,
 } from '../../types';
 import { hasSelectedFilters } from '../filters';
 import { stableStringify } from '../shared/stableStringify';
 import {
   buildInitialPivotUpdatePlan,
-  type InitialPivotUpdatePlan,
   normalizeFormDataExtraFilters,
 } from '../query/specs';
-import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';
 import {
   collectPlannedQueryWarnings,
   fetchPlannedQuerySpecs,
@@ -39,12 +36,9 @@ import {
   buildPivotFactQueryContextKey,
   createPivotFactStore,
   createPivotFactStoreFromBatches,
-  type PivotFactStore,
   type PivotFactStoreBatch,
 } from './factStore';
-import { factSelectorsCoverSelector } from './coverage';
 import { materializeLoadedPivotTreeFromFactStoreAsync } from './materializePivotTree';
-import { type ChunkedWorkOptions } from './chunkedWork';
 import {
   isAbortError,
   type LatestRequestLifecycle,
@@ -60,11 +54,6 @@ export type SeamlessRuntimeSyncSnapshot = {
   layoutSignature: string;
   upstreamSignature: string;
 };
-
-type SeamlessRuntimeUpstreamState = {
-  data: PivotTreeData;
-  signature: string;
-} | null;
 
 const selectionSignature = (selection: PivotRuntimeLayout['leafSelection']) =>
   stableStringify(selection ?? {});
@@ -100,201 +89,12 @@ export const buildSeamlessRuntimeSyncSnapshot = ({
 
 export const buildSeamlessRuntimeUpstreamSignature = (
   queryFormData?: PivotTableQueryFormData | null,
-) => {
-  if (!queryFormData) {
-    return null;
-  }
-  return buildPivotFactQueryContextKey(
-    normalizeFormDataExtraFilters(queryFormData),
-  );
-};
-
-export const prepareSeamlessRuntimeUpdateEffect = ({
-  upstreamDashboardQueryContextSignature,
-  previousUpstreamState,
-  data,
-  persistedInteractionFilters,
-  committedFilters,
-  uiSelectedFilters,
-  lastSync,
-  uiRuntimeLayout,
-  upstreamSeamlessSignature,
-}: {
-  upstreamDashboardQueryContextSignature: string | null;
-  previousUpstreamState: SeamlessRuntimeUpstreamState;
-  data: PivotTreeData;
-  persistedInteractionFilters: RuntimeSelection;
-  committedFilters: RuntimeSelection;
-  uiSelectedFilters: RuntimeSelection;
-  lastSync: SeamlessRuntimeSyncSnapshot | null;
-  uiRuntimeLayout: PivotRuntimeLayout;
-  upstreamSeamlessSignature: string;
-}) => {
-  const nextUpstreamState = upstreamDashboardQueryContextSignature
-    ? {
-        data,
-        signature: upstreamDashboardQueryContextSignature,
-      }
+) =>
+  queryFormData
+    ? buildPivotFactQueryContextKey(
+        normalizeFormDataExtraFilters(queryFormData),
+      )
     : null;
-  const shouldApplyStaleUpdate =
-    upstreamDashboardQueryContextSignature !== null &&
-    previousUpstreamState !== null &&
-    previousUpstreamState.signature !==
-      upstreamDashboardQueryContextSignature &&
-    previousUpstreamState.data === data;
-  const nextPersistedFilterSync = buildSeamlessRuntimeSyncSnapshot({
-    runtimeLayout: uiRuntimeLayout,
-    selection: persistedInteractionFilters,
-    upstreamSignature: upstreamSeamlessSignature,
-  });
-  const hasMatchingPersistedFilterSync =
-    lastSync?.filtersSignature === nextPersistedFilterSync.filtersSignature &&
-    lastSync.layoutSignature === nextPersistedFilterSync.layoutSignature &&
-    lastSync.upstreamSignature === nextPersistedFilterSync.upstreamSignature;
-  const shouldApplyPersistedFilterUpdate =
-    hasSelectedFilters(persistedInteractionFilters) &&
-    isEqual(committedFilters, persistedInteractionFilters) &&
-    isEqual(uiSelectedFilters, persistedInteractionFilters) &&
-    !hasMatchingPersistedFilterSync;
-  return {
-    nextUpstreamState,
-    update:
-      shouldApplyStaleUpdate || shouldApplyPersistedFilterUpdate
-        ? {
-            runtimeLayout: uiRuntimeLayout,
-            selection: shouldApplyPersistedFilterUpdate
-              ? persistedInteractionFilters
-              : uiSelectedFilters,
-          }
-        : undefined,
-  };
-};
-
-export const shouldSyncPersistedSelectedFilters = ({
-  pendingPersistedSelectionSync,
-  persistedSelectedFilters,
-  committedFilters,
-  uiSelectedFilters,
-  suppressStalePersistedFilterRestore,
-}: {
-  pendingPersistedSelectionSync: boolean;
-  persistedSelectedFilters: RuntimeSelection;
-  committedFilters: RuntimeSelection;
-  uiSelectedFilters: RuntimeSelection;
-  suppressStalePersistedFilterRestore: boolean;
-}) => {
-  if (pendingPersistedSelectionSync) {
-    return false;
-  }
-  const shouldSyncFilters =
-    !isEqual(persistedSelectedFilters, committedFilters) ||
-    !isEqual(persistedSelectedFilters, uiSelectedFilters);
-  if (!shouldSyncFilters) {
-    return false;
-  }
-  const hasLocalFilters =
-    hasSelectedFilters(uiSelectedFilters) ||
-    hasSelectedFilters(committedFilters);
-  if (hasLocalFilters) {
-    return false;
-  }
-  return !(
-    suppressStalePersistedFilterRestore &&
-    hasSelectedFilters(persistedSelectedFilters)
-  );
-};
-
-export const prepareRuntimeLayoutPropSync = ({
-  isDashboardRuntimeSync,
-  pendingPersistedRuntimeLayoutSync,
-  hasPendingRuntimeLayout,
-  runtimeLayout,
-  lastPersistedRuntimeLayout,
-}: {
-  isDashboardRuntimeSync: boolean;
-  pendingPersistedRuntimeLayoutSync: boolean;
-  hasPendingRuntimeLayout: boolean;
-  runtimeLayout: PivotRuntimeLayout;
-  lastPersistedRuntimeLayout: PivotRuntimeLayout;
-}) => ({
-  shouldSyncCommittedRuntimeLayout:
-    !(isDashboardRuntimeSync && pendingPersistedRuntimeLayoutSync) &&
-    !hasPendingRuntimeLayout,
-  shouldSyncUiRuntimeLayout:
-    !(isDashboardRuntimeSync && pendingPersistedRuntimeLayoutSync) &&
-    !hasPendingRuntimeLayout,
-  hasPersistedRuntimeLayoutSyncSettled:
-    isDashboardRuntimeSync &&
-    pendingPersistedRuntimeLayoutSync &&
-    isSameRuntimeLayout(runtimeLayout, lastPersistedRuntimeLayout),
-});
-
-export const prepareRuntimeStatePersistence = ({
-  layout,
-  selection,
-  isDashboardRuntimeSync,
-  lastPersistedRuntimeLayout,
-  lastPersistedSelection,
-  upstreamDashboardQueryContextSignature,
-}: {
-  layout: PivotRuntimeLayout;
-  selection: RuntimeSelection;
-  isDashboardRuntimeSync: boolean;
-  lastPersistedRuntimeLayout: PivotRuntimeLayout;
-  lastPersistedSelection: RuntimeSelection;
-  upstreamDashboardQueryContextSignature: string | null;
-}) => {
-  const shouldMarkPersistedRuntimeLayoutSyncPending =
-    isDashboardRuntimeSync &&
-    !isSameRuntimeLayout(lastPersistedRuntimeLayout, layout);
-  const shouldMarkPersistedSelectionSyncPending = !isEqual(
-    lastPersistedSelection,
-    selection,
-  );
-  return {
-    ownStatePatch: {
-      pivotRuntimeLayout: layout,
-      pivotSelectedFilters: selection,
-    },
-    persistedRuntimeLayout: shouldMarkPersistedRuntimeLayoutSyncPending
-      ? layout
-      : undefined,
-    localSyncDashboardQueryContext: isDashboardRuntimeSync
-      ? upstreamDashboardQueryContextSignature
-      : undefined,
-    persistedSelection: shouldMarkPersistedSelectionSyncPending
-      ? selection
-      : undefined,
-  };
-};
-
-export const prepareSeamlessRuntimeLayoutChange = ({
-  nextLayout,
-  dimensionKeys,
-  metricKeys,
-  selection,
-  upstreamSignature,
-}: {
-  nextLayout: PivotRuntimeLayout;
-  dimensionKeys: string[];
-  metricKeys: string[];
-  selection: RuntimeSelection;
-  upstreamSignature: string;
-}) => {
-  const runtimeLayout = normalizeRuntimeLayout(
-    nextLayout,
-    dimensionKeys,
-    metricKeys,
-  );
-  return {
-    runtimeLayout,
-    syncSnapshot: buildSeamlessRuntimeSyncSnapshot({
-      runtimeLayout,
-      selection,
-      upstreamSignature,
-    }),
-  };
-};
 
 type SeamlessRuntimeUpdateConfig = {
   baseFormData: PivotTableQueryFormData;
@@ -306,11 +106,6 @@ type SeamlessRuntimeUpdateConfig = {
   requestLifecycle: LatestRequestLifecycle;
 };
 
-type SeamlessRuntimeCoverageConfig = Omit<
-  SeamlessRuntimeUpdateConfig,
-  'requestLifecycle'
->;
-
 const buildSeamlessRuntimeCoveragePlan = ({
   baseFormData,
   sourceMetrics,
@@ -318,9 +113,7 @@ const buildSeamlessRuntimeCoveragePlan = ({
   runtimeLayout,
   selection,
   factBatches = [],
-}: SeamlessRuntimeCoverageConfig): InitialPivotUpdatePlan & {
-  factStore: PivotFactStore;
-} => ({
+}: Omit<SeamlessRuntimeUpdateConfig, 'requestLifecycle'>) => ({
   ...buildInitialPivotUpdatePlan({
     formData: baseFormData,
     runtimeLayout,
@@ -333,34 +126,6 @@ const buildSeamlessRuntimeCoveragePlan = ({
       ? createPivotFactStoreFromBatches(factBatches)
       : createPivotFactStore(),
 });
-
-export const shouldFetchSeamlessRuntimeCoverage = (
-  config: SeamlessRuntimeCoverageConfig,
-) => {
-  const { specs, factStore } = buildSeamlessRuntimeCoveragePlan(config);
-  const factSelectors = factStore.getCoverageSelectors();
-  return specs.some(
-    spec => !factSelectorsCoverSelector(factSelectors, spec.meta.factSelector),
-  );
-};
-
-export const materializeSeamlessRuntimeFactBatches = async ({
-  chunkSize,
-  shouldContinue,
-  yieldToMain,
-  ...config
-}: SeamlessRuntimeCoverageConfig & ChunkedWorkOptions) => {
-  const { formData, layout, factStore } =
-    buildSeamlessRuntimeCoveragePlan(config);
-  return materializeLoadedPivotTreeFromFactStoreAsync({
-    store: factStore,
-    layout,
-    formData,
-    chunkSize,
-    shouldContinue,
-    yieldToMain,
-  });
-};
 
 export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
   requestLifecycle,

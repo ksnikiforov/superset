@@ -39,21 +39,17 @@ import {
 } from '../../types';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
-import {
-  createLatestRequestLifecycle,
-  yieldToMainThread,
-} from '../runtime/requestLifecycle';
+import { createLatestRequestLifecycle } from '../runtime/requestLifecycle';
 import {
   buildSeamlessRuntimeSyncSnapshot,
   fetchAndMaterializeSeamlessRuntimeUpdate,
   isSameRuntimeLayout,
-  materializeSeamlessRuntimeFactBatches,
-  prepareSeamlessRuntimeUpdateEffect,
-  prepareSeamlessRuntimeLayoutChange,
-  shouldFetchSeamlessRuntimeCoverage,
   type SeamlessRuntimeSyncSnapshot,
 } from '../runtime/seamlessRuntimeUpdate';
 import { type PivotFactStoreBatch } from '../runtime/ingestQueryResults';
+import { createPivotFactStoreFromBatches } from '../runtime/factStore';
+import { materializeLoadedPivotTreeFromFactStore } from '../runtime/materializePivotTree';
+import { buildInitialPivotUpdatePlan } from '../query/specs';
 import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';
 import {
   applyDimensionFilterSelectionChange,
@@ -69,6 +65,10 @@ import { getStableColumnKey } from '../../utils';
 
 type RuntimeSelection = Record<string, DataRecordValue[]>;
 
+const runtimeErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : t('Failed to update data');
+const sameMetricSet = (left: string[], right: string[]) =>
+  isEqual([...left].sort(), [...right].sort());
 type UsePivotSeamlessRuntimeUpdateConfig = {
   dimensionKeys: string[];
   metricKeys: string[];
@@ -137,20 +137,7 @@ export const usePivotSeamlessRuntimeUpdate = (
     useState<PivotFactStoreBatch[]>(factBatches);
   const committedFactBatchesRef = useRef<PivotFactStoreBatch[]>(factBatches);
   const hasMetrics = metricKeys.length > 0;
-  const lastUpstreamQueryContextRef = useRef<{
-    data: PivotTreeData;
-    signature: string;
-  } | null>(
-    upstreamDashboardQueryContextSignature
-      ? {
-          data,
-          signature: upstreamDashboardQueryContextSignature,
-        }
-      : null,
-  );
-  const lastAppliedDashboardQueryContextRef = useRef(
-    upstreamDashboardQueryContextSignature,
-  );
+  const lastUpstreamQueryContextRef = useRef<string | null>(null);
   const lastSyncedPropsRef = useRef({ data, factBatches });
   const requestLifecycle = useMemo(
     () =>
@@ -160,101 +147,41 @@ export const usePivotSeamlessRuntimeUpdate = (
       }),
     [],
   );
-  const materializeCommittedTree = useCallback(
+  const materializeCommittedFacts = useCallback(
     (
       nextRuntimeLayout: PivotRuntimeLayout,
       selection: RuntimeSelection,
       nextFactBatches: PivotFactStoreBatch[],
     ) => {
-      const requestScope = requestLifecycle.beginScope();
-      materializeSeamlessRuntimeFactBatches({
-        baseFormData,
-        sourceMetrics,
-        sourceMeasureLeavesByMetric,
+      const { formData, layout } = buildInitialPivotUpdatePlan({
+        formData: baseFormData,
         runtimeLayout: nextRuntimeLayout,
         selection,
-        factBatches: nextFactBatches,
-        shouldContinue: requestScope.isCurrent,
-        yieldToMain: yieldToMainThread,
-      })
-        .then(tree => {
-          if (requestScope.isCurrent()) {
-            setCommittedTree(tree);
-          }
-        })
-        .catch(error => {
-          if (requestScope.isCurrent()) {
-            setError(
-              error instanceof Error
-                ? error.message
-                : t('Failed to update data'),
-            );
-          }
-        });
+        metricsOverride: sourceMetrics,
+        measureLeavesByMetricOverride: sourceMeasureLeavesByMetric,
+      });
+      setCommittedTree(
+        materializeLoadedPivotTreeFromFactStore({
+          store: createPivotFactStoreFromBatches(nextFactBatches),
+          layout,
+          formData,
+        }),
+      );
     },
-    [
-      baseFormData,
-      requestLifecycle,
-      sourceMeasureLeavesByMetric,
-      sourceMetrics,
-    ],
+    [baseFormData, sourceMeasureLeavesByMetric, sourceMetrics],
   );
-
-  useEffect(() => {
-    // Ignore stale upstream updates while a local interaction update is still
-    // pending.
-    const hasLocalSyncForCurrentDashboardQueryContext =
-      upstreamDashboardQueryContextSignature !== null &&
-      lastLocalSyncDashboardQueryContextRef.current ===
-        upstreamDashboardQueryContextSignature;
-    const shouldSyncCommittedTreeFromProps =
-      !loading &&
-      !hasLocalSyncForCurrentDashboardQueryContext &&
-      !hasSelectedFilters(persistedInteractionFilters) &&
-      isSameRuntimeLayout(runtimeLayout, committedRuntimeLayout) &&
-      isEqual(selectedFiltersForTreeSync, committedFilters);
-    if (!shouldSyncCommittedTreeFromProps) {
-      return;
-    }
-    if (
-      lastSyncedPropsRef.current.data === data &&
-      lastSyncedPropsRef.current.factBatches === factBatches
-    ) {
-      return;
-    }
-    lastSyncedPropsRef.current = { data, factBatches };
-    committedFactBatchesRef.current = factBatches;
-    setCommittedFactBatches(factBatches);
-    setWarnings([]);
-    setError(undefined);
-    setLoading(false);
-    materializeCommittedTree(
-      runtimeLayout,
-      selectedFiltersForTreeSync,
-      factBatches,
-    );
-  }, [
-    data,
-    factBatches,
-    committedFilters,
-    committedRuntimeLayout,
-    lastLocalSyncDashboardQueryContextRef,
-    loading,
-    materializeCommittedTree,
-    persistedInteractionFilters,
-    runtimeLayout,
-    selectedFiltersForTreeSync,
-    upstreamDashboardQueryContextSignature,
-  ]);
-
   const applySeamlessUpdate = useCallback(
-    async (nextLayout: PivotRuntimeLayout, nextFilters: RuntimeSelection) => {
+    async (
+      nextLayout: PivotRuntimeLayout,
+      nextFilters: RuntimeSelection,
+      { showLoading = true }: { showLoading?: boolean } = {},
+    ) => {
       const normalized = normalizeRuntimeLayout(
         nextLayout,
         dimensionKeys,
         metricKeys,
       );
-      setLoading(true);
+      setLoading(showLoading);
       setError(undefined);
       const updateResult = await fetchAndMaterializeSeamlessRuntimeUpdate({
         requestLifecycle,
@@ -269,11 +196,7 @@ export const usePivotSeamlessRuntimeUpdate = (
         return;
       }
       if (updateResult.status !== 'success') {
-        setError(
-          updateResult.error instanceof Error
-            ? updateResult.error.message
-            : t('Failed to update data'),
-        );
+        setError(runtimeErrorMessage(updateResult.error));
         setLoading(false);
         return;
       }
@@ -309,54 +232,100 @@ export const usePivotSeamlessRuntimeUpdate = (
     ],
   );
 
+  useEffect(() => {
+    const hasLocalSyncForCurrentDashboardQueryContext =
+      upstreamDashboardQueryContextSignature !== null &&
+      lastLocalSyncDashboardQueryContextRef.current ===
+        upstreamDashboardQueryContextSignature;
+    if (
+      loading ||
+      hasLocalSyncForCurrentDashboardQueryContext ||
+      hasSelectedFilters(persistedInteractionFilters) ||
+      !isSameRuntimeLayout(runtimeLayout, committedRuntimeLayout) ||
+      !isEqual(selectedFiltersForTreeSync, committedFilters) ||
+      (lastSyncedPropsRef.current.data === data &&
+        lastSyncedPropsRef.current.factBatches === factBatches)
+    ) {
+      return;
+    }
+    lastSyncedPropsRef.current = { data, factBatches };
+    requestLifecycle.invalidate();
+    committedFactBatchesRef.current = factBatches;
+    setCommittedFactBatches(factBatches);
+    setWarnings([]);
+    setError(undefined);
+    materializeCommittedFacts(
+      runtimeLayout,
+      selectedFiltersForTreeSync,
+      factBatches,
+    );
+  }, [
+    data,
+    factBatches,
+    committedFilters,
+    committedRuntimeLayout,
+    lastLocalSyncDashboardQueryContextRef,
+    loading,
+    materializeCommittedFacts,
+    persistedInteractionFilters,
+    requestLifecycle,
+    runtimeLayout,
+    selectedFiltersForTreeSync,
+    upstreamDashboardQueryContextSignature,
+  ]);
+
   const applyRuntimeLayoutChange = useCallback(
     (nextLayout: PivotRuntimeLayout) => {
-      const action = prepareSeamlessRuntimeLayoutChange({
+      const runtimeLayout = normalizeRuntimeLayout(
         nextLayout,
         dimensionKeys,
         metricKeys,
+      );
+      const syncSnapshot = buildSeamlessRuntimeSyncSnapshot({
+        runtimeLayout,
         selection: uiSelectedFilters,
         upstreamSignature,
       });
+      const previousLayout = uiRuntimeLayoutRef.current;
+      setError(undefined);
+      commitUiRuntimeLayout(runtimeLayout);
       if (
-        shouldFetchSeamlessRuntimeCoverage({
-          baseFormData,
-          sourceMetrics,
-          sourceMeasureLeavesByMetric,
-          runtimeLayout: action.runtimeLayout,
-          selection: uiSelectedFilters,
-          factBatches: committedFactBatchesRef.current,
-        })
+        isEqual(previousLayout.rows, runtimeLayout.rows) &&
+        isEqual(previousLayout.cols, runtimeLayout.cols) &&
+        isEqual(previousLayout.leafSelection, runtimeLayout.leafSelection) &&
+        previousLayout.valuePlacement.axis ===
+          runtimeLayout.valuePlacement.axis &&
+        previousLayout.valuePlacement.index ===
+          runtimeLayout.valuePlacement.index &&
+        sameMetricSet(previousLayout.metrics, runtimeLayout.metrics)
       ) {
-        setLoading(true);
-        setError(undefined);
-        commitUiRuntimeLayout(action.runtimeLayout);
-        persistRuntimeState(action.runtimeLayout, uiSelectedFilters, {
-          commit: false,
-        });
-        applySeamlessUpdate(action.runtimeLayout, uiSelectedFilters);
+        persistRuntimeState(runtimeLayout, uiSelectedFilters);
+        seamlessSyncRef.current = syncSnapshot;
+        materializeCommittedFacts(
+          runtimeLayout,
+          uiSelectedFilters,
+          committedFactBatchesRef.current,
+        );
         return;
       }
-      setLoading(false);
-      setError(undefined);
-      commitUiRuntimeLayout(action.runtimeLayout);
-      persistRuntimeState(action.runtimeLayout, uiSelectedFilters);
-      seamlessSyncRef.current = action.syncSnapshot;
-      materializeCommittedTree(
-        action.runtimeLayout,
-        uiSelectedFilters,
-        committedFactBatchesRef.current,
-      );
+      persistRuntimeState(runtimeLayout, uiSelectedFilters, {
+        commit: false,
+      });
+      seamlessSyncRef.current = syncSnapshot;
+      applySeamlessUpdate(runtimeLayout, uiSelectedFilters, {
+        showLoading: false,
+      });
     },
     [
       applySeamlessUpdate,
       commitUiRuntimeLayout,
       dimensionKeys,
+      materializeCommittedFacts,
       metricKeys,
-      materializeCommittedTree,
       persistRuntimeState,
       seamlessSyncRef,
       uiSelectedFilters,
+      uiRuntimeLayoutRef,
       upstreamSignature,
     ],
   );
@@ -462,45 +431,16 @@ export const usePivotSeamlessRuntimeUpdate = (
   );
 
   useEffect(() => {
-    const updatePlan = prepareSeamlessRuntimeUpdateEffect({
-      upstreamDashboardQueryContextSignature,
-      previousUpstreamState: lastUpstreamQueryContextRef.current,
-      data,
-      persistedInteractionFilters,
-      committedFilters,
-      uiSelectedFilters,
-      lastSync: seamlessSyncRef.current,
-      uiRuntimeLayout,
-      upstreamSeamlessSignature: upstreamSignature,
-    });
-    lastUpstreamQueryContextRef.current = updatePlan.nextUpstreamState;
-    if (updatePlan.update) {
-      const { runtimeLayout: nextLayout, selection } = updatePlan.update;
-      applySeamlessUpdate(nextLayout, selection);
-    }
-  }, [
-    applySeamlessUpdate,
-    committedFilters,
-    data,
-    persistedInteractionFilters,
-    seamlessSyncRef,
-    uiRuntimeLayout,
-    uiSelectedFilters,
-    upstreamDashboardQueryContextSignature,
-    upstreamSignature,
-  ]);
-
-  useEffect(() => {
-    if (
-      upstreamDashboardQueryContextSignature === null ||
-      lastAppliedDashboardQueryContextRef.current ===
-        upstreamDashboardQueryContextSignature
-    ) {
-      return;
-    }
-    lastAppliedDashboardQueryContextRef.current =
+    const previousUpstreamState = lastUpstreamQueryContextRef.current;
+    lastUpstreamQueryContextRef.current =
       upstreamDashboardQueryContextSignature;
-    applySeamlessUpdate(uiRuntimeLayout, uiSelectedFilters);
+    const shouldApplyStaleUpdate =
+      upstreamDashboardQueryContextSignature !== null &&
+      previousUpstreamState !== null &&
+      previousUpstreamState !== upstreamDashboardQueryContextSignature;
+    if (shouldApplyStaleUpdate) {
+      applySeamlessUpdate(uiRuntimeLayout, uiSelectedFilters);
+    }
   }, [
     applySeamlessUpdate,
     uiRuntimeLayout,
