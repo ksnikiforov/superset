@@ -96,7 +96,7 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `26546` | `-6964` | `< 20000` |
+| Full production `src` | `33510` | `26703` | `-6807` | `< 20000` |
 | Strict core pipeline | `12907` | `10556` | `-2351` | `< 8000` |
 
 Diagnostic scope only:
@@ -271,25 +271,31 @@ Completed structural cuts:
   coverage manifest layer, so query specs consume required root coverage instead
   of carrying the initial-load branch list directly.
 
-Latest source delta for this slice: `-2` production `src` lines.
+Latest source delta for this multi-commit slice, measured from
+`e5cfa7f0ee928a8c36e98e1486f75cb0eff6edd8`: `+304` production
+`src` lines (`+926` / `-622`). This slice is not complete under the
+source-reduction criterion until the same loading-authority surface is made
+net deletion-positive.
 
-Coverage-manifest loading authority status: complete for root bootstrap,
-configured pre-expansion, persisted/manual expansion, expansion reinitialization,
-seamless runtime sync, and query-context-scoped fact-store matching. Remaining
-work below is pure-runtime simplification after that loading authority is in
-place.
+Coverage-manifest loading authority status: structurally implemented for root
+bootstrap, configured pre-expansion, persisted/manual expansion, expansion
+reinitialization, seamless runtime sync, and query-context-scoped fact-store
+matching. It is not complete by the agreed plan criteria until the production
+source count for this slice is lower than it was at
+`e5cfa7f0ee928a8c36e98e1486f75cb0eff6edd8`.
 
 Completion checklist for the loading-authority plan:
 
-- Source code line count is lower than before the slice.
-- `query/specs.ts` has less initial-load special branching.
-- `stateModel.ts` no longer derives fetch needs from tree scans.
-- `stateTransitions.ts` no longer has a separate hydration planner authority.
-- `useExpansionEngine.ts` executes coverage diff through the manifest planner,
+- [ ] Source code line count is lower than before the slice.
+- [x] `query/specs.ts` has less initial-load special branching.
+- [x] `stateModel.ts` no longer derives fetch needs from tree scans.
+- [x] `stateTransitions.ts` no longer has a separate hydration planner
+  authority.
+- [x] `useExpansionEngine.ts` executes coverage diff through the manifest planner,
   not tree repair.
-- `seamlessRuntimeUpdate.ts` keeps committed fact batches authoritative instead
+- [x] `seamlessRuntimeUpdate.ts` keeps committed fact batches authoritative instead
   of erasing expansion state and relying on later hydration.
-- No fallback, compatibility adapter, or duplicate loading planner was added.
+- [x] No fallback, compatibility adapter, or duplicate loading planner was added.
 
 Remaining duplicate authority:
 
