@@ -33,6 +33,7 @@ import { buildFormData } from '../../fixtures/pivotFormData';
 import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
+  SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
 } from '../../../../src/pivot/core/tokens';
 import {
@@ -59,6 +60,50 @@ function PivotTableChart(props: TestPivotTableChartProps) {
     />
   );
 }
+
+const injectColumnSubtotalLeaves = (
+  tree: PivotTreeData,
+  depth: number,
+  fullDepth: number,
+) => {
+  if (depth <= 0 || depth >= fullDepth) {
+    return tree;
+  }
+  const next: PivotTreeData = {
+    rows: { ...tree.rows },
+    cols: { ...tree.cols },
+    cells: { ...tree.cells },
+  };
+  Object.values(tree.cols)
+    .filter(node => node.path.length === depth && node.path.length > 0)
+    .forEach(node => {
+      const subtotalPath = [...node.path, SUBTOTAL_TOKEN];
+      const subtotalKey = serializePath(subtotalPath);
+      next.cols[subtotalKey] = {
+        ...node,
+        key: subtotalKey,
+        path: subtotalPath,
+        label: SUBTOTAL_LABEL,
+        formattedLabel: SUBTOTAL_LABEL,
+        level: subtotalPath.length,
+        hasChildren: subtotalPath.length < fullDepth,
+        isSubtotal: true,
+      };
+    });
+  Object.values(tree.cells).forEach(cell => {
+    const baseColPath = tree.cols[cell.colKey]?.path;
+    if (!baseColPath || baseColPath.length !== depth) {
+      return;
+    }
+    const subtotalColKey = serializePath([...baseColPath, SUBTOTAL_TOKEN]);
+    next.cells[serializeCellKey(cell.rowKey, subtotalColKey)] = {
+      ...cell,
+      colKey: subtotalColKey,
+      isSubtotal: true,
+    };
+  });
+  return next;
+};
 
 describe('PivotTableChart totals & subtotals - columns', () => {
   const baseProps = {
@@ -93,7 +138,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
   };
 
-  it('renders selected column subtotals at the configured position using aggregated values', async () => {
+  test('renders selected column subtotals at the configured position using aggregated values', async () => {
     const detail = buildTreeFromRecords(
       [
         { region: 'US', category: 'Tech', subcategory: 'Laptop', metric1: 2 },
@@ -114,7 +159,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       1,
     );
     const tree = applyMetricAxis(
-      mergeTrees(subtotal, detail),
+      injectColumnSubtotalLeaves(mergeTrees(subtotal, detail), 1, 2),
       ['metric1'],
       MetricsLayoutEnum.COLUMNS,
       ['region'],
@@ -173,7 +218,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(values.slice(1)).toEqual(expect.arrayContaining(['2', '3']));
   });
 
-  it('hides column subtotals for unselected levels', async () => {
+  test('hides column subtotals for unselected levels', async () => {
     const detail = buildTreeFromRecords(
       [{ row1: 'A', col1: 'F', col2: 'X', col3: 'Z', metric1: 1 }],
       ['metric1'],
@@ -199,7 +244,11 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       2,
     );
     const tree = applyMetricAxis(
-      mergeTrees(mergeTrees(detail, subtotalLevel1), subtotalLevel2),
+      injectColumnSubtotalLeaves(
+        mergeTrees(mergeTrees(detail, subtotalLevel1), subtotalLevel2),
+        2,
+        3,
+      ),
       ['metric1'],
       MetricsLayoutEnum.COLUMNS,
       ['row1'],
@@ -253,7 +302,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(screen.queryByText('555')).toBeInTheDocument();
   });
 
-  it('renders multi-metric column subtotals at the end even when configured at the start', async () => {
+  test('renders multi-metric column subtotals at the end even when configured at the start', async () => {
     const metrics = ['m1', 'm2'];
     const detail = buildTreeFromRecords(
       [
@@ -337,7 +386,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(values).toEqual(['1', '10', '2', '20', '100', '200']);
   });
 
-  it('avoids duplicating metric subtotal columns when subtotal tokens are present', async () => {
+  test('avoids duplicating metric subtotal columns when subtotal tokens are present', async () => {
     const metrics = ['grossRevenue', 'countCustomers'];
     const detail = buildTreeFromRecords(
       [
@@ -463,7 +512,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(headerLabels).not.toContain('1992 countCustomers');
   });
 
-  it('keeps column grand totals when column subtotals exist with multiple metrics', async () => {
+  test('keeps column grand totals when column subtotals exist with multiple metrics', async () => {
     const metrics = ['grossRevenue', 'countCustomers'];
     const detail = buildTreeFromRecords(
       [
@@ -596,7 +645,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
   });
 
-  it('positions the column grand total row using colTotalPosition even when rowTotalPosition differs', async () => {
+  test('positions the column grand total row using colTotalPosition even when rowTotalPosition differs', async () => {
     const records = [
       { region: 'A', metric1: 10 },
       { region: 'B', metric1: 12 },
@@ -668,7 +717,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(lastRowLabel).toBe('Grand total');
   });
 
-  it('keeps column group headers when collapsed after deeper expansion data exists', async () => {
+  test('keeps column group headers when collapsed after deeper expansion data exists', async () => {
     const metrics = ['grossRevenue', 'countCustomers'];
     const detail = buildTreeFromRecords(
       [
@@ -871,7 +920,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     },
   );
 
-  it('shows column grand total when enabled without selecting level 0', async () => {
+  test('shows column grand total when enabled without selecting level 0', async () => {
     const detail = buildTreeFromRecords(
       [{ region: 'US', category: 'Tech', metric1: 5 }],
       ['metric1'],
@@ -945,7 +994,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(within(bodyRow).getByText('8')).toBeInTheDocument();
   });
 
-  it('renders metric-specific column grand totals when metrics are on columns', async () => {
+  test('renders metric-specific column grand totals when metrics are on columns', async () => {
     const metricsVariants = [
       ['averageOrderValue', 'weightedDiscount'],
       ['averageOrderValue', 'weightedDiscount', 'countOrders'],
@@ -1061,7 +1110,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     }
   });
 
-  it('orders metric columns by selection when metrics are on columns', async () => {
+  test('orders metric columns by selection when metrics are on columns', async () => {
     const metrics = ['metricB', 'metricA', 'metricC'];
     const tree = applyMetricAxis(
       buildTreeFromRecords(
@@ -1136,7 +1185,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(headerLabels).toEqual(metrics);
   });
 
-  it('shows the grand total row when no column dimensions exist', async () => {
+  test('shows the grand total row when no column dimensions exist', async () => {
     const metrics = ['metric1'];
     const tree = applyMetricAxis(
       buildTreeFromRecords(
@@ -1202,7 +1251,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(rowHeaders).toContain('Grand total');
   });
 
-  it('omits the grand total column and row when multiple metrics are on columns', async () => {
+  test('omits the grand total column and row when multiple metrics are on columns', async () => {
     const metrics = ['m1', 'm2'];
     const detail = buildTreeFromRecords(
       [{ orderPriority: '1-URGENT', shipMode: 'AIR', m1: 10, m2: 20 }],
@@ -1284,7 +1333,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(rowHeaders).not.toContain('Grand total');
   });
 
-  it('does not render metric total headers when metrics are the first column level', async () => {
+  test('does not render metric total headers when metrics are the first column level', async () => {
     const metrics = ['measure1', 'measure2'];
     const measure1Token = encodeMetricKey('measure1');
     const measure2Token = encodeMetricKey('measure2');
@@ -1487,7 +1536,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
   });
 
-  it('renders metric total headers without duplicate metric labels when metrics are between columns', async () => {
+  test('renders metric total headers without duplicate metric labels when metrics are between columns', async () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = ['quantityBand'];
     const colGroupby = ['orderStatus', 'lineStatus'];
@@ -1575,7 +1624,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(totalHeader?.rowSpan).toBe(headerRowCount);
   });
 
-  it('renders a single grand total column when a single metric sits between column dimensions', async () => {
+  test('renders a single grand total column when a single metric sits between column dimensions', async () => {
     const metrics = ['metric1'];
     const detail = buildTreeFromRecords(
       [
@@ -1660,7 +1709,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
   });
 
-  it('renders metric-specific column grand totals when metrics are nested at depth 2', async () => {
+  test('renders metric-specific column grand totals when metrics are nested at depth 2', async () => {
     const metrics = ['measure1', 'measure2'];
     const detail = buildTreeFromRecords(
       [
@@ -1768,7 +1817,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
   });
 
-  it('renders metric-specific column grand totals when metrics are nested at depth 3', async () => {
+  test('renders metric-specific column grand totals when metrics are nested at depth 3', async () => {
     const metrics = ['measure1', 'measure2'];
     const detail = buildTreeFromRecords(
       [
@@ -1861,7 +1910,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
   });
 
-  it('renders metric-specific column subtotals even when they match grand totals', async () => {
+  test('renders metric-specific column subtotals even when they match grand totals', async () => {
     const metrics = ['measure1', 'measure2'];
     const detail = buildTreeFromRecords(
       [
@@ -1979,7 +2028,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(headerLabels).not.toContain('Group1 measure2');
   });
 
-  it('does not render parent column totals as leaves when branch subtotals exist under multiple column roots', async () => {
+  test('does not render parent column totals as leaves when branch subtotals exist under multiple column roots', async () => {
     const rootKey = serializePath([]);
     const rowKey = serializePath(['US']);
     const makeColNode = (
@@ -2137,7 +2186,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(labels).not.toContain('N');
   });
 
-  it('renders explicit subtotal leaves without parent-total duplication', async () => {
+  test('renders explicit subtotal leaves without parent-total duplication', async () => {
     const rootKey = serializePath([]);
     const rowKey = serializePath(['US']);
     const makeColNode = (
@@ -2270,7 +2319,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
   });
 
-  it('suppresses duplicated ancestor subtotal leaves on deeper column levels', async () => {
+  test('suppresses duplicated ancestor subtotal leaves on deeper column levels', async () => {
     const rootKey = serializePath([]);
     const rowKey = serializePath(['US']);
     const makeColNode = (
@@ -2437,7 +2486,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('orders deep column totals and subtotals according to positions across five levels (end)', async () => {
+  test('orders deep column totals and subtotals according to positions across five levels (end)', async () => {
     const rootKey = serializePath([]);
     const rowKey = serializePath(['US']);
     const cols: Record<string, PivotTreeNode> = {};
@@ -2507,7 +2556,19 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       values: { metric1: 500 },
       isSubtotal: true,
     };
-    const tree: PivotTreeData = { rows, cols, cells };
+    const treeWithSubtotals = injectColumnSubtotalLeaves(
+      injectColumnSubtotalLeaves({ rows, cols, cells }, 1, 5),
+      3,
+      5,
+    );
+    const tree = applyMetricAxis(
+      treeWithSubtotals,
+      ['metric1'],
+      MetricsLayoutEnum.COLUMNS,
+      ['region'],
+      labels,
+      5,
+    );
 
     const { container } = render(
       <PivotTableChart
@@ -2568,7 +2629,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
   });
 
-  it('orders deep column totals and subtotals at the start when configured across five levels', async () => {
+  test('orders deep column totals and subtotals at the start when configured across five levels', async () => {
     const rootKey = serializePath([]);
     const rowKey = serializePath(['US']);
     const cols: Record<string, PivotTreeNode> = {};
@@ -2638,7 +2699,19 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       values: { metric1: 500 },
       isSubtotal: true,
     };
-    const tree: PivotTreeData = { rows, cols, cells };
+    const treeWithSubtotals = injectColumnSubtotalLeaves(
+      injectColumnSubtotalLeaves({ rows, cols, cells }, 1, 5),
+      3,
+      5,
+    );
+    const tree = applyMetricAxis(
+      treeWithSubtotals,
+      ['metric1'],
+      MetricsLayoutEnum.COLUMNS,
+      ['region'],
+      labels,
+      5,
+    );
 
     const { container } = render(
       <PivotTableChart
@@ -2699,7 +2772,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
   });
 
-  it('does not render expansion toggles for subtotal headers', async () => {
+  test('does not render expansion toggles for subtotal headers', async () => {
     const rootKey = serializePath([]);
     const rowKey = serializePath(['US']);
     const makeColNode = (

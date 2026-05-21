@@ -1030,7 +1030,7 @@ export const applyMeasureHierarchyAxis = (
   });
 };
 
-const buildBatchTreeProjection = ({
+const buildBatchMaterializationProjection = ({
   batch,
   formData,
   pivotProgram,
@@ -1065,7 +1065,7 @@ const buildBatchTreeProjection = ({
 
 const applyBatchSubtotalLeaves = (
   tree: PivotTreeData,
-  projection: ReturnType<typeof buildBatchTreeProjection>,
+  projection: ReturnType<typeof buildBatchMaterializationProjection>,
 ) => {
   let nextTree = tree;
   if (projection.columnSubtotalDepth !== undefined) {
@@ -1086,19 +1086,20 @@ const applyBatchSubtotalLeaves = (
 };
 
 const buildTreeFromFactBatch = (
-  input: Parameters<typeof buildBatchTreeProjection>[0],
+  input: Parameters<typeof buildBatchMaterializationProjection>[0],
 ) => {
-  const projection = buildBatchTreeProjection(input);
+  const projection = buildBatchMaterializationProjection(input);
   const builder = createFactTreeBuilder(projection);
   projection.facts.forEach(builder.addFact);
   return applyBatchSubtotalLeaves(builder.finish(), projection);
 };
 
 const buildTreeFromFactBatchAsync = async (
-  input: Parameters<typeof buildBatchTreeProjection>[0] & ChunkedWorkOptions,
+  input: Parameters<typeof buildBatchMaterializationProjection>[0] &
+    ChunkedWorkOptions,
 ) => {
   const { chunkSize, shouldContinue, yieldToMain } = input;
-  const projection = buildBatchTreeProjection(input);
+  const projection = buildBatchMaterializationProjection(input);
   const builder = createFactTreeBuilder(projection);
   for (let idx = 0; idx < projection.facts.length; idx += 1) {
     builder.addFact(projection.facts[idx]);
@@ -1111,11 +1112,10 @@ const buildTreeFromFactBatchAsync = async (
     });
   }
   const tree = builder.finish();
-  if (projection.columnSubtotalDepth !== undefined) {
-    await yieldChunkedWork({ shouldContinue, yieldToMain });
-  }
-  for (let idx = 0; idx < projection.rowSubtotalDepths.length; idx += 1) {
-    // eslint-disable-next-line no-await-in-loop
+  if (
+    projection.columnSubtotalDepth !== undefined ||
+    projection.rowSubtotalDepths.length > 0
+  ) {
     await yieldChunkedWork({ shouldContinue, yieldToMain });
   }
   assertChunkedWorkCurrent(shouldContinue);

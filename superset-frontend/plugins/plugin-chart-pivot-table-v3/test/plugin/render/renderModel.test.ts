@@ -28,6 +28,7 @@ import { serializePath } from '../../../src/pivot/core/path';
 import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
+  SUBTOTAL_TOKEN,
 } from '../../../src/pivot/core/tokens';
 import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
 
@@ -54,7 +55,7 @@ const makeNode = ({
 });
 
 describe('findChildren', () => {
-  it('returns direct children without exposing cached lookup arrays', () => {
+  test('returns direct children without exposing cached lookup arrays', () => {
     const rowAKey = serializePath(['A']);
     const rowBKey = serializePath(['B']);
     const rowA1Key = serializePath(['A', 'A1']);
@@ -99,7 +100,7 @@ describe('findChildren', () => {
 });
 
 describe('buildRenderModel', () => {
-  it('computes visible rows/cols and totals flags', () => {
+  test('computes visible rows/cols and totals flags', () => {
     const rowKey = 'A';
     const colKey = 'C';
     const tree: PivotTreeData = {
@@ -174,7 +175,7 @@ describe('buildRenderModel', () => {
     ]);
   });
 
-  it('keeps root row visible when there are no row dimensions and multiple measures', () => {
+  test('keeps root row visible when there are no row dimensions and multiple measures', () => {
     const metricColKey = 'm1';
     const tree: PivotTreeData = {
       rows: {
@@ -233,7 +234,7 @@ describe('buildRenderModel', () => {
     expect(renderModel.visibleRows.map(node => node.key)).toEqual([rootKey]);
   });
 
-  it('renders post-Values dimension children under expanded collapsed metric rows', () => {
+  test('renders post-Values dimension children under expanded collapsed metric rows', () => {
     const urgentKey = serializePath(['1-URGENT']);
     const shipModeKey = serializePath(['1-URGENT', 'AIR']);
     const metricKey = serializePath([
@@ -333,6 +334,76 @@ describe('buildRenderModel', () => {
       shipModeKey,
       metricKey,
       statusKey,
+    ]);
+  });
+
+  test('does not repair a missing non-root column subtotal leaf', () => {
+    const categoryKey = serializePath(['Furniture']);
+    const subcategoryKey = serializePath(['Furniture', 'Chairs']);
+    const omittedSubtotalKey = serializePath(['Furniture', SUBTOTAL_TOKEN]);
+    const tree: PivotTreeData = {
+      rows: {
+        [rootKey]: makeNode({
+          axis: 'row',
+          key: rootKey,
+          path: [],
+          label: 'Grand total',
+          hasChildren: false,
+        }),
+      },
+      cols: {
+        [rootKey]: makeNode({
+          axis: 'col',
+          key: rootKey,
+          path: [],
+          label: 'Grand total',
+          hasChildren: true,
+        }),
+        [categoryKey]: makeNode({
+          axis: 'col',
+          key: categoryKey,
+          path: ['Furniture'],
+          label: 'Furniture',
+          hasChildren: true,
+        }),
+        [subcategoryKey]: makeNode({
+          axis: 'col',
+          key: subcategoryKey,
+          path: ['Furniture', 'Chairs'],
+          label: 'Chairs',
+          hasChildren: false,
+        }),
+      },
+      cells: {},
+    };
+
+    const renderModel = buildRenderModel({
+      tree,
+      expandedRows: new Set([rootKey]),
+      expandedCols: new Set([rootKey, categoryKey]),
+      config: {
+        normalizedRowSubtotalLevels: [],
+        normalizedColSubtotalLevels: [1],
+        rowTotals: false,
+        colTotals: false,
+        rowTotalPosition: 'start',
+        colTotalPosition: 'start',
+        resolvedColSubtotalPosition: 'end',
+        pivotProgram: compilePivotProgram({
+          groupbyColumns: ['category', 'subcategory'],
+        }),
+        hasMultipleMeasures: false,
+        isLeafTierVisible: false,
+        rowSubTotals: false,
+        getRowSubtotalPosition: () => 'start',
+        rowSorter: (a, b) => a.label.localeCompare(b.label),
+        colSorter: (a, b) => a.label.localeCompare(b.label),
+      },
+    });
+
+    expect(tree.cols[omittedSubtotalKey]).toBeUndefined();
+    expect(renderModel.visibleCols.map(node => node.key)).toEqual([
+      subcategoryKey,
     ]);
   });
 });

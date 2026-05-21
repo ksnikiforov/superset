@@ -178,10 +178,6 @@ const createColLeavesBuilder = ({
         ? config.colTotalPosition
         : config.resolvedColSubtotalPosition) === 'start';
     const childLeaves = children.flatMap(buildColLeavesWithSubtotals);
-    const hasMeasureLeafDescendants = childLeaves.some(leaf =>
-      leaf.path.some(val => decodeMeasureLeafId(val)),
-    );
-    const suppressMetricGroupLeaf = isMetricGroup && hasMeasureLeafDescendants;
     if (!includeSubtotal) {
       return hasDeeperLeaves(childLeaves)
         ? childLeaves.filter(leaf => !shouldHideSubtotalLeaf(leaf))
@@ -203,10 +199,13 @@ const createColLeavesBuilder = ({
         ? [...resolvedSubtotalLeaves, ...remainingLeaves]
         : [...remainingLeaves, ...resolvedSubtotalLeaves];
     }
-    if (suppressMetricGroupLeaf) {
-      return childLeaves;
+    if (
+      config.rowTotals &&
+      (node.path.length === 0 || (isMetricGroup && !config.isLeafTierVisible))
+    ) {
+      return placeAtFront ? [node, ...childLeaves] : [...childLeaves, node];
     }
-    return placeAtFront ? [node, ...childLeaves] : [...childLeaves, node];
+    return childLeaves;
   };
 
   return buildColLeavesWithSubtotals;
