@@ -25,6 +25,7 @@ import {
 import {
   type MeasureHierarchy,
   type MeasureLeafSpec,
+  type PivotAxis,
   type PivotPath,
   type PivotTableQueryFormData,
   type PivotTreeData,
@@ -1245,6 +1246,83 @@ const materializeInputFromPlanGroup = (
   pivotProgram: plan.pivotProgram,
 });
 
+const columnRefKey = (column: QueryFormColumn) =>
+  typeof column === 'string' ? column : getColumnLabel(column);
+
+const coverageMatchesProgramAxis = ({
+  coverageDimensions,
+  programDimensions,
+  materialization,
+  axis,
+}: {
+  coverageDimensions: QueryFormColumn[];
+  programDimensions: QueryFormColumn[];
+  materialization: PivotFactStoreBatch['materialization'];
+  axis: PivotAxis;
+}) => {
+  const dimensionMatches = (left: QueryFormColumn, right: QueryFormColumn) =>
+    columnRefKey(left) === columnRefKey(right);
+
+  if (materialization?.valueAxis !== axis) {
+    return coverageDimensions.every((dimension, index) =>
+      dimensionMatches(dimension, programDimensions[index]),
+    );
+  }
+
+  const insertIndex = Math.min(
+    Math.max(materialization.valueInsertIndex, 0),
+    programDimensions.length,
+  );
+  const prefix = coverageDimensions.slice(0, insertIndex);
+  if (
+    !prefix.every((dimension, index) =>
+      dimensionMatches(dimension, programDimensions[index]),
+    )
+  ) {
+    return false;
+  }
+
+  let programIndex = insertIndex;
+  return coverageDimensions.slice(insertIndex).every(dimension => {
+    const matchedIndex = programDimensions.findIndex(
+      (programDimension, index) =>
+        index >= programIndex && dimensionMatches(dimension, programDimension),
+    );
+    if (matchedIndex < 0) {
+      return false;
+    }
+    programIndex = matchedIndex + 1;
+    return true;
+  });
+};
+
+const coverageMatchesProgram = (
+  batch: PivotFactStoreBatch,
+  program: PivotProgram,
+) => {
+  const { coverage, materialization } = batch;
+  if (
+    coverage.rowDepth > program.rowDimensions.length ||
+    coverage.columnDepth > program.columnDimensions.length
+  ) {
+    return false;
+  }
+  return (
+    coverageMatchesProgramAxis({
+      coverageDimensions: coverage.rowDimensions,
+      programDimensions: program.rowDimensions,
+      materialization,
+      axis: 'row',
+    }) &&
+    coverageMatchesProgramAxis({
+      coverageDimensions: coverage.columnDimensions,
+      programDimensions: program.columnDimensions,
+      materialization,
+      axis: 'col',
+    })
+  );
+};
+
 const materializeFactStoreBatches = ({
   batches,
   layout,
@@ -1255,7 +1333,9 @@ const materializeFactStoreBatches = ({
   formData: PivotTableQueryFormData;
 }): PivotTreeData =>
   groupFactStoreBatchesByMaterializationPlan({
-    batches,
+    batches: batches.filter(batch =>
+      coverageMatchesProgram(batch, layout.pivotProgram),
+    ),
     layout,
   }).reduce<PivotTreeData>(
     (tree, group) =>
@@ -1295,7 +1375,9 @@ export const materializeLoadedPivotTreeFromFactStoreAsync = async ({
 } & ChunkedWorkOptions): Promise<PivotTreeData> => {
   let mergedTree = emptyPivotTree();
   const groups = groupFactStoreBatchesByMaterializationPlan({
-    batches: store.getFactBatches(),
+    batches: store
+      .getFactBatches()
+      .filter(batch => coverageMatchesProgram(batch, layout.pivotProgram)),
     layout,
   });
   for (let idx = 0; idx < groups.length; idx += 1) {

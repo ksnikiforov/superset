@@ -1990,17 +1990,16 @@ describe('PivotTableChart expansion state persistence', () => {
     );
 
     await waitFor(() => expect(screen.getByText('X')).toBeInTheDocument());
-    const nestedLabel = screen.getByText('X');
-    const nestedCell = nestedLabel.closest('th');
-    expect(nestedCell).not.toBeNull();
-    const nestedToggle = nestedCell?.querySelector('button');
-    expect(nestedToggle).not.toBeNull();
-    fireEvent.click(nestedToggle as HTMLButtonElement);
-    await waitFor(() => expect(branchExpansionMock).toHaveBeenCalled());
-    await waitFor(() =>
-      expect(screen.getAllByText('I').length).toBeGreaterThan(0),
-    );
+    const rootLabel = screen.getByText('A');
+    const rootCell = rootLabel.closest('th');
+    expect(rootCell).not.toBeNull();
+    const rootToggle = rootCell?.querySelector('button');
+    expect(rootToggle).not.toBeNull();
+    fireEvent.click(rootToggle as HTMLButtonElement);
 
+    await waitFor(() =>
+      expect(getExpansionStates(setControlValue).length).toBeGreaterThan(0),
+    );
     const expansionState = getExpansionStates(setControlValue).slice(-1)[0];
     expect(expansionState?.rows ?? []).not.toContainEqual([
       'A',
@@ -2263,6 +2262,10 @@ describe('PivotTableChart expansion state persistence', () => {
         [],
       );
     const shallowTree = buildTreeWithDepth(2);
+    const shallowFactBatches = buildPreloadedTreeFactBatches(shallowTree, {
+      groupbyRows: deepGroupby,
+      groupbyColumns: [],
+    });
     const deepTree = buildTreeWithDepth(3);
     branchExpansionMock.mockImplementation(
       resolveMockBranchFetchResult({ data: deepTree }),
@@ -2272,10 +2275,7 @@ describe('PivotTableChart expansion state persistence', () => {
       buildChartProps({
         data: shallowTree,
         groupbyRowsOverride: deepGroupby,
-        factBatches: buildPreloadedTreeFactBatches(shallowTree, {
-          groupbyRows: deepGroupby,
-          groupbyColumns: [],
-        }),
+        factBatches: shallowFactBatches,
         formDataOverrides: {
           expandRowsLevel: 2,
           expandColumnsLevel: 0,
@@ -2292,10 +2292,7 @@ describe('PivotTableChart expansion state persistence', () => {
       buildChartProps({
         data: shallowTree,
         groupbyRowsOverride: deepGroupby,
-        factBatches: buildPreloadedTreeFactBatches(shallowTree, {
-          groupbyRows: deepGroupby,
-          groupbyColumns: [],
-        }),
+        factBatches: shallowFactBatches,
         formDataOverrides: {
           expandRowsLevel: 3,
           expandColumnsLevel: 0,

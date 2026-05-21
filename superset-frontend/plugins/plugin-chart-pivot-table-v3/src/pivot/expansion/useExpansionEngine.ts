@@ -165,6 +165,7 @@ export type ExpansionEngineResult = {
 export type ExpansionEngineConfig = {
   data: PivotTreeData;
   factBatches: PivotFactStoreBatch[];
+  onFactBatchesChange?: (factBatches: PivotFactStoreBatch[]) => void;
   expansionSemanticSignature: string;
   fetchFormData: PivotTableQueryFormData;
   axisCoverageNeeds: PivotAxisCoverageNeed[];
@@ -180,6 +181,7 @@ export type ExpansionEngineConfig = {
 export const useExpansionEngine = ({
   data,
   factBatches,
+  onFactBatchesChange,
   expansionSemanticSignature,
   fetchFormData,
   axisCoverageNeeds,
@@ -451,10 +453,12 @@ export const useExpansionEngine = ({
             store: factStore,
             layout: fetchLayout,
             formData: fetchFormData,
+            shouldContinue: requestScope.isCurrent,
             yieldToMain: yieldToMainThread,
           });
         }
         if (requestScope.isCurrent()) {
+          onFactBatchesChange?.(factStore.getFactBatches());
           const nextDesired = {
             row: buildDesiredExpanded('row', nextTree),
             col: buildDesiredExpanded('col', nextTree),
@@ -484,6 +488,7 @@ export const useExpansionEngine = ({
       fetchFormData,
       fetchLayout,
       addWarnings,
+      onFactBatchesChange,
       persistExpansionState,
       pivotProgram,
       resolveExpandedByAxisForMetrics,

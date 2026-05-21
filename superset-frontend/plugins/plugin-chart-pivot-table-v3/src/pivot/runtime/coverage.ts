@@ -157,7 +157,10 @@ const isRuntimeLayoutCoverageScope = (
     return true;
   }
   if (scope.kind !== 'axisPaths') {
-    return false;
+    return (
+      scope.kind === 'scopedFull' &&
+      scope.ancestorPaths.every(path => path.every(isMetricToken))
+    );
   }
   return scope.paths.every(path => path.every(isMetricToken));
 };
@@ -355,8 +358,5 @@ export const factSelectorsCoverSelector = (
 ) =>
   diffCoverageManifest({
     required: [buildCoverageNeedFromFactSelector(selector)],
-    factSelectors:
-      selector.scope.kind === 'root'
-        ? factSelectors.filter(candidate => candidate.scope.kind === 'root')
-        : factSelectors,
+    factSelectors,
   }).length === 0;

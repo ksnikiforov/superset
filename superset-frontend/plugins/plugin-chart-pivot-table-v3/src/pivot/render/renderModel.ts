@@ -509,20 +509,22 @@ export const buildRenderModelAxes = ({
   const groupbyRowsLength = config.pivotProgram.rowDimensions.length;
   const groupbyColumnsLength = config.pivotProgram.columnDimensions.length;
   const showRowRootBase =
-    groupbyRowsLength > 0 &&
-    (config.normalizedRowSubtotalLevels.includes(0) || config.colTotals);
+    config.colTotals ||
+    (groupbyRowsLength > 0 && config.normalizedRowSubtotalLevels.includes(0));
   const suppressRowRootForMultiMeasure =
     config.hasMultipleMeasures &&
     (config.pivotProgram.valueAxis === 'row' || config.rowTotals);
   const showRowRoot = showRowRootBase && !suppressRowRootForMultiMeasure;
   const showColRoot =
-    groupbyColumnsLength > 0 &&
-    (config.normalizedColSubtotalLevels.includes(0) || config.rowTotals);
+    config.rowTotals ||
+    (groupbyColumnsLength > 0 &&
+      config.normalizedColSubtotalLevels.includes(0));
 
   const skipRowRoot =
-    (groupbyRowsLength > 0 && !showRowRoot) ||
-    (groupbyRowsLength === 0 && config.hasMultipleMeasures);
-  const skipColRoot = groupbyColumnsLength === 0 || !showColRoot;
+    !showRowRoot &&
+    ((groupbyRowsLength > 0 && !showRowRoot) ||
+      (groupbyRowsLength === 0 && config.hasMultipleMeasures));
+  const skipColRoot = !showColRoot;
 
   const shouldHideMetricGrandTotalsOnRows = !showRowRootBase;
   const totalRowPosition = config.colTotals

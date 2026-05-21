@@ -19,6 +19,7 @@
 
 import {
   type PivotRuntimeLayout,
+  type PivotTableQueryFormData,
   type PivotTreeData,
 } from '../../../../src/types';
 import {
@@ -28,9 +29,10 @@ import {
   prepareRuntimeStatePersistence,
   prepareSeamlessRuntimeLayoutChange,
   prepareSeamlessRuntimeUpdateEffect,
-  shouldFetchRuntimeLayout,
+  shouldFetchSeamlessRuntimeCoverage,
   shouldSyncPersistedSelectedFilters,
 } from '../../../../src/pivot/runtime/seamlessRuntimeUpdate';
+import { type PivotFactStoreBatch } from '../../../../src/pivot/runtime/factStore';
 
 const runtimeLayout: PivotRuntimeLayout = {
   version: 1,
@@ -288,161 +290,110 @@ test('prepares runtime state persistence side-effect plan', () => {
   });
 });
 
-describe('runtime layout reuse fetch policy', () => {
-  it('does not fetch for trailing dimension appends on an already visible axis', () => {
+const baseFormData = {
+  datasource: '1__table',
+  viz_type: 'pivot_table_v3',
+  dimensions: ['country', 'state', 'month'],
+  groupbyRows: ['country'],
+  groupbyColumns: ['month'],
+  metrics: ['sales'],
+  metricColorFormatters: [],
+  rowFormatting: [],
+  colFormatting: [],
+  metricFormatting: [],
+  metricDatabars: [],
+} as PivotTableQueryFormData;
+
+const rootBatch = (
+  rowDepth: number,
+  columnDepth: number,
+): PivotFactStoreBatch => ({
+  coverage: {
+    rowDepth,
+    columnDepth,
+    rowDimensions: ['country', 'state'].slice(0, rowDepth),
+    columnDimensions: ['month'].slice(0, columnDepth),
+  },
+  scope: { kind: 'root' },
+  valueKeys: ['sales'],
+  facts: [],
+});
+
+describe('runtime layout coverage fetch policy', () => {
+  it('does not fetch when committed facts cover the next runtime layout', () => {
     expect(
-      shouldFetchRuntimeLayout({
-        reusableLayout: runtimeLayout,
-        nextLayout: {
+      shouldFetchSeamlessRuntimeCoverage({
+        baseFormData,
+        sourceMetrics: ['sales'],
+        sourceMeasureLeavesByMetric: undefined,
+        runtimeLayout: {
           ...runtimeLayout,
           rows: ['country', 'state'],
         },
+        selection: {},
+        factBatches: [
+          rootBatch(0, 0),
+          rootBatch(1, 1),
+          rootBatch(1, 0),
+          rootBatch(0, 1),
+        ],
       }),
     ).toBe(false);
   });
 
-  it('fetches when a visible axis is removed', () => {
+  it('fetches when committed facts do not cover the next runtime layout', () => {
     expect(
-      shouldFetchRuntimeLayout({
-        reusableLayout: {
-          ...runtimeLayout,
-          cols: [],
-        },
-        nextLayout: {
-          ...runtimeLayout,
-          rows: [],
-          cols: [],
-        },
-      }),
-    ).toBe(true);
-  });
-
-  it('fetches when removing a metric', () => {
-    expect(
-      shouldFetchRuntimeLayout({
-        reusableLayout: {
-          ...runtimeLayout,
-          metrics: ['sales', 'profit'],
-        },
-        nextLayout: runtimeLayout,
-      }),
-    ).toBe(true);
-  });
-
-  it('fetches when adding a metric', () => {
-    expect(
-      shouldFetchRuntimeLayout({
-        reusableLayout: runtimeLayout,
-        nextLayout: {
-          ...runtimeLayout,
-          metrics: ['sales', 'profit'],
-        },
-      }),
-    ).toBe(true);
-  });
-
-  it('fetches when dimension order changes', () => {
-    expect(
-      shouldFetchRuntimeLayout({
-        reusableLayout: runtimeLayout,
-        nextLayout: {
-          ...runtimeLayout,
-          rows: ['state', 'country'],
-        },
-      }),
-    ).toBe(true);
-  });
-
-  it('fetches when trimming a hidden dimension', () => {
-    expect(
-      shouldFetchRuntimeLayout({
-        reusableLayout: {
-          ...runtimeLayout,
-          cols: ['month', 'quarter'],
-        },
-        nextLayout: runtimeLayout,
-      }),
-    ).toBe(true);
-  });
-
-  it('fetches when adding a hidden dimension changes Values placement', () => {
-    expect(
-      shouldFetchRuntimeLayout({
-        reusableLayout: {
-          ...runtimeLayout,
-          rows: [],
-          cols: ['month'],
-          valuePlacement: { axis: 'col', index: 1 },
-        },
-        nextLayout: {
-          ...runtimeLayout,
-          rows: [],
-          cols: ['month', 'quarter'],
-          valuePlacement: { axis: 'col', index: 2 },
-        },
-      }),
-    ).toBe(true);
-  });
-
-  it('fetches when Values moves across an already shared dimension', () => {
-    expect(
-      shouldFetchRuntimeLayout({
-        reusableLayout: {
-          ...runtimeLayout,
-          rows: [],
-          cols: ['month', 'quarter'],
-          valuePlacement: { axis: 'col', index: 2 },
-        },
-        nextLayout: {
-          ...runtimeLayout,
-          rows: [],
-          cols: ['month', 'quarter'],
-          valuePlacement: { axis: 'col', index: 1 },
-        },
+      shouldFetchSeamlessRuntimeCoverage({
+        baseFormData,
+        sourceMetrics: ['sales'],
+        sourceMeasureLeavesByMetric: undefined,
+        runtimeLayout: { ...runtimeLayout, rows: ['country', 'state'] },
+        selection: {},
+        factBatches: [rootBatch(1, 1), rootBatch(1, 0), rootBatch(0, 1)],
       }),
     ).toBe(true);
   });
 });
 
-test('prepares fetch actions for semantic runtime layout changes', () => {
+test('prepares normalized runtime layout changes without fetch authority', () => {
   expect(
     prepareSeamlessRuntimeLayoutChange({
       nextLayout: runtimeLayout,
       dimensionKeys: ['country', 'month'],
       metricKeys: ['sales'],
-      reusableLayout: { ...runtimeLayout, cols: [] },
       selection: {},
       upstreamSignature: 'query-a',
     }),
   ).toEqual({
-    kind: 'fetch',
     runtimeLayout,
-  });
-});
-
-test('prepares local commit actions for covered runtime layout changes', () => {
-  const nextLayout: PivotRuntimeLayout = {
-    ...runtimeLayout,
-    rows: ['country', 'state'],
-    metrics: ['sales', 'missing'],
-  };
-
-  expect(
-    prepareSeamlessRuntimeLayoutChange({
-      nextLayout,
-      dimensionKeys: ['country', 'state', 'month'],
-      metricKeys: ['sales'],
-      reusableLayout: runtimeLayout,
-      selection: { country: ['France'] },
+    syncSnapshot: buildSeamlessRuntimeSyncSnapshot({
+      runtimeLayout,
+      selection: {},
       upstreamSignature: 'query-a',
     }),
-  ).toEqual({
-    kind: 'commit-local',
-    runtimeLayout: {
-      ...runtimeLayout,
-      rows: ['country', 'state'],
-    },
-    syncSnapshot: buildSeamlessRuntimeSyncSnapshot({
+  });
+  expect(
+    prepareSeamlessRuntimeLayoutChange({
+      nextLayout: { ...runtimeLayout, rows: ['country', 'state'] },
+      dimensionKeys: ['country', 'month'],
+      metricKeys: ['sales'],
+      selection: { country: ['France'] },
+      upstreamSignature: 'query-a',
+    }).runtimeLayout,
+  ).toEqual(runtimeLayout);
+});
+
+test('prepares sync snapshot for runtime layout changes', () => {
+  expect(
+    prepareSeamlessRuntimeLayoutChange({
+      nextLayout: { ...runtimeLayout, rows: ['country', 'state'] },
+      dimensionKeys: ['country', 'state', 'month'],
+      metricKeys: ['sales'],
+      selection: { country: ['France'] },
+      upstreamSignature: 'query-a',
+    }).syncSnapshot,
+  ).toEqual(
+    buildSeamlessRuntimeSyncSnapshot({
       runtimeLayout: {
         ...runtimeLayout,
         rows: ['country', 'state'],
@@ -450,5 +401,5 @@ test('prepares local commit actions for covered runtime layout changes', () => {
       selection: { country: ['France'] },
       upstreamSignature: 'query-a',
     }),
-  });
+  );
 });

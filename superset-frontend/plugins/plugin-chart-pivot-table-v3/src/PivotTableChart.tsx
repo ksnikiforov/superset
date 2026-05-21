@@ -251,6 +251,7 @@ function PivotTableChart(props: PivotTableProps) {
     applyRuntimeLayoutChange,
     applyDimensionFilterChange,
     clearAllFilters,
+    commitFactBatchesForRender,
     removeRuntimeDimension,
     dropRuntimeDimension,
     dropRuntimeValue,
@@ -329,6 +330,7 @@ function PivotTableChart(props: PivotTableProps) {
   } = useExpansionEngine({
     data: dataForRender,
     factBatches: factBatchesForRender,
+    onFactBatchesChange: commitFactBatchesForRender,
     expansionSemanticSignature: layoutResult.expansionSemanticSignature,
     fetchFormData: expansionFetchFormData,
     axisCoverageNeeds: layoutResult.layout.axisCoverageNeeds,

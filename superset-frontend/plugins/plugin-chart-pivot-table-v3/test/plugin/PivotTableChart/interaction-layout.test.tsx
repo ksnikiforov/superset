@@ -2004,26 +2004,17 @@ describe('PivotTableChart interaction layout', () => {
             `${spec.meta.factSelector.coverage.rowDepth}|${spec.meta.factSelector.coverage.columnDepth}`,
         ),
       ),
-    ).toEqual(new Set(['1|1', '1|0', '0|1']));
+    ).toEqual(new Set(['1|1', '0|1']));
     await waitFor(() => expect(screen.getByText('X')).toBeInTheDocument());
 
     fireEvent.click(screen.getAllByLabelText('Remove dimension')[0]);
 
-    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
-    expect(
-      new Set(
-        (fetchSpy.mock.calls[1][0].specs as PlannedQuerySpec[]).map(
-          spec =>
-            `${spec.meta.factSelector.coverage.rowDepth}|${spec.meta.factSelector.coverage.columnDepth}`,
-        ),
-      ),
-    ).toEqual(new Set(['1|0']));
     await waitFor(() =>
       expect(rowMetricValues()).toEqual(
         expect.arrayContaining([10, 20, 30, 40]),
       ),
     );
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
 
     fetchSpy.mockRestore();
     cancelSpy.mockRestore();

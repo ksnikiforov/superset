@@ -27,15 +27,23 @@ import { hasSelectedFilters } from '../filters';
 import { stableStringify } from '../shared/stableStringify';
 import {
   buildInitialPivotUpdatePlan,
+  type InitialPivotUpdatePlan,
   normalizeFormDataExtraFilters,
 } from '../query/specs';
 import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';
 import {
   collectPlannedQueryWarnings,
-  createPivotFactStore,
   fetchPlannedQuerySpecs,
 } from './ingestQueryResults';
+import {
+  createPivotFactStore,
+  createPivotFactStoreFromBatches,
+  type PivotFactStore,
+  type PivotFactStoreBatch,
+} from './factStore';
+import { factSelectorsCoverSelector } from './coverage';
 import { materializeLoadedPivotTreeFromFactStoreAsync } from './materializePivotTree';
+import { type ChunkedWorkOptions } from './chunkedWork';
 import {
   isAbortError,
   type LatestRequestLifecycle,
@@ -60,14 +68,6 @@ type SeamlessRuntimeUpstreamState = {
 const selectionSignature = (selection: PivotRuntimeLayout['leafSelection']) =>
   stableStringify(selection ?? {});
 
-const hasMetricSelectionChanged = (left: string[], right: string[]) => {
-  if (left.length !== right.length) {
-    return true;
-  }
-  const rightSet = new Set(right);
-  return left.some(metric => !rightSet.has(metric));
-};
-
 export const isSameRuntimeLayout = (
   prev: PivotRuntimeLayout,
   next: PivotRuntimeLayout,
@@ -80,35 +80,6 @@ export const isSameRuntimeLayout = (
     selectionSignature(next.leafSelection) &&
   prev.valuePlacement.axis === next.valuePlacement.axis &&
   prev.valuePlacement.index === next.valuePlacement.index;
-
-export const shouldFetchRuntimeLayout = ({
-  reusableLayout,
-  nextLayout,
-}: {
-  reusableLayout: PivotRuntimeLayout;
-  nextLayout: PivotRuntimeLayout;
-}) => {
-  const isTrailingHiddenAppend = (previous: string[], next: string[]) =>
-    previous.length > 0 &&
-    next.length > previous.length &&
-    previous.every((value, index) => value === next[index]);
-  const axisChangeRequiresFetch = (previous: string[], next: string[]) =>
-    !isEqual(previous, next) && !isTrailingHiddenAppend(previous, next);
-
-  if (
-    hasMetricSelectionChanged(reusableLayout.metrics, nextLayout.metrics) ||
-    selectionSignature(reusableLayout.leafSelection) !==
-      selectionSignature(nextLayout.leafSelection) ||
-    reusableLayout.valuePlacement.axis !== nextLayout.valuePlacement.axis ||
-    reusableLayout.valuePlacement.index !== nextLayout.valuePlacement.index
-  ) {
-    return true;
-  }
-  return (
-    axisChangeRequiresFetch(reusableLayout.rows, nextLayout.rows) ||
-    axisChangeRequiresFetch(reusableLayout.cols, nextLayout.cols)
-  );
-};
 
 export const buildSeamlessRuntimeSyncSnapshot = ({
   runtimeLayout,
@@ -307,14 +278,12 @@ export const prepareSeamlessRuntimeLayoutChange = ({
   nextLayout,
   dimensionKeys,
   metricKeys,
-  reusableLayout,
   selection,
   upstreamSignature,
 }: {
   nextLayout: PivotRuntimeLayout;
   dimensionKeys: string[];
   metricKeys: string[];
-  reusableLayout: PivotRuntimeLayout;
   selection: RuntimeSelection;
   upstreamSignature: string;
 }) => {
@@ -323,19 +292,7 @@ export const prepareSeamlessRuntimeLayoutChange = ({
     dimensionKeys,
     metricKeys,
   );
-  if (
-    shouldFetchRuntimeLayout({
-      reusableLayout,
-      nextLayout: runtimeLayout,
-    })
-  ) {
-    return {
-      kind: 'fetch',
-      runtimeLayout,
-    };
-  }
   return {
-    kind: 'commit-local',
     runtimeLayout,
     syncSnapshot: buildSeamlessRuntimeSyncSnapshot({
       runtimeLayout,
@@ -351,7 +308,71 @@ type SeamlessRuntimeUpdateConfig = {
   sourceMeasureLeavesByMetric: PivotTableQueryFormData['measureLeavesByMetric'];
   runtimeLayout: PivotRuntimeLayout;
   selection: RuntimeSelection;
+  factBatches?: PivotFactStoreBatch[];
   requestLifecycle: LatestRequestLifecycle;
+};
+
+type SeamlessRuntimeCoverageConfig = Omit<
+  SeamlessRuntimeUpdateConfig,
+  'requestLifecycle'
+>;
+
+const buildSeamlessRuntimeCoveragePlan = ({
+  baseFormData,
+  sourceMetrics,
+  sourceMeasureLeavesByMetric,
+  runtimeLayout,
+  selection,
+  factBatches = [],
+}: SeamlessRuntimeCoverageConfig): InitialPivotUpdatePlan & {
+  factStore: PivotFactStore;
+} => {
+  const normalizedBaseFormData = normalizeFormDataExtraFilters(baseFormData);
+  const hasQueryContextFilters =
+    (normalizedBaseFormData.extra_form_data?.filters ?? []).length > 0;
+  const canReuseFactBatches =
+    !hasSelectedFilters(selection) && !hasQueryContextFilters;
+  return {
+    ...buildInitialPivotUpdatePlan({
+      formData: baseFormData,
+      runtimeLayout,
+      selection,
+      metricsOverride: sourceMetrics,
+      measureLeavesByMetricOverride: sourceMeasureLeavesByMetric,
+    }),
+    factStore:
+      canReuseFactBatches && factBatches.length > 0
+        ? createPivotFactStoreFromBatches(factBatches)
+        : createPivotFactStore(),
+  };
+};
+
+export const shouldFetchSeamlessRuntimeCoverage = (
+  config: SeamlessRuntimeCoverageConfig,
+) => {
+  const { specs, factStore } = buildSeamlessRuntimeCoveragePlan(config);
+  const factSelectors = factStore.getCoverageSelectors();
+  return specs.some(
+    spec => !factSelectorsCoverSelector(factSelectors, spec.meta.factSelector),
+  );
+};
+
+export const materializeSeamlessRuntimeFactBatches = async ({
+  chunkSize,
+  shouldContinue,
+  yieldToMain,
+  ...config
+}: SeamlessRuntimeCoverageConfig & ChunkedWorkOptions) => {
+  const { formData, layout, factStore } =
+    buildSeamlessRuntimeCoveragePlan(config);
+  return materializeLoadedPivotTreeFromFactStoreAsync({
+    store: factStore,
+    layout,
+    formData,
+    chunkSize,
+    shouldContinue,
+    yieldToMain,
+  });
 };
 
 export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
@@ -361,15 +382,17 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
   sourceMeasureLeavesByMetric,
   runtimeLayout,
   selection,
+  factBatches,
 }: SeamlessRuntimeUpdateConfig) => {
-  const { formData, layout, specs } = buildInitialPivotUpdatePlan({
-    formData: baseFormData,
-    runtimeLayout,
-    selection,
-    metricsOverride: sourceMetrics,
-    measureLeavesByMetricOverride: sourceMeasureLeavesByMetric,
-  });
-  const factStore = createPivotFactStore();
+  const { formData, layout, specs, factStore } =
+    buildSeamlessRuntimeCoveragePlan({
+      baseFormData,
+      sourceMetrics,
+      sourceMeasureLeavesByMetric,
+      runtimeLayout,
+      selection,
+      factBatches,
+    });
   const requestScope = requestLifecycle.beginScope();
   requestScope.beginRequest(SEAMLESS_REQUEST_GROUP);
 

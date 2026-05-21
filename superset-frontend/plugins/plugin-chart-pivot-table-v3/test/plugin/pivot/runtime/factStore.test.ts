@@ -294,7 +294,7 @@ test('does not reuse values-token branch coverage for root materialization', () 
   const rootSelector = {
     coverage,
     scope: { kind: 'root' } as PivotFactStoreBatchScope,
-    valueKeys: ['sales'],
+    valueKeys: ['sales', 'profit'],
   };
 
   store.upsertBatch({

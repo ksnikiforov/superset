@@ -96,14 +96,14 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `26389` | `-7121` | `< 20000` |
+| Full production `src` | `33510` | `26477` | `-7033` | `< 20000` |
 | Strict core pipeline | `12907` | `10487` | `-2420` | `< 8000` |
 
 Diagnostic scope only:
 
 | Scope | Baseline lines | Current lines | Delta |
 | --- | ---: | ---: | ---: |
-| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7687` | `-1011` |
+| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7708` | `-990` |
 
 Core pipeline breakdown:
 
@@ -239,11 +239,21 @@ Completed structural cuts:
 - Expansion hydration fetch planning now uses explicit expansion intent plus
   configured coverage needs; materialized tree-derived expansion is only used
   after materialization to commit visible UI state.
+- Seamless runtime state now treats committed fact batches as the authority:
+  expansion fetches publish their updated fact batches back to seamless state,
+  prop sync rematerializes the committed tree from fact batches, and covered
+  layout changes rematerialize locally from committed facts instead of trusting
+  the previous committed tree.
 
 Remaining duplicate authority:
 
 - `stateTransitions.ts` and `useExpansionEngine.ts` still own too much
   scheduler state and row/column orchestration.
+- `interaction-seamless-expansion.test.tsx` still encodes the older heuristic
+  fetch policy in several assertions. The source behavior should be kept
+  coverage-based; the tests need to be rewritten around visible coverage,
+  explicit fact batches, and no fetch when committed facts already satisfy the
+  requested projection.
 - `materializePivotTree.ts` still mixes tree construction, subtotal injection,
   measure-axis projection, and some display labeling.
 - Render/layout code still contains policy that should become pure projection
@@ -275,13 +285,16 @@ deletion-conscious.
 
 ## Next Commits
 
-1. Continue Priority 2 only where it deletes code: reduce the remaining
+1. Finish the seamless/expansion interaction test rewrite around fact-store
+   authority. Keep old fetch-count expectations only where coverage is actually
+   missing; otherwise assert no fetch and stable visible state.
+2. Continue Priority 2 only where it deletes code: reduce the remaining
    expansion hook scheduler state or fold it into manifest execution.
-2. Attack Priority 3 only with tests first: isolate subtotal and measure-axis
+3. Attack Priority 3 only with tests first: isolate subtotal and measure-axis
    materialization behavior, then delete post-processing wrappers.
-3. Resume Priority 4 after materializer behavior is stable: render should stop
+4. Resume Priority 4 after materializer behavior is stable: render should stop
    inferring metric/subtotal structure from tree shape.
-4. Shrink `PivotTableChart.tsx` only where code is deleted, not merely moved.
+5. Shrink `PivotTableChart.tsx` only where code is deleted, not merely moved.
 
 ## Verification Standard
 
