@@ -36,7 +36,7 @@ import {
   type PivotExpansionStateKeys,
   coerceExpansionState,
 } from './stateModel';
-import { parsePath, serializePath } from '../core/path';
+import { parsePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { stableStringify } from '../shared/stableStringify';
 import { type LayoutContext } from '../layout/LayoutContext';
@@ -47,10 +47,7 @@ import {
   type PivotFactStore,
   type PivotFactStoreBatch,
 } from '../runtime/factStore';
-import {
-  pathsFromAxisScope,
-  type PivotAxisCoverageNeed,
-} from '../runtime/coverage';
+import { type PivotAxisCoverageNeed } from '../runtime/coverage';
 import {
   PIVOT_AXES,
   resolveCollapsedExpansionState,
@@ -64,15 +61,11 @@ import {
   planHydrationIteration,
 } from './planner';
 import { useSyncRef } from '../shared/useSyncRef';
-import {
-  createLatestRequestLifecycle,
-  yieldToMainThread,
-} from '../runtime/requestLifecycle';
+import { createLatestRequestLifecycle } from '../runtime/requestLifecycle';
 import { StaleChunkedWorkError } from '../runtime/chunkedWork';
-import { materializeLoadedPivotTreeFromFactStoreAsync } from '../runtime/materializePivotTree';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { getStableColumnKey } from '../../utils';
-import { fetchPivotExpansion } from './fetchPivotExpansion';
+import { executeExpansionHydration } from './hydrationExecutor';
 import { rootKey } from '../viewModel';
 
 type AxisSetMap = Record<PivotAxis, Set<string>>;
@@ -426,79 +419,38 @@ export const useExpansionEngine = ({
 
   const hydrateAtomic = useCallback(
     async (persistOnComplete = false) => {
-      const requestScope = expansionRequestLifecycle.beginScope({
-        cancelActive: false,
-        latestOnly: false,
-      });
-      setLoadingKeys(new Set());
+      const factStore = factStoreRef.current as PivotFactStore;
+      const plan = planHydrationFromIntent();
 
-      try {
-        if (!requestScope.isCurrent()) {
-          return;
-        }
-        const factStore = factStoreRef.current as PivotFactStore;
-        const plan = planHydrationFromIntent();
-        let nextTree = treeRef.current;
-        if (plan.kind === 'fetch') {
-          setLoadingKeys(
-            new Set(
-              plan.targets.flatMap(target =>
-                target.need.rowScope.kind !== 'root' &&
-                target.need.columnScope.kind !== 'root'
-                  ? [
-                      ...pathsFromAxisScope(target.need.rowScope),
-                      ...pathsFromAxisScope(target.need.columnScope),
-                    ].map(serializePath)
-                  : [target.pathKey],
-              ),
-            ),
-          );
-          const requestGroupId = `${expansionInstanceId}:${requestScope.id}`;
-          requestScope.beginRequest(requestGroupId);
-          try {
-            const result = await fetchPivotExpansion({
-              targets: plan.targets,
-              layout: fetchLayout,
-              requestGroupId,
-              formData: fetchFormData,
+      const result =
+        plan.kind === 'complete'
+          ? { tree: treeRef.current }
+          : await executeExpansionHydration({
+              expansionInstanceId,
               factStore,
-              shouldContinue: requestScope.isCurrent,
-              yieldToMain: yieldToMainThread,
+              fetchFormData,
+              fetchLayout,
+              onLoadingKeys: setLoadingKeys,
+              targets: plan.targets,
+              lifecycle: expansionRequestLifecycle,
             });
-            if (requestScope.isCurrent()) {
-              addWarnings(result.warnings);
-            }
-          } finally {
-            requestScope.finish(requestGroupId);
-          }
-          nextTree = await materializeLoadedPivotTreeFromFactStoreAsync({
-            store: factStore,
-            layout: fetchLayout,
-            formData: fetchFormData,
-            shouldContinue: requestScope.isCurrent,
-            yieldToMain: yieldToMainThread,
-          });
-        }
-        if (requestScope.isCurrent()) {
-          onFactBatchesChange?.(factStore.getFactBatches());
-          const nextDesired = {
-            row: buildDesiredExpanded('row', nextTree),
-            col: buildDesiredExpanded('col', nextTree),
-          };
-          const resolvedExpanded = resolveExpandedByAxisForMetrics(
-            nextDesired,
-            nextTree,
-          );
-          commitExpansionState({
-            tree: nextTree,
-            expanded: resolvedExpanded,
-          });
-          if (persistOnComplete) {
-            persistExpansionState();
-          }
-        }
-      } finally {
-        setLoadingKeys(new Set());
+      if (!result.tree) {
+        return;
+      }
+      addWarnings('warnings' in result ? result.warnings : undefined);
+      onFactBatchesChange?.(factStore.getFactBatches());
+      commitExpansionState({
+        tree: result.tree,
+        expanded: resolveExpandedByAxisForMetrics(
+          {
+            row: buildDesiredExpanded('row', result.tree),
+            col: buildDesiredExpanded('col', result.tree),
+          },
+          result.tree,
+        ),
+      });
+      if (persistOnComplete) {
+        persistExpansionState();
       }
     },
     [

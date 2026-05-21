@@ -21,6 +21,7 @@ import {
   MAX_EXPANSION_BATCH_SIBLINGS,
 } from '../../../src/pivot/query/specs';
 import { type ExpansionCoverageTarget } from '../../../src/pivot/expansion/planner';
+import { buildExpansionHydrationLoadingKeys } from '../../../src/pivot/expansion/hydrationExecutor';
 import { parsePath, serializePath } from '../../../src/pivot/core/path';
 import { encodeMetricKey } from '../../../src/pivot/core/tokens';
 import { type PivotPathValue } from '../../../src/types';
@@ -52,7 +53,7 @@ const singleTargetGroups = (
 ) => groups.filter(group => group.length === 1);
 
 describe('fetchPlanOptimizer', () => {
-  it('groups compatible sibling targets into a batch', () => {
+  test('groups compatible sibling targets into a batch', () => {
     const targets = [makeTarget(['US', 'CA']), makeTarget(['US', 'NY'])];
     const plan = optimizeExpansionFetchPlan({ targets });
 
@@ -60,7 +61,7 @@ describe('fetchPlanOptimizer', () => {
     expect(batchSiblingValues(plan[0])).toEqual(['CA', 'NY']);
   });
 
-  it('does not mix null and non-null siblings', () => {
+  test('does not mix null and non-null siblings', () => {
     const targets = [
       makeTarget(['US', null]),
       makeTarget(['US', 'CA']),
@@ -78,7 +79,7 @@ describe('fetchPlanOptimizer', () => {
     expect(nullSingles).toHaveLength(1);
   });
 
-  it('groups by query scope path rather than rendered metric path', () => {
+  test('groups by query scope path rather than rendered metric path', () => {
     const caTarget = makeTarget(['US', 'CA']);
     const nyTarget = makeTarget(['US', 'NY']);
     const plan = optimizeExpansionFetchPlan({
@@ -98,7 +99,7 @@ describe('fetchPlanOptimizer', () => {
     expect(batchSiblingValues(plan[0])).toEqual(['CA', 'NY']);
   });
 
-  it('enforces max batch size', () => {
+  test('enforces max batch size', () => {
     const targets = Array.from(
       { length: MAX_EXPANSION_BATCH_SIBLINGS + 1 },
       (_, idx) => makeTarget(['US', `S${idx}`]),
@@ -113,7 +114,7 @@ describe('fetchPlanOptimizer', () => {
     );
   });
 
-  it('separates incompatible coverage depths', () => {
+  test('separates incompatible coverage depths', () => {
     const nyTarget = makeTarget(['US', 'NY']);
     const targets = [
       makeTarget(['US', 'CA']),
@@ -131,7 +132,7 @@ describe('fetchPlanOptimizer', () => {
     expect(singleTargetGroups(plan)).toHaveLength(2);
   });
 
-  it('separates sibling targets with different value keys', () => {
+  test('separates sibling targets with different value keys', () => {
     const caTarget = makeTarget(['US', 'CA']);
     const nyTarget = makeTarget(['US', 'NY']);
     const plan = optimizeExpansionFetchPlan({
@@ -155,5 +156,36 @@ describe('fetchPlanOptimizer', () => {
 
     expect(multiTargetGroups(plan)).toHaveLength(0);
     expect(singleTargetGroups(plan)).toHaveLength(2);
+  });
+
+  test('derives loading keys from coverage targets', () => {
+    expect(
+      buildExpansionHydrationLoadingKeys([makeTarget(['US', 'CA'])]),
+    ).toEqual(new Set([serializePath(['US', 'CA'])]));
+
+    expect(
+      buildExpansionHydrationLoadingKeys([
+        {
+          ...makeTarget([]),
+          need: {
+            ...makeTarget([]).need,
+            rowScope: {
+              kind: 'paths',
+              paths: [['US'], ['FR']],
+            },
+            columnScope: {
+              kind: 'paths',
+              paths: [['Q1']],
+            },
+          },
+        },
+      ]),
+    ).toEqual(
+      new Set([
+        serializePath(['US']),
+        serializePath(['FR']),
+        serializePath(['Q1']),
+      ]),
+    );
   });
 });

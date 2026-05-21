@@ -22,16 +22,35 @@ import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 import { mergeTrees } from '../fixtures/tree';
 import { parsePath } from '../../../src/pivot/core/path';
-import { fetchPivotExpansion as fetchPivotBranch } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import {
+  fetchPivotExpansion as fetchPivotBranch,
   fetchPivotExpansion as fetchPivotBranchesBatch,
-  type FetchPivotBranchesBatchParams,
-  type FetchPivotBranchesBatchResult,
+  type FetchPivotExpansionRequest,
+  type FetchPivotExpansionResult,
 } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 import { buildMockBranchFetchResult } from '../fixtures/factBatches';
+
+type FetchPivotBranchesBatchParams = FetchPivotExpansionRequest & {
+  batch: FetchPivotExpansionRequest['targets'];
+  visibleRowDepth?: number;
+  visibleColDepth?: number;
+};
+type FetchPivotBranchParams = Omit<
+  FetchPivotExpansionRequest,
+  'layout' | 'targets'
+> & {
+  axis: FetchPivotExpansionRequest['targets'][number]['axis'];
+  path: ReturnType<typeof parsePath>;
+  visibleRowDepth?: number;
+  visibleColDepth?: number;
+};
+type FetchPivotBranch = (
+  params: FetchPivotExpansionRequest | FetchPivotBranchParams,
+) => Promise<FetchPivotExpansionResult>;
+type FetchPivotBranchesBatchResult = FetchPivotExpansionResult;
 
 jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
@@ -71,9 +90,8 @@ const buildTree = (
 };
 
 describe('PivotTableChart error UX (Phase 4.5)', () => {
-  const fetchPivotBranchMock = fetchPivotBranch as jest.MockedFunction<
-    typeof fetchPivotBranch
-  >;
+  const fetchPivotBranchMock =
+    fetchPivotBranch as unknown as jest.MockedFunction<FetchPivotBranch>;
   const fetchPivotBranchesBatchMock =
     fetchPivotBranchesBatch as jest.MockedFunction<
       typeof fetchPivotBranchesBatch
@@ -113,7 +131,7 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
     fetchPivotBranchesBatchMock.mockImplementation(resolveBatchWithSingles);
   });
 
-  it('AS-22: renders a full-chart error and supports Retry', async () => {
+  test('AS-22: renders a full-chart error and supports Retry', async () => {
     const records = [
       { r1: 'A', r2: 'X', m1: 10 },
       { r1: 'B', r2: 'Y', m1: 15 },
@@ -127,7 +145,11 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
     fetchPivotBranchMock
       .mockRejectedValueOnce(error)
       .mockImplementation(params =>
-        Promise.resolve(buildMockBranchFetchResult(params, { data: branchA })),
+        Promise.resolve(
+          buildMockBranchFetchResult(params as FetchPivotExpansionRequest, {
+            data: branchA,
+          }),
+        ),
       );
 
     const formData = buildFormData({
@@ -189,7 +211,7 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('AS-23: layout changes while failed auto-retry using standard rules', async () => {
+  test('AS-23: layout changes while failed auto-retry using standard rules', async () => {
     const records = [
       { r1: 'A', r2: 'X', m1: 10 },
       { r1: 'B', r2: 'Y', m1: 15 },
@@ -203,7 +225,11 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
     fetchPivotBranchMock
       .mockRejectedValueOnce(error)
       .mockImplementation(params =>
-        Promise.resolve(buildMockBranchFetchResult(params, { data: branchA })),
+        Promise.resolve(
+          buildMockBranchFetchResult(params as FetchPivotExpansionRequest, {
+            data: branchA,
+          }),
+        ),
       );
 
     const formDataV1 = buildFormData({

@@ -27,14 +27,33 @@ import {
   fetchPivotExpansion as fetchPivotBranchesBatch,
 } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import type {
-  FetchPivotBranchResult,
-  FetchPivotBranchesBatchParams,
-  FetchPivotBranchesBatchResult,
+  FetchPivotExpansionRequest,
+  FetchPivotExpansionResult,
 } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 import { buildMockBranchFetchResult } from '../fixtures/factBatches';
+
+type FetchPivotBranchResult = FetchPivotExpansionResult;
+type FetchPivotBranchesBatchParams = FetchPivotExpansionRequest & {
+  batch: FetchPivotExpansionRequest['targets'];
+  visibleRowDepth?: number;
+  visibleColDepth?: number;
+};
+type FetchPivotBranchParams = Omit<
+  FetchPivotExpansionRequest,
+  'layout' | 'targets'
+> & {
+  axis: FetchPivotExpansionRequest['targets'][number]['axis'];
+  path: ReturnType<typeof parsePath>;
+  visibleRowDepth?: number;
+  visibleColDepth?: number;
+};
+type FetchPivotBranch = (
+  params: FetchPivotExpansionRequest | FetchPivotBranchParams,
+) => Promise<FetchPivotExpansionResult>;
+type FetchPivotBranchesBatchResult = FetchPivotExpansionResult;
 
 jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
@@ -91,9 +110,8 @@ const getPivotTable = (container: HTMLElement) =>
     container.querySelector('table')) as HTMLTableElement | null;
 
 describe('PivotTableChart persisted prefetch ignores stale results', () => {
-  const fetchPivotBranchMock = fetchPivotBranch as jest.MockedFunction<
-    typeof fetchPivotBranch
-  >;
+  const fetchPivotBranchMock =
+    fetchPivotBranch as unknown as jest.MockedFunction<FetchPivotBranch>;
   const fetchPivotBranchesBatchMock =
     fetchPivotBranchesBatch as jest.MockedFunction<
       typeof fetchPivotBranchesBatch
@@ -134,7 +152,7 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
     fetchPivotBranchesBatchMock.mockImplementation(resolveBatchWithSingles);
   });
 
-  it('does not apply an in-flight prefetch result after base data changes', async () => {
+  test('does not apply an in-flight prefetch result after base data changes', async () => {
     const recordsV1 = [
       { r1: 'A', r2: 'X', m1: 10 },
       { r1: 'B', r2: 'Z', m1: 12 },
@@ -161,7 +179,7 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
       .mockReturnValueOnce(deferredV2.promise)
       .mockImplementation(params =>
         Promise.resolve(
-          buildMockBranchFetchResult(params, {
+          buildMockBranchFetchResult(params as FetchPivotExpansionRequest, {
             data: branchAV2,
           }),
         ),
@@ -228,17 +246,23 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
     );
 
     deferredV1.resolve(
-      buildMockBranchFetchResult(fetchPivotBranchMock.mock.calls[0][0], {
-        data: branchAV1,
-      }),
+      buildMockBranchFetchResult(
+        fetchPivotBranchMock.mock.calls[0][0] as FetchPivotExpansionRequest,
+        {
+          data: branchAV1,
+        },
+      ),
     );
     await fetchPivotBranchMock.mock.results[0].value;
     await Promise.resolve();
 
     deferredV2.resolve(
-      buildMockBranchFetchResult(fetchPivotBranchMock.mock.calls[1][0], {
-        data: branchAV2,
-      }),
+      buildMockBranchFetchResult(
+        fetchPivotBranchMock.mock.calls[1][0] as FetchPivotExpansionRequest,
+        {
+          data: branchAV2,
+        },
+      ),
     );
     await fetchPivotBranchMock.mock.results[1].value;
 
