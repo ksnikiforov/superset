@@ -26,7 +26,9 @@ import {
 } from 'react';
 import { useSelector } from 'react-redux';
 import rison from 'rison';
-import { styled, SupersetClient, t, useTheme } from '@superset-ui/core';
+import { t } from '@apache-superset/core/translation';
+import { SupersetClient } from '@superset-ui/core';
+import { styled, useTheme } from '@apache-superset/core/theme';
 import {
   Icons,
   Switch,

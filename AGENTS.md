@@ -2,6 +2,27 @@
 
 Apache Superset is a data visualization platform with Flask/Python backend and React/TypeScript frontend.
 
+## ⚠️ CRITICAL: Always Run Pre-commit Before Pushing
+
+**ALWAYS run `pre-commit run --all-files` before pushing commits.** CI will fail if pre-commit checks don't pass. This is non-negotiable.
+
+```bash
+# Stage your changes first
+git add .
+
+# Run pre-commit on all files
+pre-commit run --all-files
+
+# If there are auto-fixes, stage them and commit
+git add .
+git commit --amend  # or new commit
+```
+
+Common pre-commit failures:
+- **Formatting** - black, prettier, eslint will auto-fix
+- **Type errors** - mypy failures need manual fixes
+- **Linting** - ruff, pylint issues need manual fixes
+
 ## ⚠️ CRITICAL: Ongoing Refactors (What NOT to Do)
 
 **These migrations are actively happening - avoid deprecated patterns:**
@@ -15,9 +36,11 @@ Apache Superset is a data visualization platform with Flask/Python backend and R
 
 ### Testing Strategy Migration
 - **Prefer unit tests** over integration tests
-- **Prefer integration tests** over Cypress end-to-end tests
-- **Cypress is last resort** - Actively moving away from Cypress
+- **Prefer integration tests** over end-to-end tests
+- **Use Playwright for E2E tests** - Migrating from Cypress
+- **Cypress is deprecated** - Will be removed once migration is completed
 - **Use Jest + React Testing Library** for component testing
+- **Use `test()` instead of `describe()`** - Follow [avoid nesting when testing](https://kentcdodds.com/blog/avoid-nesting-when-youre-testing) principles
 
 ### Backend Type Safety
 - **Add type hints** - All new Python code needs proper typing
@@ -66,13 +89,41 @@ superset/
 
 ### Apache License Headers
 - **New files require ASF license headers** - When creating new code files, include the standard Apache Software Foundation license header
-- **LLM instruction files are excluded** - Files like LLMS.md, AGENTS.md, etc. are in `.rat-excludes` to avoid header token overhead
+- **LLM instruction files are excluded** - Files like AGENTS.md, CLAUDE.md, etc. are in `.rat-excludes` to avoid header token overhead
+
+### Code Comments
+- **Avoid time-specific language** - Don't use words like "now", "currently", "today" in code comments as they become outdated
+- **Write timeless comments** - Comments should remain accurate regardless of when they're read
 
 ## Documentation Requirements
 
 - **docs/**: Update for any user-facing changes
 - **UPDATING.md**: Add breaking changes here
 - **Docstrings**: Required for new functions/classes
+
+## Developer Portal: Storybook-to-MDX Documentation
+
+The Developer Portal auto-generates MDX documentation from Storybook stories. **Stories are the single source of truth.**
+
+### Core Philosophy
+- **Fix issues in the STORY, not the generator** - When something doesn't render correctly, update the story file first
+- **Generator should be lightweight** - It extracts and passes through data; avoid special cases
+- **Stories define everything** - Props, controls, galleries, examples all come from story metadata
+
+### Story Requirements for Docs Generation
+- Use `export default { title: '...' }` (inline), not `const meta = ...; export default meta;`
+- Name interactive stories `Interactive${ComponentName}` (e.g., `InteractiveButton`)
+- Define `args` for default prop values
+- Define `argTypes` at the story level (not meta level) with control types and descriptions
+- Use `parameters.docs.gallery` for size×style variant grids
+- Use `parameters.docs.sampleChildren` for components that need children
+- Use `parameters.docs.liveExample` for custom live code blocks
+- Use `parameters.docs.staticProps` for complex object props that can't be parsed inline
+
+### Generator Location
+- Script: `docs/scripts/generate-superset-components.mjs`
+- Wrapper: `docs/src/components/StorybookWrapper.jsx`
+- Output: `docs/developer_portal/components/`
 
 ## Architecture Patterns
 
@@ -106,6 +157,18 @@ superset/
 npm run test                           # All tests
 npm run test -- filename.test.tsx     # Single file
 
+# E2E Tests (Playwright - NEW)
+npm run playwright:test                # All Playwright tests
+npm run playwright:ui                  # Interactive UI mode
+npm run playwright:headed              # See browser during tests
+npx playwright test tests/auth/login.spec.ts  # Single file
+npm run playwright:debug tests/auth/login.spec.ts  # Debug specific file
+
+# E2E Tests (Cypress - DEPRECATED)
+cd superset-frontend/cypress-base
+npm run cypress-run-chrome             # All Cypress tests (headless)
+npm run cypress-debug                  # Interactive Cypress UI
+
 # Backend  
 pytest                                 # All tests
 pytest tests/unit_tests/specific_test.py  # Single file
@@ -134,6 +197,19 @@ curl -f http://localhost:8088/health || echo "❌ Setup required - see https://s
 ## SQLAlchemy Query Best Practices  
 - **Use negation operator**: `~Model.field` instead of `== False` to avoid ruff E712 errors
 - **Example**: `~Model.is_active` instead of `Model.is_active == False`
+
+## Pull Request Guidelines
+
+**When creating pull requests:**
+
+1. **Read the current PR template**: Always check `.github/PULL_REQUEST_TEMPLATE.md` for the latest format
+2. **Use the template sections**: Include all sections from the template (SUMMARY, BEFORE/AFTER, TESTING INSTRUCTIONS, ADDITIONAL INFORMATION)
+3. **Follow PR title conventions**: Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/)
+   - Format: `type(scope): description`
+   - Example: `fix(dashboard): load charts correctly`
+   - Types: `fix`, `feat`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`
+
+**Important**: Always reference the actual template file at `.github/PULL_REQUEST_TEMPLATE.md` instead of using cached content, as the template may be updated over time.
 
 ## Pre-commit Validation
 
@@ -182,7 +258,7 @@ pre-commit run eslint            # Frontend linting
 
 ## Platform-Specific Instructions
 
-- **[AGENTS.md](AGENTS.md)** - For Codex/Anthropic tools
+- **[CLAUDE.md](CLAUDE.md)** - For Claude/Anthropic tools
 - **[.github/copilot-instructions.md](.github/copilot-instructions.md)** - For GitHub Copilot  
 - **[GEMINI.md](GEMINI.md)** - For Google Gemini tools
 - **[GPT.md](GPT.md)** - For OpenAI/ChatGPT tools

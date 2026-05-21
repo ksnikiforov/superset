@@ -18,7 +18,9 @@
  */
 import { useCallback, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { styled, SupersetClient, t, useTheme, css } from '@superset-ui/core';
+import { t } from '@apache-superset/core/translation';
+import { SupersetClient } from '@superset-ui/core';
+import { styled, useTheme, css } from '@apache-superset/core/theme';
 import CodeSyntaxHighlighter, {
   preloadLanguages,
 } from '@superset-ui/core/components/CodeSyntaxHighlighter';

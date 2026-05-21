@@ -70,7 +70,7 @@ export default function EchartsTimeseries({
     const element = extraControlRef.current;
     if (!element) {
       setExtraControlHeight(0);
-      return undefined;
+      return;
     }
 
     const updateHeight = () => {
@@ -339,7 +339,7 @@ export default function EchartsTimeseries({
       if (echartInstance?.containPixel('grid', pointInPixel)) {
         // do not trigger if click unstacked chart's blank area
         if (!stack && params.target?.type === 'ec-polygon') return;
-        // @ts-ignore
+        // @ts-expect-error
         const globalModel = echartInstance.getModel();
         const model = getModelInfo(params.target, globalModel);
         if (model) {
@@ -371,6 +371,7 @@ export default function EchartsTimeseries({
         eventHandlers={eventHandlers}
         zrEventHandlers={zrEventHandlers}
         selectedValues={selectedValues}
+        vizType={formData.vizType}
       />
     </>
   );

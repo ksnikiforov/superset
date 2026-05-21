@@ -17,10 +17,10 @@
  * under the License.
  */
 
-import { GenericDataType } from '@superset-ui/core';
-import type { ControlState } from '@superset-ui/chart-controls';
+import { GenericDataType } from '@apache-superset/core/common';
 import { xAxisForceCategoricalControl } from '../../src/shared-controls/customControls';
 import { checkColumnType } from '../../src/utils/checkColumnType';
+import type { ControlState } from '@superset-ui/chart-controls';
 
 jest.mock('../../src/utils/checkColumnType');
 jest.mock('@superset-ui/core', () => ({

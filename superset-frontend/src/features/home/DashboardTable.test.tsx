@@ -29,10 +29,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import fetchMock from 'fetch-mock';
 import * as hooks from 'src/views/CRUD/hooks';
 import handleResourceExport from 'src/utils/export';
-import { handleDashboardDelete } from 'src/views/CRUD/utils';
 import DashboardTable from './DashboardTable';
-
-const mockHandleDashboardDelete = handleDashboardDelete as jest.Mock;
 
 // Mock the export module
 jest.mock('src/utils/export', () => ({
@@ -44,18 +41,15 @@ const mockExport = handleResourceExport as jest.MockedFunction<
   typeof handleResourceExport
 >;
 
-jest.mock('src/views/CRUD/utils', () => {
-  const actual = jest.requireActual('src/views/CRUD/utils');
-  return {
-    ...actual,
-    handleDashboardDelete: jest
-      .fn()
-      .mockImplementation((dashboard, refreshData) => {
-        refreshData();
-        return Promise.resolve();
-      }),
-  };
-});
+jest.mock('src/views/CRUD/utils', () => ({
+  ...jest.requireActual('src/views/CRUD/utils'),
+  handleDashboardDelete: jest
+    .fn()
+    .mockImplementation((dashboard, refreshData) => {
+      refreshData();
+      return Promise.resolve();
+    }),
+}));
 
 // Mock the CRUD hooks
 jest.mock('src/views/CRUD/hooks', () => ({
@@ -133,13 +127,15 @@ beforeEach(() => {
     }),
   );
 
+  const getDashboardMockUrl = 'glob:*/api/v1/dashboard/*';
+  fetchMock.removeRoute(getDashboardMockUrl);
   fetchMock.get(
-    'glob:*/api/v1/dashboard/*',
+    getDashboardMockUrl,
     {
       result: mockDashboards[0],
     },
-    { overwriteRoutes: true },
-  ); // Add overwriteRoutes option
+    { name: getDashboardMockUrl },
+  );
 
   // Mock loading state for first render
   jest.spyOn(hooks, 'useListViewResource').mockImplementationOnce(() => ({
@@ -273,7 +269,7 @@ test('handles bulk dashboard export with correct ID and shows spinner', async ()
   // Mock export to take some time before calling the done callback
   mockExport.mockImplementation(
     (resource: string, ids: number[], done: () => void) =>
-      new Promise<void>(resolve => {
+      new Promise(resolve => {
         setTimeout(() => {
           done();
           resolve();
@@ -408,6 +404,8 @@ test('handles dashboard deletion confirmation', async () => {
 });
 
 test('passes correct parameters to handleDashboardDelete for Other tab', async () => {
+  const mockHandleDashboardDelete =
+    require('src/views/CRUD/utils').handleDashboardDelete;
   mockHandleDashboardDelete.mockClear();
 
   const refreshDataMock = jest.fn();

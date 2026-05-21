@@ -19,6 +19,7 @@
 
 import { RefObject } from 'react';
 import { createSelector, lruMemoize } from 'reselect';
+import { supersetTheme, SupersetTheme } from '@apache-superset/core/theme';
 import {
   AppSection,
   Behavior,
@@ -34,7 +35,6 @@ import {
   SetDataMaskHook,
 } from '../types/Base';
 import { QueryData, DataRecordFilters } from '..';
-import { supersetTheme, SupersetTheme } from '../../theme';
 
 // TODO: more specific typing for these fields of ChartProps
 type AnnotationData = PlainObject;
@@ -72,8 +72,6 @@ type Hooks = {
  * Preferred format for ChartProps config
  */
 export interface ChartPropsConfig {
-  /** Render chart id */
-  chartId?: number | string;
   annotationData?: AnnotationData;
   /** Datasource metadata */
   datasource?: SnakeCaseDatasource;
@@ -117,8 +115,6 @@ const DEFAULT_HEIGHT = 600;
 
 export default class ChartProps<FormData extends RawFormData = RawFormData> {
   static createSelector: () => ChartPropsSelector;
-
-  chartId?: number | string;
 
   annotationData: AnnotationData;
 
@@ -171,7 +167,6 @@ export default class ChartProps<FormData extends RawFormData = RawFormData> {
   ) {
     const {
       annotationData = {},
-      chartId,
       datasource = {},
       formData = {} as FormData,
       hooks = {},
@@ -192,7 +187,6 @@ export default class ChartProps<FormData extends RawFormData = RawFormData> {
       emitCrossFilters = false,
       theme,
     } = config;
-    this.chartId = chartId;
     this.width = width;
     this.height = height;
     this.annotationData = annotationData;
@@ -222,7 +216,6 @@ export default class ChartProps<FormData extends RawFormData = RawFormData> {
 ChartProps.createSelector = function create(): ChartPropsSelector {
   return createSelector(
     (input: ChartPropsConfig) => input.annotationData,
-    input => input.chartId,
     input => input.datasource,
     input => input.formData,
     input => input.height,
@@ -244,7 +237,6 @@ ChartProps.createSelector = function create(): ChartPropsSelector {
     input => input.theme,
     (
       annotationData,
-      chartId,
       datasource,
       formData,
       height,
@@ -267,7 +259,6 @@ ChartProps.createSelector = function create(): ChartPropsSelector {
     ) =>
       new ChartProps({
         annotationData,
-        chartId,
         datasource,
         formData,
         height,

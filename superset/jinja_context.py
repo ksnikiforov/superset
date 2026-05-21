@@ -46,6 +46,7 @@ from superset.exceptions import (
 )
 from superset.extensions import feature_flag_manager
 from superset.sql.parse import Table
+from superset.superset_typing import Column, QueryObjectDict
 from superset.utils import json
 from superset.utils.core import (
     AdhocFilterClause,
@@ -121,13 +122,13 @@ class ExtraCache:
     # be added to the cache key.
     regex = re.compile(
         r"(\{\{|\{%)[^{}]*?("
-        r"current_user_id\([^()]*\)|"
-        r"current_username\([^()]*\)|"
-        r"current_user_email\([^()]*\)|"
-        r"current_user_rls_rules\([^()]*\)|"
-        r"current_user_roles\([^()]*\)|"
-        r"cache_key_wrapper\([^()]*\)|"
-        r"url_param\([^()]*\)"
+        r"current_user_id\([^)]*\)|"
+        r"current_username\([^)]*\)|"
+        r"current_user_email\([^)]*\)|"
+        r"current_user_rls_rules\([^)]*\)|"
+        r"current_user_roles\([^)]*\)|"
+        r"cache_key_wrapper\([^)]*\)|"
+        r"url_param\([^)]*\)"
         r")"
         r"[^{}]*?(\}\}|\%\})"
     )
@@ -1022,11 +1023,11 @@ def dataset_macro(
 
     columns = columns or [column.column_name for column in dataset.columns]
     metrics = [metric.metric_name for metric in dataset.metrics]
-    query_obj = {
+    query_obj: QueryObjectDict = {
         "is_timeseries": False,
         "filter": [],
         "metrics": metrics if include_metrics else None,
-        "columns": columns,
+        "columns": cast(list[Column], columns),
         "from_dttm": from_dttm,
         "to_dttm": to_dttm,
     }

@@ -255,7 +255,7 @@ def test_database_connection(
                     "service_account_info": {
                         "type": "service_account",
                         "project_id": "black-sanctum-314419",
-                        "private_key_id": "259b0d419a8f840056158763ff54d8b08f7b8173",
+                        "private_key_id": "259b0d419a8f840056158763ff54d8b08f7b8173",  # noqa: E501
                         "private_key": "XXXXXXXXXX",
                         "client_email": "google-spreadsheets-demo-servi@black-sanctum-314419.iam.gserviceaccount.com",  # noqa: E501
                         "client_id": "114567578578109757129",
@@ -308,6 +308,7 @@ def test_database_connection(
             },
             "server_cert": None,
             "sqlalchemy_uri": "gsheets://",
+            "ssh_tunnel": None,
             "uuid": "02feae18-2dd6-4bb4-a9c0-49e9d4f29d58",
         },
     }
@@ -450,6 +451,76 @@ def test_import(
         ssh_tunnel_passwords=None,
         ssh_tunnel_private_keys=None,
         ssh_tunnel_priv_key_passwords=None,
+        encrypted_extra_secrets=None,
+    )
+
+
+def test_import_with_encrypted_extra_secrets(
+    mocker: MockerFixture,
+    client: Any,
+    full_api_access: None,
+) -> None:
+    """
+    Test that encrypted_extra_secrets are passed to ImportDatabasesCommand.
+    """
+    contents = {
+        "metadata.yaml": yaml.safe_dump(
+            {
+                "version": "1.0.0",
+                "type": "Database",
+                "timestamp": "2021-01-01T00:00:00Z",
+            }
+        ),
+        "databases/test.yaml": yaml.safe_dump(
+            {
+                "database_name": "test",
+                "sqlalchemy_uri": "bigquery://gcp-project-id/",
+                "cache_timeout": 0,
+                "expose_in_sqllab": True,
+                "allow_run_async": False,
+                "allow_ctas": False,
+                "allow_cvas": False,
+                "allow_dml": False,
+                "allow_file_upload": False,
+                "masked_encrypted_extra": json.dumps(
+                    {"credentials_info": {"private_key": "XXXXXXXXXX"}}
+                ),
+                "extra": json.dumps({"allows_virtual_table_explore": True}),
+                "uuid": "00000000-0000-0000-0000-123456789001",
+            }
+        ),
+    }
+    mocker.patch("superset.databases.api.is_zipfile", return_value=True)
+    mocker.patch("superset.databases.api.ZipFile")
+    mocker.patch(
+        "superset.databases.api.get_contents_from_bundle",
+        return_value=contents,
+    )
+    command = mocker.patch("superset.databases.api.ImportDatabasesCommand")
+
+    secrets = {
+        "databases/test.yaml": {
+            "$.credentials_info.private_key": "-----BEGIN PRIVATE KEY-----"
+        }
+    }
+    form_data = {
+        "formData": (BytesIO(b"test"), "test.zip"),
+        "encrypted_extra_secrets": json.dumps(secrets),
+    }
+    client.post(
+        "/api/v1/database/import/",
+        data=form_data,
+        content_type="multipart/form-data",
+    )
+
+    command.assert_called_with(
+        contents,
+        passwords=None,
+        overwrite=False,
+        ssh_tunnel_passwords=None,
+        ssh_tunnel_private_keys=None,
+        ssh_tunnel_priv_key_passwords=None,
+        encrypted_extra_secrets=secrets,
     )
 
 
@@ -484,160 +555,6 @@ def test_non_zip_import(client: Any, full_api_access: None) -> None:
             }
         ]
     }
-
-
-def test_delete_ssh_tunnel(
-    mocker: MockerFixture,
-    app: Any,
-    session: Session,
-    client: Any,
-    full_api_access: None,
-) -> None:
-    """
-    Test that we can delete SSH Tunnel
-    """
-    with app.app_context():
-        from superset.daos.database import DatabaseDAO
-        from superset.databases.api import DatabaseRestApi
-        from superset.databases.ssh_tunnel.models import SSHTunnel
-        from superset.models.core import Database
-
-        DatabaseRestApi.datamodel._session = session
-
-        # create table for databases
-        Database.metadata.create_all(session.get_bind())  # pylint: disable=no-member
-
-        # Create our Database
-        database = Database(
-            database_name="my_database",
-            sqlalchemy_uri="gsheets://",
-            encrypted_extra=json.dumps(
-                {
-                    "service_account_info": {
-                        "type": "service_account",
-                        "project_id": "black-sanctum-314419",
-                        "private_key_id": "259b0d419a8f840056158763ff54d8b08f7b8173",
-                        "private_key": "SECRET",
-                        "client_email": "google-spreadsheets-demo-servi@black-sanctum-314419.iam.gserviceaccount.com",  # noqa: E501
-                        "client_id": "SSH_TUNNEL_CREDENTIALS_CLIENT",
-                        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                        "token_uri": "https://oauth2.googleapis.com/token",
-                        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-                        "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/google-spreadsheets-demo-servi%40black-sanctum-314419.iam.gserviceaccount.com",
-                    },
-                }
-            ),
-        )
-        db.session.add(database)
-        db.session.commit()
-
-        # mock the lookup so that we don't need to include the driver
-        mocker.patch("sqlalchemy.engine.URL.get_driver_name", return_value="gsheets")
-        mocker.patch("superset.utils.log.DBEventLogger.log")
-        mocker.patch(
-            "superset.commands.database.ssh_tunnel.delete.is_feature_enabled",
-            return_value=True,
-        )
-
-        # Create our SSHTunnel
-        tunnel = SSHTunnel(
-            database_id=1,
-            database=database,
-        )
-
-        db.session.add(tunnel)
-        db.session.commit()
-
-        # Get our recently created SSHTunnel
-        response_tunnel = DatabaseDAO.get_ssh_tunnel(1)
-        assert response_tunnel
-        assert isinstance(response_tunnel, SSHTunnel)
-        assert 1 == response_tunnel.database_id
-
-        # Delete the recently created SSHTunnel
-        response_delete_tunnel = client.delete(
-            f"/api/v1/database/{database.id}/ssh_tunnel/"
-        )
-        assert response_delete_tunnel.json["message"] == "OK"
-
-        response_tunnel = DatabaseDAO.get_ssh_tunnel(1)
-        assert response_tunnel is None
-
-
-def test_delete_ssh_tunnel_not_found(
-    mocker: MockerFixture,
-    app: Any,
-    session: Session,
-    client: Any,
-    full_api_access: None,
-) -> None:
-    """
-    Test that we cannot delete a tunnel that does not exist
-    """
-    with app.app_context():
-        from superset.daos.database import DatabaseDAO
-        from superset.databases.api import DatabaseRestApi
-        from superset.databases.ssh_tunnel.models import SSHTunnel
-        from superset.models.core import Database
-
-        DatabaseRestApi.datamodel._session = session
-
-        # create table for databases
-        Database.metadata.create_all(session.get_bind())  # pylint: disable=no-member
-
-        # Create our Database
-        database = Database(
-            database_name="my_database",
-            sqlalchemy_uri="gsheets://",
-            encrypted_extra=json.dumps(
-                {
-                    "service_account_info": {
-                        "type": "service_account",
-                        "project_id": "black-sanctum-314419",
-                        "private_key_id": "259b0d419a8f840056158763ff54d8b08f7b8173",
-                        "private_key": "SECRET",
-                        "client_email": "google-spreadsheets-demo-servi@black-sanctum-314419.iam.gserviceaccount.com",  # noqa: E501
-                        "client_id": "SSH_TUNNEL_CREDENTIALS_CLIENT",
-                        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                        "token_uri": "https://oauth2.googleapis.com/token",
-                        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-                        "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/google-spreadsheets-demo-servi%40black-sanctum-314419.iam.gserviceaccount.com",
-                    },
-                }
-            ),
-        )
-        db.session.add(database)
-        db.session.commit()
-
-        # mock the lookup so that we don't need to include the driver
-        mocker.patch("sqlalchemy.engine.URL.get_driver_name", return_value="gsheets")
-        mocker.patch("superset.utils.log.DBEventLogger.log")
-        mocker.patch(
-            "superset.commands.database.ssh_tunnel.delete.is_feature_enabled",
-            return_value=True,
-        )
-
-        # Create our SSHTunnel
-        tunnel = SSHTunnel(
-            database_id=1,
-            database=database,
-        )
-
-        db.session.add(tunnel)
-        db.session.commit()
-
-        # Delete the recently created SSHTunnel
-        response_delete_tunnel = client.delete("/api/v1/database/2/ssh_tunnel/")
-        assert response_delete_tunnel.json["message"] == "Not found"
-
-        # Get our recently created SSHTunnel
-        response_tunnel = DatabaseDAO.get_ssh_tunnel(1)
-        assert response_tunnel
-        assert isinstance(response_tunnel, SSHTunnel)
-        assert 1 == response_tunnel.database_id
-
-        response_tunnel = DatabaseDAO.get_ssh_tunnel(2)
-        assert response_tunnel is None
 
 
 def test_apply_dynamic_database_filter(
@@ -698,10 +615,6 @@ def test_apply_dynamic_database_filter(
         # mock the lookup so that we don't need to include the driver
         mocker.patch("sqlalchemy.engine.URL.get_driver_name", return_value="gsheets")
         mocker.patch("superset.utils.log.DBEventLogger.log")
-        mocker.patch(
-            "superset.commands.database.ssh_tunnel.delete.is_feature_enabled",
-            return_value=False,
-        )
 
         def _base_filter(query):
             from superset.models.core import Database
@@ -778,6 +691,10 @@ def test_oauth2_happy_path(
         "expires_in": 3600,
         "refresh_token": "ZZZ",
     }
+    mocker.patch(
+        "superset.commands.database.oauth2.KeyValueDAO.get_value",
+        return_value=None,
+    )
 
     state: OAuth2State = {
         "user_id": 1,
@@ -798,7 +715,11 @@ def test_oauth2_happy_path(
         )
 
     assert response.status_code == 200
-    get_oauth2_token.assert_called_with({"id": "one", "secret": "two"}, "XXX")
+    get_oauth2_token.assert_called_with(
+        {"id": "one", "secret": "two"},
+        "XXX",
+        code_verifier=None,
+    )
 
     token = db.session.query(DatabaseUserOAuth2Tokens).one()
     assert token.user_id == 1
@@ -846,6 +767,10 @@ def test_oauth2_permissions(
         "expires_in": 3600,
         "refresh_token": "ZZZ",
     }
+    mocker.patch(
+        "superset.commands.database.oauth2.KeyValueDAO.get_value",
+        return_value=None,
+    )
 
     state: OAuth2State = {
         "user_id": 1,
@@ -866,7 +791,11 @@ def test_oauth2_permissions(
         )
 
     assert response.status_code == 200
-    get_oauth2_token.assert_called_with({"id": "one", "secret": "two"}, "XXX")
+    get_oauth2_token.assert_called_with(
+        {"id": "one", "secret": "two"},
+        "XXX",
+        code_verifier=None,
+    )
 
     token = db.session.query(DatabaseUserOAuth2Tokens).one()
     assert token.user_id == 1
@@ -919,6 +848,10 @@ def test_oauth2_multiple_tokens(
             "refresh_token": "ZZZ2",
         },
     ]
+    mocker.patch(
+        "superset.commands.database.oauth2.KeyValueDAO.get_value",
+        return_value=None,
+    )
 
     state: OAuth2State = {
         "user_id": 1,

@@ -845,6 +845,70 @@ def test_quoted_name_prevents_double_quoting(mocker: MockerFixture) -> None:
     assert '"MY_DB"."MY_SCHEMA"."MY_TABLE"' in compiled
 
 
+def test_sqla_table_currency_code_column_property() -> None:
+    """
+    Test currency_code_column property on SqlaTable.
+    """
+    database = Database(database_name="my_db")
+    table = SqlaTable(
+        table_name="sales",
+        database=database,
+        currency_code_column="currency",
+    )
+    assert table.currency_code_column == "currency"
+
+
+def test_sqla_table_data_includes_currency_code_column(mocker: MockerFixture) -> None:
+    """
+    Test that data property includes currency_code_column.
+    """
+    database = mocker.MagicMock()
+    database.get_sqla_engine.return_value.__enter__ = mocker.MagicMock()
+    database.get_sqla_engine.return_value.__exit__ = mocker.MagicMock()
+
+    table = SqlaTable(
+        table_name="sales",
+        database=database,
+        currency_code_column="currency_code",
+        main_dttm_col="ds",
+    )
+    table.columns = []
+    table.metrics = []
+
+    # Mock the columns property to return empty list
+    mocker.patch.object(SqlaTable, "columns", [])
+    mocker.patch.object(SqlaTable, "metrics", [])
+
+    data = table.data
+    assert data["currency_code_column"] == "currency_code"
+    assert data["main_dttm_col"] == "ds"
+
+
+def test_sqla_table_link_escapes_url(mocker: MockerFixture) -> None:
+    """
+    Test that link property properly escapes URL to prevent XSS.
+    """
+    database = Database(database_name="my_db")
+    table = SqlaTable(
+        table_name='test<script>alert("xss")</script>',
+        database=database,
+        id=1,
+    )
+
+    # Mock explore_url to return a URL with special characters
+    mocker.patch.object(
+        SqlaTable,
+        "explore_url",
+        new_callable=mocker.PropertyMock,
+        return_value='/explore/?datasource_type=table&datasource_id=1&name=<script>alert("xss")</script>',
+    )
+
+    link = table.link
+    # Verify that special characters are escaped in both name and URL
+    assert "&lt;script&gt;" in str(link)
+    assert "<script>" not in str(link)
+
+
 def test_data_for_slices_handles_missing_datasource(mocker: MockerFixture) -> None:
     """
     Test that data_for_slices gracefully handles a chart whose query_context
@@ -882,3 +946,34 @@ def test_data_for_slices_handles_missing_datasource(mocker: MockerFixture) -> No
     assert "columns" in result
     assert "metrics" in result
     assert "verbose_map" in result
+
+
+def test_owners_data_includes_email(mocker: MockerFixture) -> None:
+    """Test that the owners_data property includes the email field."""
+    database = mocker.MagicMock()
+
+    table = SqlaTable(
+        table_name="test_table",
+        database=database,
+        columns=[],
+        metrics=[],
+    )
+
+    mock_owner = mocker.MagicMock()
+    mock_owner.first_name = "John"
+    mock_owner.last_name = "Doe"
+    mock_owner.username = "johndoe"
+    mock_owner.id = 1
+    mock_owner.email = "john@example.com"
+
+    table.owners = [mock_owner]
+
+    owners_data = table.owners_data
+    assert len(owners_data) == 1
+    assert owners_data[0] == {
+        "first_name": "John",
+        "last_name": "Doe",
+        "username": "johndoe",
+        "id": 1,
+        "email": "john@example.com",
+    }

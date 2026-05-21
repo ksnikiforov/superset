@@ -17,17 +17,17 @@
  * under the License.
  */
 
+import reducer, { getInitialDataMask } from './reducer';
+import {
+  SET_DATA_MASK_FOR_FILTER_CHANGES_COMPLETE,
+  type SetDataMaskForFilterChangesComplete,
+} from './actions';
 import {
   type DataMaskStateWithId,
   type Filter,
   type NativeFilterTarget,
   NativeFilterType,
 } from '@superset-ui/core';
-import reducer, { getInitialDataMask } from './reducer';
-import {
-  SET_DATA_MASK_FOR_FILTER_CHANGES_COMPLETE,
-  type SetDataMaskForFilterChangesComplete,
-} from './actions';
 
 // Helper to create minimal filter for testing
 const createFilter = (

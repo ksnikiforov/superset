@@ -17,7 +17,6 @@
  * under the License.
  */
 import {
-  GenericDataType,
   NumberFormats,
   QueryFormColumn,
   getColumnLabel,
@@ -25,12 +24,13 @@ import {
   getSequentialSchemeRegistry,
   getTimeFormatter,
   getValueFormatter,
-  logging,
   rgbToHex,
   addAlpha,
   tooltipHtml,
   DataRecordValue,
 } from '@superset-ui/core';
+import { logging } from '@apache-superset/core/utils';
+import { GenericDataType } from '@apache-superset/core/common';
 import memoizeOne from 'memoize-one';
 import { maxBy, minBy } from 'lodash';
 import type { ComposeOption } from 'echarts/core';
@@ -207,8 +207,17 @@ export default function transformProps(
   const xAxisLabel = getColumnLabel(xAxis);
   // groupby is overridden to be a single value
   const yAxisLabel = getColumnLabel(groupby as unknown as QueryFormColumn);
-  const { data, colnames, coltypes } = queriesData[0];
-  const { columnFormats = {}, currencyFormats = {} } = datasource;
+  const {
+    data,
+    colnames,
+    coltypes,
+    detected_currency: detectedCurrency,
+  } = queriesData[0];
+  const {
+    columnFormats = {},
+    currencyFormats = {},
+    currencyCodeColumn,
+  } = datasource;
   const colorColumn = normalized ? RANK_COLUMN_NAME : metricLabel;
   const colors = getSequentialSchemeRegistry().get(linearColorScheme)?.colors;
   const getAxisFormatter =
@@ -231,6 +240,10 @@ export default function transformProps(
     columnFormats,
     yAxisFormat,
     currencyFormat,
+    undefined,
+    data,
+    currencyCodeColumn,
+    detectedCurrency,
   );
 
   let [min, max] = (valueBounds || []).map(parseAxisBound);
@@ -357,20 +370,32 @@ export default function transformProps(
           metricLabel,
         );
         const paramsValue = params.value as (string | number)[];
-        const x = paramsValue?.[0];
-        const y = paramsValue?.[1];
+        // paramsValue contains [xIndex, yIndex, metricValue, rankValue?]
+        // We need to look up the actual axis values from the sorted arrays
+        const xIndex = paramsValue?.[0] as number;
+        const yIndex = paramsValue?.[1] as number;
         const value = paramsValue?.[2] as number | null | undefined;
-        const formattedX = xAxisFormatter(x);
-        const formattedY = yAxisFormatter(y);
+        const xValue = sortedXAxisValues[xIndex];
+        const yValue = sortedYAxisValues[yIndex];
+        // Format the axis values for display (handle null/undefined with empty string fallback)
+        // Convert to string/number for formatter compatibility
+        const formattedX =
+          xValue !== null && xValue !== undefined
+            ? xAxisFormatter(xValue as string | number)
+            : '';
+        const formattedY =
+          yValue !== null && yValue !== undefined
+            ? yAxisFormatter(yValue as string | number)
+            : '';
         const formattedValue = valueFormatter(value);
         let percentage = 0;
         let suffix = 'heatmap';
         if (typeof value === 'number') {
           if (normalizeAcross === 'x') {
-            percentage = value / totals.x[x];
+            percentage = value / totals.x[String(xValue)];
             suffix = formattedX;
           } else if (normalizeAcross === 'y') {
-            percentage = value / totals.y[y];
+            percentage = value / totals.y[String(yValue)];
             suffix = formattedY;
           } else {
             percentage = value / totals.total;

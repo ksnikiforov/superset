@@ -17,16 +17,16 @@
  * under the License.
  */
 
+import { t } from '@apache-superset/core/translation';
 import {
   ContributionType,
   ensureIsArray,
-  GenericDataType,
   getColumnLabel,
   getMetricLabel,
   QueryFormColumn,
   QueryFormMetric,
-  t,
 } from '@superset-ui/core';
+import { GenericDataType } from '@apache-superset/core/common';
 import {
   ControlPanelState,
   ControlState,

@@ -18,7 +18,6 @@
  */
 // eslint-disable-next-line import/no-extraneous-dependencies
 import '@testing-library/jest-dom';
-
 import { getLayer, getPoints, getHighlightLayer } from './Path';
 
 jest.mock('../../DeckGLContainer', () => ({
