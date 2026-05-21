@@ -270,6 +270,7 @@ volumes:
   superset_home:
     external: false
   db_home:
+    name: superset_db_home_pg17
     external: false
   redis:
     external: false
