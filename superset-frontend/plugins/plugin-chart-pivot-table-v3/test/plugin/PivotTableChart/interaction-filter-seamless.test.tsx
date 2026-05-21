@@ -17,7 +17,9 @@
  * under the License.
  */
 import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
-import PivotTableChart from '../fixtures/TestPivotTableChart';
+import PivotTableChart, {
+  buildPreloadedTreeFactBatches,
+} from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
 
@@ -127,6 +129,10 @@ describe('PivotTableChart interaction filter seamless updates', () => {
       [],
       0,
     );
+    const unfilteredFactBatches = buildPreloadedTreeFactBatches(tree, {
+      groupbyRows: rows,
+      groupbyColumns: [],
+    });
 
     type FetchArgs = {
       requestGroupId?: string;
@@ -167,6 +173,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
+        factBatches={unfilteredFactBatches}
         setControlValue={setControlValue}
         width={600}
         height={300}
@@ -194,6 +201,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
+        factBatches={unfilteredFactBatches}
         selectedFilters={{ row1: ['A'] }}
         setControlValue={setControlValue}
         width={600}
@@ -219,6 +227,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
+        factBatches={unfilteredFactBatches}
         selectedFilters={{}}
         setControlValue={setControlValue}
         width={600}
@@ -244,6 +253,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
+        factBatches={unfilteredFactBatches}
         selectedFilters={{ row1: ['A'] }}
         setControlValue={setControlValue}
         width={600}
@@ -431,6 +441,10 @@ describe('PivotTableChart interaction filter seamless updates', () => {
       [],
       0,
     );
+    const unfilteredFactBatches = buildPreloadedTreeFactBatches(tree, {
+      groupbyRows: rows,
+      groupbyColumns: [],
+    });
 
     fetchMock.mockImplementation(
       async ({
@@ -454,6 +468,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
+        factBatches={unfilteredFactBatches}
         selectedFilters={{}}
         width={600}
         height={300}
@@ -485,6 +500,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
+        factBatches={unfilteredFactBatches}
         selectedFilters={{}}
         width={480}
         height={300}
@@ -537,6 +553,10 @@ describe('PivotTableChart interaction filter seamless updates', () => {
       [],
       0,
     );
+    const unfilteredFactBatches = buildPreloadedTreeFactBatches(tree, {
+      groupbyRows: rows,
+      groupbyColumns: [],
+    });
 
     fetchMock.mockImplementation(
       async ({
@@ -560,6 +580,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
+        factBatches={unfilteredFactBatches}
         selectedFilters={{}}
         treeDataSignature="signature-a"
         width={600}
@@ -593,6 +614,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
+        factBatches={unfilteredFactBatches}
         selectedFilters={{}}
         treeDataSignature="signature-b"
         width={480}

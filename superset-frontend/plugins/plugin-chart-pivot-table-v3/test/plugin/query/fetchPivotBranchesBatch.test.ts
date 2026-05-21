@@ -415,6 +415,7 @@ describe('fetchBatch', () => {
         axis: 'row',
         ancestorPaths: [['US', 'CA']],
       },
+      queryContextKey: preloadedSpec.meta.factSelector.queryContextKey,
       valueKeys: ['m1'],
       facts: [],
     });

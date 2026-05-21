@@ -43,6 +43,8 @@ import {
 } from '../../../../src/types';
 import { buildExpansionQuerySpecs } from '../../fixtures/querySpecs';
 
+const queryContextKey = 'test-query-context';
+
 const axisScope = (
   axis: 'row' | 'col',
   path: PivotPath,
@@ -93,6 +95,7 @@ describe('expansion fact coverage', () => {
           columnDimensions: ['year'],
         },
         scope: scopedFullScope('row', ['France']),
+        queryContextKey,
         valueKeys: ['sales'],
       },
       {
@@ -103,6 +106,7 @@ describe('expansion fact coverage', () => {
           columnDimensions: ['year', 'quarter', 'month'],
         },
         scope: scopedFullScope('row', ['France']),
+        queryContextKey,
         valueKeys: ['sales'],
       },
     ];
@@ -202,6 +206,7 @@ describe('coverage manifest diff', () => {
     columnDepth: 2,
     rowDimensions: ['country', 'city'],
     columnDimensions: ['year', 'quarter'],
+    queryContextKey,
     valueKeys: ['sales'],
     rowScope,
     columnScope,
@@ -219,6 +224,7 @@ describe('coverage manifest diff', () => {
       columnDepth,
     }),
     scope,
+    queryContextKey,
     valueKeys: ['sales'],
   });
 
@@ -401,6 +407,7 @@ describe('coverage manifest diff', () => {
               columnDimensions: ['year', 'quarter'],
             },
             scope: scopedFullScope('row', ['USA']),
+            queryContextKey,
             valueKeys: ['sales'],
           },
         ],
@@ -432,6 +439,7 @@ describe('coverage manifest diff', () => {
               columnDepth: 2,
             }),
             scope: scopedFullScope('row', ['USA']),
+            queryContextKey,
             valueKeys: ['sales'],
           },
         ],
@@ -516,6 +524,7 @@ describe('branch fact coverage', () => {
           columnDimensions: ['shipMode'],
         },
         scope: scopedFullScope('row', ['A']),
+        queryContextKey,
         valueKeys: ['averageOrderValue'],
       },
     ];

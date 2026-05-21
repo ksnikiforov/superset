@@ -36,6 +36,7 @@ import {
   fetchPlannedQuerySpecs,
 } from './ingestQueryResults';
 import {
+  buildPivotFactQueryContextKey,
   createPivotFactStore,
   createPivotFactStoreFromBatches,
   type PivotFactStore,
@@ -103,16 +104,9 @@ export const buildSeamlessRuntimeUpstreamSignature = (
   if (!queryFormData) {
     return null;
   }
-  const normalizedQueryFormData = normalizeFormDataExtraFilters(queryFormData);
-  return stableStringify({
-    adhoc_filters: normalizedQueryFormData.adhoc_filters ?? [],
-    extra_form_data: normalizedQueryFormData.extra_form_data ?? null,
-    extras: normalizedQueryFormData.extras ?? null,
-    granularity_sqla: normalizedQueryFormData.granularity_sqla ?? null,
-    time_grain_sqla: normalizedQueryFormData.time_grain_sqla ?? null,
-    time_offsets: normalizedQueryFormData.time_offsets ?? [],
-    time_range: normalizedQueryFormData.time_range ?? null,
-  });
+  return buildPivotFactQueryContextKey(
+    normalizeFormDataExtraFilters(queryFormData),
+  );
 };
 
 export const prepareSeamlessRuntimeUpdateEffect = ({
@@ -326,26 +320,19 @@ const buildSeamlessRuntimeCoveragePlan = ({
   factBatches = [],
 }: SeamlessRuntimeCoverageConfig): InitialPivotUpdatePlan & {
   factStore: PivotFactStore;
-} => {
-  const normalizedBaseFormData = normalizeFormDataExtraFilters(baseFormData);
-  const hasQueryContextFilters =
-    (normalizedBaseFormData.extra_form_data?.filters ?? []).length > 0;
-  const canReuseFactBatches =
-    !hasSelectedFilters(selection) && !hasQueryContextFilters;
-  return {
-    ...buildInitialPivotUpdatePlan({
-      formData: baseFormData,
-      runtimeLayout,
-      selection,
-      metricsOverride: sourceMetrics,
-      measureLeavesByMetricOverride: sourceMeasureLeavesByMetric,
-    }),
-    factStore:
-      canReuseFactBatches && factBatches.length > 0
-        ? createPivotFactStoreFromBatches(factBatches)
-        : createPivotFactStore(),
-  };
-};
+} => ({
+  ...buildInitialPivotUpdatePlan({
+    formData: baseFormData,
+    runtimeLayout,
+    selection,
+    metricsOverride: sourceMetrics,
+    measureLeavesByMetricOverride: sourceMeasureLeavesByMetric,
+  }),
+  factStore:
+    factBatches.length > 0
+      ? createPivotFactStoreFromBatches(factBatches)
+      : createPivotFactStore(),
+});
 
 export const shouldFetchSeamlessRuntimeCoverage = (
   config: SeamlessRuntimeCoverageConfig,

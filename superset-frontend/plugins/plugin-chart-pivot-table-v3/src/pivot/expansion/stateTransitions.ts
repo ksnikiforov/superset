@@ -449,9 +449,11 @@ export const resolveReinitializedExpansionState = (params: {
 const selectMissingCoverageTargets = ({
   targets,
   factSelectors,
+  queryContextKey,
 }: {
   targets: ExpansionCoverageTarget[];
   factSelectors: PivotFactSelector[];
+  queryContextKey: string;
 }) => {
   const plannedSelectors = [...factSelectors];
   return targets.filter(target => {
@@ -461,7 +463,7 @@ const selectMissingCoverageTargets = ({
         factSelectors: plannedSelectors,
       }).length > 0;
     if (isMissing) {
-      plannedSelectors.push(factSelectorFromTarget(target));
+      plannedSelectors.push(factSelectorFromTarget(target, queryContextKey));
     }
     return isMissing;
   });
@@ -523,11 +525,13 @@ export const planHydrationIteration = ({
   axisCoverageNeeds = [],
   factSelectors,
   program,
+  queryContextKey,
 }: {
   desired: Record<PivotAxis, Set<string>>;
   axisCoverageNeeds?: PivotAxisCoverageNeed[];
   factSelectors: PivotFactSelector[];
   program: PivotProgram;
+  queryContextKey: string;
 }) => {
   const visibleRowDepth = depthForExpansionKeys({
     axis: 'row',
@@ -559,10 +563,13 @@ export const planHydrationIteration = ({
       }),
     ),
     factSelectors,
+    queryContextKey,
   });
   const factSelectorsWithPlannedCoverage = [
     ...factSelectors,
-    ...directCoverageTargets.map(factSelectorFromTarget),
+    ...directCoverageTargets.map(target =>
+      factSelectorFromTarget(target, queryContextKey),
+    ),
   ];
   const coverageDepths = {
     rowDepth: visibleRowDepth,
@@ -577,6 +584,7 @@ export const planHydrationIteration = ({
         coverage: coverageDepths,
       }),
       factSelectors: factSelectorsWithPlannedCoverage,
+      queryContextKey,
     }),
     ...coverageDepths,
   });
@@ -589,6 +597,7 @@ export const planHydrationIteration = ({
         coverage: coverageDepths,
       }),
       factSelectors: factSelectorsWithPlannedCoverage,
+      queryContextKey,
     }),
     ...coverageDepths,
   });
@@ -613,6 +622,7 @@ export const planHydrationIteration = ({
     selectMissingCoverageTargets({
       targets: [intersectionCoverageTarget],
       factSelectors,
+      queryContextKey,
     }).length > 0
       ? [intersectionCoverageTarget]
       : [];

@@ -27,9 +27,11 @@ import {
   PivotTreeData,
 } from '../../../src/types';
 import {
+  buildPivotFactQueryContextKey,
   type PivotFact,
   type PivotFactStoreBatch,
 } from '../../../src/pivot/runtime/factStore';
+import { buildInitialPivotUpdatePlan } from '../../../src/pivot/query/specs';
 import { serializePath } from '../../../src/pivot/core/path';
 import {
   isMeasureLeafToken,
@@ -47,9 +49,18 @@ const emptyTree: PivotTreeData = {
 };
 
 const baseFormData = buildFormData({});
+const baseQueryContextKey = buildPivotFactQueryContextKey(baseFormData);
 const emptyMetrics: PivotTableQueryFormData['metrics'] = [];
 const emptyGroupbyRows: PivotTableQueryFormData['groupbyRows'] = [];
 const emptyGroupbyColumns: PivotTableQueryFormData['groupbyColumns'] = [];
+
+const buildPreloadedQueryContextKey = (formData: PivotTableQueryFormData) =>
+  buildPivotFactQueryContextKey(
+    buildInitialPivotUpdatePlan({
+      formData,
+      runtimeLayout: formData.pivotRuntimeLayout,
+    }).formData,
+  );
 
 type LegacyTestPivotProps = {
   metrics?: PivotTableQueryFormData['metrics'];
@@ -74,6 +85,13 @@ type LegacyTestPivotProps = {
   allowRenderHtml?: PivotTableQueryFormData['allowRenderHtml'];
   metricColorFormatters?: unknown[];
   rawFormData?: PivotTableQueryFormData;
+};
+
+type PreloadedFactBatchContext = Pick<
+  LegacyTestPivotProps,
+  'groupbyRows' | 'groupbyColumns'
+> & {
+  queryContextKey?: string;
 };
 
 const isDimensionalChildValue = (value: PivotPath[number]) =>
@@ -258,7 +276,7 @@ const collectLoadedBranchPaths = ({
 
 export const buildPreloadedBootstrapFactBatches = (
   tree: PivotTreeData | undefined,
-  groupby: Pick<LegacyTestPivotProps, 'groupbyRows' | 'groupbyColumns'> = {
+  groupby: PreloadedFactBatchContext = {
     groupbyRows: [],
     groupbyColumns: [],
   },
@@ -273,6 +291,7 @@ export const buildPreloadedBootstrapFactBatches = (
   const bootstrapColDepth =
     groupby.groupbyColumns.length > 0 && colDepth > 0 ? 1 : 0;
   const valueKeys = collectTreeValueKeys(tree);
+  const queryContextKey = groupby.queryContextKey ?? baseQueryContextKey;
   return collectExactCoverageDepths(tree, {
     rowDepth: bootstrapRowDepth,
     columnDepth: bootstrapColDepth,
@@ -286,6 +305,7 @@ export const buildPreloadedBootstrapFactBatches = (
     return {
       coverage,
       facts: buildExactFactsForCoverage(tree, coverage),
+      queryContextKey,
       valueKeys,
       scope: {
         kind: 'root',
@@ -296,7 +316,7 @@ export const buildPreloadedBootstrapFactBatches = (
 
 export const buildPreloadedBranchFactBatches = (
   tree: PivotTreeData | undefined,
-  groupby: Pick<LegacyTestPivotProps, 'groupbyRows' | 'groupbyColumns'> = {
+  groupby: PreloadedFactBatchContext = {
     groupbyRows: [],
     groupbyColumns: [],
   },
@@ -308,6 +328,7 @@ export const buildPreloadedBranchFactBatches = (
   const colDepth = maxPathDepth(tree.cols);
   const batches: PivotFactStoreBatch[] = [];
   const valueKeys = collectTreeValueKeys(tree);
+  const queryContextKey = groupby.queryContextKey ?? baseQueryContextKey;
   (
     [
       ['row', tree.rows],
@@ -343,6 +364,7 @@ export const buildPreloadedBranchFactBatches = (
           batches.push({
             coverage,
             facts: buildFactsForCoverage(tree, coverage),
+            queryContextKey,
             valueKeys,
             scope: {
               kind: 'scopedFull',
@@ -359,7 +381,7 @@ export const buildPreloadedBranchFactBatches = (
 
 export const buildPreloadedRenderedBranchFactBatches = (
   tree: PivotTreeData | undefined,
-  groupby: Pick<LegacyTestPivotProps, 'groupbyRows' | 'groupbyColumns'> = {
+  groupby: PreloadedFactBatchContext = {
     groupbyRows: [],
     groupbyColumns: [],
   },
@@ -371,6 +393,7 @@ export const buildPreloadedRenderedBranchFactBatches = (
   const colDepth = maxPathDepth(tree.cols);
   const batches: PivotFactStoreBatch[] = [];
   const valueKeys = collectTreeValueKeys(tree);
+  const queryContextKey = groupby.queryContextKey ?? baseQueryContextKey;
   (
     [
       ['row', tree.rows],
@@ -405,6 +428,7 @@ export const buildPreloadedRenderedBranchFactBatches = (
           batches.push({
             coverage,
             facts: buildFactsForCoverage(tree, coverage),
+            queryContextKey,
             valueKeys,
             scope: {
               kind: 'scopedFull',
@@ -542,6 +566,7 @@ export default function TestPivotTableChart(props: TestPivotTableChartProps) {
         buildPreloadedTreeFactBatches(mergedProps.data, {
           groupbyRows: runtimeLayout?.rows ?? mergedProps.groupbyRows,
           groupbyColumns: runtimeLayout?.cols ?? mergedProps.groupbyColumns,
+          queryContextKey: buildPreloadedQueryContextKey(mergedProps.formData),
         })
       }
     />

@@ -78,6 +78,7 @@ export const targetAxisScope = (
 
 export const factSelectorFromTarget = (
   target: ExpansionCoverageTarget,
+  queryContextKey: string,
 ): PivotFactSelector => ({
   coverage: {
     rowDepth: target.need.rowDepth,
@@ -86,6 +87,7 @@ export const factSelectorFromTarget = (
     columnDimensions: target.need.columnDimensions,
   },
   scope: targetAxisScope(target),
+  queryContextKey,
   valueKeys: target.need.valueKeys,
 });
 

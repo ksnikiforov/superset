@@ -17,7 +17,11 @@
  * under the License.
  */
 import { type DataRecordValue } from '@superset-ui/core';
-import { type PivotAxis, type PivotPath } from '../../types';
+import {
+  type PivotAxis,
+  type PivotPath,
+  type PivotTableQueryFormData,
+} from '../../types';
 import { serializePath } from '../core/path';
 import { stableStringify } from '../shared/stableStringify';
 import { normalizeFactValueKeys } from './coverage';
@@ -34,6 +38,7 @@ export type PivotFactSelector = {
   coverage: PivotFactCoverage;
   scope: PivotFactStoreBatchScope;
   valueKeys: string[];
+  queryContextKey: string;
   materialization?: PivotFactMaterialization;
 };
 
@@ -68,22 +73,37 @@ export type PivotFactMaterialization = {
 
 export type PivotFactStore = {
   upsertBatch: (batch: PivotFactStoreBatch) => void;
-  getCoverageSelectors: () => PivotFactSelector[];
-  getFactBatches: () => PivotFactStoreBatch[];
+  getCoverageSelectors: (queryContextKey?: string) => PivotFactSelector[];
+  getFactBatches: (queryContextKey?: string) => PivotFactStoreBatch[];
 };
 
 const buildPivotFactRequestKey = ({
   coverage,
   materialization,
+  queryContextKey,
   scope,
   valueKeys,
 }: PivotFactSelector) =>
   stableStringify([
+    queryContextKey,
     coverage,
     scope,
     materialization,
     normalizeFactValueKeys(valueKeys),
   ]);
+
+export const buildPivotFactQueryContextKey = (
+  formData: PivotTableQueryFormData,
+) =>
+  stableStringify({
+    adhoc_filters: formData.adhoc_filters ?? [],
+    extra_form_data: formData.extra_form_data ?? null,
+    extras: formData.extras ?? null,
+    granularity_sqla: formData.granularity_sqla ?? null,
+    time_grain_sqla: formData.time_grain_sqla ?? null,
+    time_offsets: formData.time_offsets ?? [],
+    time_range: formData.time_range ?? null,
+  });
 
 export const buildFactValueKeys = ({
   metricKeys,
@@ -110,11 +130,13 @@ const buildPivotFactKey = (selector: PivotFactSelector, fact: PivotFact) =>
 const normalizeSelector = ({
   coverage,
   materialization,
+  queryContextKey,
   scope,
   valueKeys,
 }: PivotFactSelector): PivotFactSelector => ({
   coverage,
   materialization,
+  queryContextKey,
   scope,
   valueKeys: normalizeFactValueKeys(valueKeys),
 });
@@ -162,13 +184,20 @@ export const createPivotFactStore = (): PivotFactStore => {
     factsByRequest.set(key, Array.from(factsByFactKey.values()));
   };
 
+  const selectors = (queryContextKey?: string) =>
+    Array.from(selectorByRequest.values()).filter(
+      selector =>
+        queryContextKey === undefined ||
+        selector.queryContextKey === queryContextKey,
+    );
+
   return {
     upsertBatch,
-    getCoverageSelectors: () => Array.from(selectorByRequest.values()),
-    getFactBatches: () =>
-      Array.from(selectorByRequest.entries()).map(([key, selector]) => ({
+    getCoverageSelectors: selectors,
+    getFactBatches: queryContextKey =>
+      selectors(queryContextKey).map(selector => ({
         ...selector,
-        facts: factsByRequest.get(key) ?? [],
+        facts: factsByRequest.get(buildPivotFactRequestKey(selector)) ?? [],
       })),
   };
 };

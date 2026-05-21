@@ -97,7 +97,7 @@ describe('resolveAxisProjection', () => {
     expect(skippedColumns(projection)).toEqual([]);
   });
 
-  it('extracts metric and measure-leaf scope from the projected axis path', () => {
+  it('extracts metric scope from the projected axis path', () => {
     const program = compilePivotProgram({
       groupbyColumns: ['segment', METRICS_PLACEHOLDER, 'month'],
       metrics: ['revenue', 'orders'],
@@ -118,7 +118,6 @@ describe('resolveAxisProjection', () => {
     expect(projection.filterDimensionPath).toEqual(['Consumer']);
     expect(projection.projectedDimensionPath).toEqual(['Consumer', '2024-01']);
     expect(projection.metricKeys).toEqual(['revenue']);
-    expect(projection.measureLeafIds).toEqual(['1 year ago']);
   });
 
   it.each([

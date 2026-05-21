@@ -25,6 +25,7 @@ import {
   pathsFromAxisScope,
 } from '../../../src/pivot/runtime/coverage';
 import {
+  buildPivotFactQueryContextKey,
   type PivotFact,
   type PivotFactStoreBatchScope,
   type PivotFactStoreBatch,
@@ -315,6 +316,7 @@ export const buildMockIntersectionFactBatches = ({
             columnDepth: target.need.columnDepth,
           }),
           facts: [],
+          queryContextKey: buildPivotFactQueryContextKey(formData),
           valueKeys: [],
           scope: {
             kind: 'intersection',

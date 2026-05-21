@@ -38,6 +38,9 @@ import {
   serializePath,
 } from '../../../../src/pivot/core/path';
 import { buildFormData } from '../../fixtures/pivotFormData';
+import { buildPivotFactQueryContextKey } from '../../../../src/pivot/runtime/factStore';
+
+const queryContextKey = buildPivotFactQueryContextKey(buildFormData({}));
 
 const buildSpec = ({
   queryName,
@@ -76,6 +79,7 @@ const buildSpec = ({
       requiredTimeOffsets: [],
       factSelector: {
         coverage,
+        queryContextKey,
         scope,
         valueKeys: metrics,
         materialization,

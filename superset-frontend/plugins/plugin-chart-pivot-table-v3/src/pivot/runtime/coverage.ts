@@ -358,5 +358,7 @@ export const factSelectorsCoverSelector = (
 ) =>
   diffCoverageManifest({
     required: [buildCoverageNeedFromFactSelector(selector)],
-    factSelectors,
+    factSelectors: factSelectors.filter(
+      factSelector => factSelector.queryContextKey === selector.queryContextKey,
+    ),
   }).length === 0;

@@ -93,7 +93,7 @@ describe('PivotTableChart expansion with measure leaves before dimensions', () =
     applyMeasureHierarchyAxis(
       buildTreeFromRecords(
         [record],
-        [metricKey],
+        [metricKey, `${metricKey}__1 year ago`],
         rowGroupby,
         colGroupby,
         rowDepth,

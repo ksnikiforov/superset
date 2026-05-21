@@ -96,14 +96,14 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `26477` | `-7033` | `< 20000` |
-| Strict core pipeline | `12907` | `10487` | `-2420` | `< 8000` |
+| Full production `src` | `33510` | `26556` | `-6954` | `< 20000` |
+| Strict core pipeline | `12907` | `10566` | `-2341` | `< 8000` |
 
 Diagnostic scope only:
 
 | Scope | Baseline lines | Current lines | Delta |
 | --- | ---: | ---: | ---: |
-| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7708` | `-990` |
+| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7787` | `-911` |
 
 Core pipeline breakdown:
 
@@ -244,16 +244,28 @@ Completed structural cuts:
   prop sync rematerializes the committed tree from fact batches, and covered
   layout changes rematerialize locally from committed facts instead of trusting
   the previous committed tree.
+- Fact selectors and fact batches now carry the query-context identity that
+  produced them. Filtered, unfiltered, and time-offset contexts can no longer
+  satisfy each other accidentally.
+- Seamless runtime coverage no longer drops all committed fact batches when
+  filters are present. The fact store now decides compatibility through
+  context-scoped selectors and `diffCoverageManifest`.
+- Query ingestion, expansion hydration, and materialization now read only the
+  active query context's fact selectors/batches.
+- Measure-leaf query coverage remains leaf-scoped for offsets and support
+  metrics, while the materializer preserves configured sibling leaf headers for
+  loaded metrics and only projects expanded child branches when that leaf's
+  value is present.
+
+Latest source delta for this slice: `+79` production `src` lines. This is not a
+deletion-positive slice; it closes a fact-store authority bug and keeps
+measure-leaf fetches narrow. The next slice should be deletion-focused against
+remaining expansion scheduler/materializer branching.
 
 Remaining duplicate authority:
 
 - `stateTransitions.ts` and `useExpansionEngine.ts` still own too much
   scheduler state and row/column orchestration.
-- `interaction-seamless-expansion.test.tsx` still encodes the older heuristic
-  fetch policy in several assertions. The source behavior should be kept
-  coverage-based; the tests need to be rewritten around visible coverage,
-  explicit fact batches, and no fetch when committed facts already satisfy the
-  requested projection.
 - `materializePivotTree.ts` still mixes tree construction, subtotal injection,
   measure-axis projection, and some display labeling.
 - Render/layout code still contains policy that should become pure projection

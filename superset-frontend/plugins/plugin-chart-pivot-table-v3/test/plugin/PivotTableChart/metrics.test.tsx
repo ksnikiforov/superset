@@ -19,7 +19,9 @@
 
 import { supersetTheme } from '@superset-ui/core';
 import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
-import PivotTableChart from '../fixtures/TestPivotTableChart';
+import PivotTableChart, {
+  buildPreloadedTreeFactBatches,
+} from '../fixtures/TestPivotTableChart';
 import {
   MetricsLayoutEnum,
   PivotTableProps,
@@ -1228,7 +1230,7 @@ describe('PivotTableChart metric tier suppression', () => {
           countCustomers: 10,
         },
       ],
-      [metricKey, secondaryMetric],
+      [metricKey, `${metricKey}__1 year ago`, secondaryMetric],
       [],
       ['c1'],
       0,
@@ -1242,7 +1244,6 @@ describe('PivotTableChart metric tier suppression', () => {
       ['c1'],
       1,
     );
-
     const { container } = render(
       <PivotTableChart
         data={treeWithLeaves}
@@ -1266,6 +1267,10 @@ describe('PivotTableChart metric tier suppression', () => {
         metrics={[metricKey, secondaryMetric]}
         groupbyRows={[]}
         groupbyColumns={['c1']}
+        factBatches={buildPreloadedTreeFactBatches(baseTree, {
+          groupbyRows: [],
+          groupbyColumns: ['c1'],
+        })}
         width={400}
         height={300}
         columnFormats={{}}
@@ -1281,14 +1286,16 @@ describe('PivotTableChart metric tier suppression', () => {
     );
 
     await waitForPivotReady();
-    const header = container.querySelector('thead') as HTMLElement;
-    const headerRows = within(header).getAllByRole('row');
-    const leafLabels = within(headerRows[headerRows.length - 1])
-      .getAllByRole('columnheader')
-      .map(cell => cell.textContent?.trim() ?? '')
-      .filter(label => label.length > 0);
+    await waitFor(() => {
+      const header = container.querySelector('thead') as HTMLElement;
+      const headerRows = within(header).getAllByRole('row');
+      const leafLabels = within(headerRows[headerRows.length - 1])
+        .getAllByRole('columnheader')
+        .map(cell => cell.textContent?.trim() ?? '')
+        .filter(label => label.length > 0);
 
-    expect(leafLabels.slice(0, 3)).toEqual(['Value', 'IX 1YA', '1YA']);
+      expect(leafLabels.slice(0, 3)).toEqual(['Value', 'IX 1YA', '1YA']);
+    });
   });
 
   it('formats custom measure leaves with the custom metric format', async () => {

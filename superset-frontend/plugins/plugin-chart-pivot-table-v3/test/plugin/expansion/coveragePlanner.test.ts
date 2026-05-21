@@ -33,6 +33,7 @@ const testProgram = compilePivotProgram({
   groupbyColumns: ['month', 'day'],
   metrics: ['sales'],
 });
+const queryContextKey = 'test-query-context';
 
 const makeNode = ({
   axis,
@@ -70,7 +71,7 @@ const factSelectorsFromFetchedColumnDepths = (
         rowDepth: 1,
         columnDepth: depth,
       });
-      return factSelectorFromTarget(target);
+      return factSelectorFromTarget(target, queryContextKey);
     }),
   );
 

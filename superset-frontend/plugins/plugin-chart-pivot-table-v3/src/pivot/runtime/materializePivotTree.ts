@@ -44,7 +44,6 @@ import {
 import { getMetricKey, getMetricKeys } from '../metrics';
 import { createMetricNodePolicy } from '../metricsTotals';
 import {
-  buildOffsetMetricKey,
   buildMeasureLeafOutputKey,
   computeMeasureLeafValue,
   isValueLeaf,
@@ -52,6 +51,7 @@ import {
 import { type LayoutContext } from '../layout/LayoutContext';
 import { type PivotFactCoverage, type PivotProgram } from './types';
 import {
+  buildPivotFactQueryContextKey,
   type PivotFact,
   type PivotFactMaterialization,
   type PivotFactStore,
@@ -187,39 +187,6 @@ const buildBatchMaterializationProgram = ({
   };
 };
 
-const canMaterializeMeasureLeaf = ({
-  valueKeys,
-  metricKey,
-  leaf,
-}: {
-  valueKeys: ReadonlySet<string>;
-  metricKey: string;
-  leaf: MeasureLeafSpec;
-}) => {
-  if (isValueLeaf(leaf)) {
-    return valueKeys.has(metricKey);
-  }
-  if (leaf.kind === 'custom') {
-    const customMetricKey = getMetricKey(leaf.metric);
-    if (!customMetricKey) {
-      return false;
-    }
-    return valueKeys.has(
-      leaf.offset
-        ? buildOffsetMetricKey(customMetricKey, leaf.offset)
-        : customMetricKey,
-    );
-  }
-  if (!leaf.offset) {
-    return false;
-  }
-  const offsetKey = buildOffsetMetricKey(metricKey, leaf.offset);
-  if (leaf.operator === 'offset_value') {
-    return valueKeys.has(offsetKey);
-  }
-  return valueKeys.has(metricKey) && valueKeys.has(offsetKey);
-};
-
 const deriveBatchMaterializationPlan = ({
   batch,
   layout,
@@ -239,19 +206,9 @@ const deriveBatchMaterializationPlan = ({
   const loadedMetricKeys = new Set(getMetricKeys(loadedMetrics));
   const materializedMeasureHierarchy: MeasureHierarchy = {
     ...layout.measureHierarchy,
-    groups: layout.measureHierarchy.groups
-      .filter(group => loadedMetricKeys.has(group.metricKey))
-      .map(group => ({
-        ...group,
-        leaves: group.leaves.filter(leaf =>
-          canMaterializeMeasureLeaf({
-            valueKeys,
-            metricKey: group.metricKey,
-            leaf,
-          }),
-        ),
-      }))
-      .filter(group => group.leaves.length > 0),
+    groups: layout.measureHierarchy.groups.filter(group =>
+      loadedMetricKeys.has(group.metricKey),
+    ),
   };
 
   const pivotProgram = buildBatchMaterializationProgram({
@@ -980,8 +937,37 @@ const applyMeasureAxis = ({
       const leafTargets = leafTierVisible ? group.leaves : [group.leaves[0]];
 
       leafTargets.forEach(leaf => {
+        const leafPath = leafTierVisible
+          ? [...metricAxisPath, encodeMeasureLeafKey(leaf.id)]
+          : metricAxisPath;
+        const leafValue = computeMeasureLeafValue({
+          values: cellValues,
+          metricKey: metric,
+          leaf,
+        });
+        if (
+          leafTierVisible &&
+          valueTail.length > 0 &&
+          leafValue === undefined
+        ) {
+          for (let depth = 0; depth <= leafPath.length; depth += 1) {
+            ensureNode(
+              valueAxis,
+              leafPath.slice(0, depth),
+              valueDepthWithMeasures,
+              valueNode?.isSubtotal || undefined,
+            );
+          }
+          ensureNode(
+            oppositeAxis,
+            oppositePath,
+            oppositeAxisDepth,
+            oppositeNode?.isSubtotal || undefined,
+          );
+          return;
+        }
         const projectedValuePath = leafTierVisible
-          ? [...metricAxisPath, encodeMeasureLeafKey(leaf.id), ...valueTail]
+          ? [...leafPath, ...valueTail]
           : [...metricAxisPath, ...valueTail];
         for (let depth = 0; depth <= projectedValuePath.length; depth += 1) {
           ensureNode(
@@ -1356,7 +1342,7 @@ export const materializeLoadedPivotTreeFromFactStore = ({
   formData: PivotTableQueryFormData;
 }): PivotTreeData =>
   materializeFactStoreBatches({
-    batches: store.getFactBatches(),
+    batches: store.getFactBatches(buildPivotFactQueryContextKey(formData)),
     layout,
     formData,
   });
@@ -1374,9 +1360,10 @@ export const materializeLoadedPivotTreeFromFactStoreAsync = async ({
   formData: PivotTableQueryFormData;
 } & ChunkedWorkOptions): Promise<PivotTreeData> => {
   let mergedTree = emptyPivotTree();
+  const queryContextKey = buildPivotFactQueryContextKey(formData);
   const groups = groupFactStoreBatchesByMaterializationPlan({
     batches: store
-      .getFactBatches()
+      .getFactBatches(queryContextKey)
       .filter(batch => coverageMatchesProgram(batch, layout.pivotProgram)),
     layout,
   });

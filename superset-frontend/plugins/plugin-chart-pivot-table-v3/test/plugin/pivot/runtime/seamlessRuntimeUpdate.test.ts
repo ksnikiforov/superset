@@ -32,7 +32,10 @@ import {
   shouldFetchSeamlessRuntimeCoverage,
   shouldSyncPersistedSelectedFilters,
 } from '../../../../src/pivot/runtime/seamlessRuntimeUpdate';
-import { type PivotFactStoreBatch } from '../../../../src/pivot/runtime/factStore';
+import {
+  buildPivotFactQueryContextKey,
+  type PivotFactStoreBatch,
+} from '../../../../src/pivot/runtime/factStore';
 
 const runtimeLayout: PivotRuntimeLayout = {
   version: 1,
@@ -315,6 +318,7 @@ const rootBatch = (
     columnDimensions: ['month'].slice(0, columnDepth),
   },
   scope: { kind: 'root' },
+  queryContextKey: buildPivotFactQueryContextKey(baseFormData),
   valueKeys: ['sales'],
   facts: [],
 });
@@ -350,6 +354,32 @@ describe('runtime layout coverage fetch policy', () => {
         runtimeLayout: { ...runtimeLayout, rows: ['country', 'state'] },
         selection: {},
         factBatches: [rootBatch(1, 1), rootBatch(1, 0), rootBatch(0, 1)],
+      }),
+    ).toBe(true);
+  });
+
+  it('fetches when committed facts belong to another query context', () => {
+    expect(
+      shouldFetchSeamlessRuntimeCoverage({
+        baseFormData: {
+          ...baseFormData,
+          extra_form_data: {
+            filters: [{ col: 'country', op: 'IN', val: ['US'] }],
+          },
+        },
+        sourceMetrics: ['sales'],
+        sourceMeasureLeavesByMetric: undefined,
+        runtimeLayout: {
+          ...runtimeLayout,
+          rows: ['country', 'state'],
+        },
+        selection: {},
+        factBatches: [
+          rootBatch(0, 0),
+          rootBatch(1, 1),
+          rootBatch(1, 0),
+          rootBatch(0, 1),
+        ],
       }),
     ).toBe(true);
   });

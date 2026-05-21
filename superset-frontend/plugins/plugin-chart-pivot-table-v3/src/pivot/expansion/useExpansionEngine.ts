@@ -42,6 +42,7 @@ import { stableStringify } from '../shared/stableStringify';
 import { type LayoutContext } from '../layout/LayoutContext';
 import type { PivotProgram } from '../runtime/types';
 import {
+  buildPivotFactQueryContextKey,
   createPivotFactStoreFromBatches,
   type PivotFactStore,
   type PivotFactStoreBatch,
@@ -223,6 +224,10 @@ export const useExpansionEngine = ({
           supersetChartDataClient.cancel(requestGroupId),
       }),
     [],
+  );
+  const queryContextKey = useMemo(
+    () => buildPivotFactQueryContextKey(fetchFormData),
+    [fetchFormData],
   );
 
   const expansionPersistenceDepsRef = useRef<ExpansionPersistenceDeps>({
@@ -413,8 +418,9 @@ export const useExpansionEngine = ({
             col: new Set([rootKey, ...expansionIntentRef.current.expanded.col]),
           },
           axisCoverageNeeds,
-          factSelectors: factStore.getCoverageSelectors(),
+          factSelectors: factStore.getCoverageSelectors(queryContextKey),
           program: pivotProgram,
+          queryContextKey,
         });
         let nextTree = treeRef.current;
         if (plan.kind === 'fetch') {
@@ -487,6 +493,7 @@ export const useExpansionEngine = ({
       expansionInstanceId,
       fetchFormData,
       fetchLayout,
+      queryContextKey,
       addWarnings,
       onFactBatchesChange,
       persistExpansionState,

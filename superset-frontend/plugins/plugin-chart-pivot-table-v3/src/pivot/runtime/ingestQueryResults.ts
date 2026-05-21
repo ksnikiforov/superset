@@ -33,6 +33,7 @@ import {
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { type PivotFactCoverage } from './types';
 import {
+  buildPivotFactQueryContextKey,
   createPivotFactStore,
   createPivotFactStoreFromBatches,
   type PivotFact,
@@ -324,7 +325,9 @@ export const fetchPlannedQuerySpecs = async ({
   requestGroupId?: string;
   factStore?: PivotFactStore;
 } & ChunkedWorkOptions): Promise<{ results: ChartDataQueryResult[] }> => {
-  const factSelectors = factStore?.getCoverageSelectors() ?? [];
+  const factSelectors =
+    factStore?.getCoverageSelectors(buildPivotFactQueryContextKey(formData)) ??
+    [];
   const missingSpecs = specs.filter(
     spec =>
       !factStore ||

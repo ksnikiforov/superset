@@ -237,8 +237,8 @@ describe('pivot/core/tree', () => {
 
     const rowTree = applyMeasureHierarchyAxis(
       buildTreeFromRecords(
-        [{ r1: 'A', r2: 'B', m1: 10 }],
-        ['m1'],
+        [{ r1: 'A', r2: 'B', m1: 10, 'm1__1 year ago': 5 }],
+        ['m1', 'm1__1 year ago'],
         ['r1', 'r2'],
         [],
         2,
@@ -271,8 +271,8 @@ describe('pivot/core/tree', () => {
 
     const colTree = applyMeasureHierarchyAxis(
       buildTreeFromRecords(
-        [{ c1: 'C1', c2: 'C2', m1: 10 }],
-        ['m1'],
+        [{ c1: 'C1', c2: 'C2', m1: 10, 'm1__1 year ago': 5 }],
+        ['m1', 'm1__1 year ago'],
         [],
         ['c1', 'c2'],
         0,

@@ -59,7 +59,11 @@ import {
 } from '../layout/LayoutContext';
 import { resolveInteractionFormData } from '../layout/resolveInteractionLayout';
 import { getMetricKey } from '../metrics';
-import { collectRequiredTimeOffsets } from '../measureLeaves';
+import {
+  buildOffsetMetricKey,
+  collectRequiredTimeOffsets,
+  getRequiredOffsetsForLeaves,
+} from '../measureLeaves';
 import {
   isIntersectionCoverageTarget,
   targetAxisScope,
@@ -68,11 +72,13 @@ import {
 import { coerceValueForColumn, normalizeTemporalValue } from './pathFilters';
 import {
   buildFactCoverage,
+  normalizeFactValueKeys,
   pathsFromAxisScope,
   type PivotCoverageNeed,
 } from '../runtime/coverage';
 import {
   buildFactValueKeys,
+  buildPivotFactQueryContextKey,
   type PivotFactSelector,
   type PivotFactMaterialization,
   type PivotFactStoreBatchScope,
@@ -245,8 +251,10 @@ const buildQueryShape = ({
 type PlannedQuerySpecParams = {
   coverage: PivotFactCoverage;
   metrics: QueryFormMetric[];
+  measureHierarchy?: MeasureHierarchy;
   requiredTimeOffsets: string[];
   materialization?: PivotFactMaterialization;
+  queryContextKey: string;
   scope: PivotFactStoreBatchScope;
   filters: QueryObjectFilterClause[];
 };
@@ -581,6 +589,7 @@ const resolveFetchContext = ({
 
   return {
     metricsForQuery: queryShape.metrics,
+    measureHierarchy: materializedMeasureHierarchy,
     requiredTimeOffsets,
     materialization: resolveFactMaterialization({
       layout,
@@ -595,30 +604,68 @@ const resolveFetchContext = ({
 const buildPlannedQuerySpec = ({
   coverage,
   metrics,
+  measureHierarchy,
   requiredTimeOffsets,
   materialization,
+  queryContextKey,
   scope,
   filters,
-}: PlannedQuerySpecParams): PlannedQuerySpec => ({
-  queryName: `${formatQueryName(coverage.rowDepth, coverage.columnDepth)}${
-    scope.kind === 'root' ? '' : `|scope:${stableStringify(scope)}`
-  }`,
-  columns: [...coverage.rowDimensions, ...coverage.columnDimensions],
-  metrics,
-  filters,
-  meta: {
-    requiredTimeOffsets,
-    factSelector: {
-      coverage,
-      materialization,
-      scope,
-      valueKeys: buildFactValueKeys({
-        metricKeys: metrics.map(getMetricKey).filter(Boolean) as string[],
-        requiredTimeOffsets,
-      }),
+}: PlannedQuerySpecParams): PlannedQuerySpec => {
+  const metricKeys = metrics.map(getMetricKey).filter(Boolean) as string[];
+  const metricKeySet = new Set(metricKeys);
+  const valueKeys =
+    measureHierarchy && measureHierarchy.groups.length > 0
+      ? normalizeFactValueKeys([
+          ...metricKeys,
+          ...measureHierarchy.groups.flatMap(group => {
+            if (!metricKeySet.has(group.metricKey)) {
+              return [];
+            }
+            return [
+              ...getRequiredOffsetsForLeaves(group.leaves).map(offset =>
+                buildOffsetMetricKey(group.metricKey, offset),
+              ),
+              ...group.leaves.flatMap(leaf => {
+                if (leaf.kind !== 'custom') {
+                  return [];
+                }
+                const customMetricKey = getMetricKey(leaf.metric);
+                if (!customMetricKey || !metricKeySet.has(customMetricKey)) {
+                  return [];
+                }
+                return leaf.offset
+                  ? [
+                      customMetricKey,
+                      buildOffsetMetricKey(customMetricKey, leaf.offset),
+                    ]
+                  : [customMetricKey];
+              }),
+            ];
+          }),
+        ])
+      : buildFactValueKeys({
+          metricKeys,
+          requiredTimeOffsets,
+        });
+  return {
+    queryName: `${formatQueryName(coverage.rowDepth, coverage.columnDepth)}${
+      scope.kind === 'root' ? '' : `|scope:${stableStringify(scope)}`
+    }`,
+    columns: [...coverage.rowDimensions, ...coverage.columnDimensions],
+    metrics,
+    filters,
+    meta: {
+      requiredTimeOffsets,
+      factSelector: {
+        coverage,
+        materialization,
+        queryContextKey,
+        scope,
+        valueKeys,
+      },
     },
-  },
-});
+  };
+};
 
 const buildAxisExpansionSpecs = ({
   formData,
@@ -653,8 +700,10 @@ const buildAxisExpansionSpecs = ({
     buildPlannedQuerySpec({
       coverage,
       metrics: ctx.metricsForQuery,
+      measureHierarchy: ctx.measureHierarchy,
       requiredTimeOffsets: ctx.requiredTimeOffsets,
       materialization: ctx.materialization,
+      queryContextKey: buildPivotFactQueryContextKey(formData),
       scope,
       filters,
     }),
@@ -930,6 +979,7 @@ export const buildInitialQuerySpecs = (
     layout.colTotals ||
     rowSubtotalLevels.length > 0 ||
     colSubtotalLevels.length > 0;
+  const queryContextKey = buildPivotFactQueryContextKey(formData);
   const rootVisibleDepth = (axis: PivotAxis, maxDepth: number) =>
     Math.min(
       layout.axisCoverageNeeds
@@ -1014,7 +1064,9 @@ export const buildInitialQuerySpecs = (
     return buildPlannedQuerySpec({
       coverage,
       metrics: queryShape.metrics,
+      measureHierarchy: layout.measureHierarchy,
       requiredTimeOffsets: layout.requiredTimeOffsets,
+      queryContextKey,
       scope: { kind: 'root' },
       filters: [],
     });
