@@ -17,10 +17,20 @@
  * under the License.
  */
 
-import { type PivotAxis, type PivotPath } from '../../types';
-import { parsePath, serializePath } from '../core/path';
-import { decodeMetricKey } from '../core/tokens';
 import {
+  type PivotAxis,
+  type PivotPath,
+  type PivotTreeData,
+  type PivotTreeNode,
+} from '../../types';
+import { parsePath, serializePath } from '../core/path';
+import {
+  decodeMetricKey,
+  isMetricTokenForKeys,
+  isSubtotalToken,
+} from '../core/tokens';
+import {
+  diffCoverageManifest,
   normalizeFactValueKeys,
   pathsFromAxisScope,
   type PivotAxisCoverageNeed,
@@ -33,12 +43,14 @@ import {
 } from '../runtime/factStore';
 import {
   canRequestAxisExpansion,
+  isValuesFirstOnAxis,
   type PivotAxisProjection,
   resolveAxisProjection,
 } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 import { stableStringify } from '../shared/stableStringify';
 import { rootKey } from '../viewModel';
+import { createMetricNodePolicy } from '../metricsTotals';
 
 type PivotExpansionCoverageDepths = {
   rowDepth: number;
@@ -295,6 +307,85 @@ export const buildIntersectionCoverageTarget = ({
   },
 });
 
+export const getAxisDimensionCount = (program: PivotProgram, axis: PivotAxis) =>
+  (axis === 'row' ? program.rowDimensions : program.columnDimensions).length;
+
+export const createExpansionMetricPolicy = (program: PivotProgram) => {
+  const metricNodePolicy = createMetricNodePolicy(program);
+  return {
+    metricLabelSet: metricNodePolicy.metricLabelSet,
+    countDimDepth: (path: PivotTreeNode['path']) =>
+      metricNodePolicy.countDimDepth(path.filter(val => !isSubtotalToken(val))),
+  };
+};
+
+const pathStartsWith = (path: PivotPath, prefix: PivotPath) =>
+  prefix.every((value, index) => path[index] === value);
+
+const addAncestors = (path: PivotPath, expanded: Set<string>) => {
+  for (let depth = 0; depth <= path.length; depth += 1) {
+    expanded.add(serializePath(path.slice(0, depth)));
+  }
+};
+
+export const buildExpandedKeysForCoverageNeeds = ({
+  axis,
+  tree,
+  axisCoverageNeeds,
+  program,
+}: {
+  axis: PivotAxis;
+  tree: PivotTreeData;
+  axisCoverageNeeds: PivotAxisCoverageNeed[];
+  program: PivotProgram;
+}) => {
+  const nodes = axis === 'row' ? tree.rows : tree.cols;
+  const { metricLabelSet, countDimDepth } =
+    createExpansionMetricPolicy(program);
+  const expanded = new Set<string>([rootKey]);
+  axisCoverageNeeds.forEach(need => {
+    if (need.axis !== axis) {
+      return;
+    }
+    if (need.scope.kind === 'root') {
+      return;
+    }
+    if (need.scope.kind === 'paths') {
+      need.scope.paths.forEach(path => addAncestors(path, expanded));
+      return;
+    }
+    const includeMetricDepthZero =
+      program.metricKeys.length > 0 &&
+      isValuesFirstOnAxis(program, need.axis) &&
+      need.depth > 0;
+    need.scope.ancestorPaths.forEach(anchor => {
+      addAncestors(anchor, expanded);
+      Object.values(nodes).forEach(node => {
+        if (!pathStartsWith(node.path, anchor)) {
+          return;
+        }
+        const lastValue = node.path[node.path.length - 1];
+        const decodedMetric = decodeMetricKey(lastValue);
+        const isMetricNode = decodedMetric
+          ? metricLabelSet.has(decodedMetric)
+          : false;
+        const depth = countDimDepth(node.path);
+        if (
+          depth > 0 &&
+          (isMetricNode ? depth < need.depth : depth <= need.depth)
+        ) {
+          addAncestors(node.path, expanded);
+          return;
+        }
+        if (includeMetricDepthZero && depth === 0 && isMetricNode) {
+          addAncestors(node.path, expanded);
+        }
+      });
+    });
+  });
+  return expanded;
+};
+
 export const planExpansionForAxis = ({
   axis,
   program,
@@ -348,4 +439,196 @@ export const planExpansionForAxis = ({
   }
 
   return Array.from(fetchTargets.values());
+};
+
+const selectMissingCoverageTargets = ({
+  targets,
+  factSelectors,
+  queryContextKey,
+}: {
+  targets: ExpansionCoverageTarget[];
+  factSelectors: PivotFactSelector[];
+  queryContextKey: string;
+}) => {
+  const plannedSelectors = [...factSelectors];
+  return targets.filter(target => {
+    const isMissing =
+      diffCoverageManifest({
+        required: [target.need],
+        factSelectors: plannedSelectors,
+      }).length > 0;
+    if (isMissing) {
+      plannedSelectors.push(factSelectorFromTarget(target, queryContextKey));
+    }
+    return isMissing;
+  });
+};
+
+const dropRedundantAncestorExpansionTargets = ({
+  targets,
+  rowDepth,
+  columnDepth,
+}: {
+  targets: ExpansionCoverageTarget[];
+  rowDepth: number;
+  columnDepth: number;
+}) =>
+  targets.filter(target => {
+    const path = parsePath(target.pathKey);
+    const axisDepth = target.axis === 'row' ? rowDepth : columnDepth;
+    return !(
+      path.length > axisDepth &&
+      targets.some(ancestorTarget => {
+        const ancestorPath = parsePath(ancestorTarget.pathKey);
+        return (
+          ancestorTarget.pathKey !== target.pathKey &&
+          ancestorPath.length > 0 &&
+          ancestorPath.length < path.length &&
+          pathStartsWith(path, ancestorPath)
+        );
+      })
+    );
+  });
+
+const depthForExpansionKeys = ({
+  axis,
+  axisCoverageNeeds,
+  expanded,
+  program,
+}: {
+  axis: PivotAxis;
+  axisCoverageNeeds: PivotAxisCoverageNeed[];
+  expanded: Set<string>;
+  program: PivotProgram;
+}) => {
+  const { countDimDepth } = createExpansionMetricPolicy(program);
+  const dimensionCount = getAxisDimensionCount(program, axis);
+  const configuredDepth = axisCoverageNeeds
+    .filter(need => need.axis === axis)
+    .reduce((max, need) => Math.max(max, need.depth), 0);
+  const expansionDepth = Array.from(expanded).reduce((max, key) => {
+    if (key === rootKey) {
+      return Math.max(max, dimensionCount > 0 ? 1 : 0);
+    }
+    return Math.max(max, countDimDepth(parsePath(key)) + 1);
+  }, 0);
+  return Math.min(dimensionCount, Math.max(configuredDepth, expansionDepth));
+};
+
+export const planHydrationIteration = ({
+  desired,
+  axisCoverageNeeds = [],
+  factSelectors,
+  program,
+  queryContextKey,
+}: {
+  desired: Record<PivotAxis, Set<string>>;
+  axisCoverageNeeds?: PivotAxisCoverageNeed[];
+  factSelectors: PivotFactSelector[];
+  program: PivotProgram;
+  queryContextKey: string;
+}) => {
+  const visibleRowDepth = depthForExpansionKeys({
+    axis: 'row',
+    expanded: desired.row,
+    axisCoverageNeeds,
+    program,
+  });
+  const visibleColDepth = depthForExpansionKeys({
+    axis: 'col',
+    expanded: desired.col,
+    axisCoverageNeeds,
+    program,
+  });
+  const rowPathKeys = Array.from(desired.row).filter(key => key !== rootKey);
+  const columnPathKeys = Array.from(desired.col).filter(key => key !== rootKey);
+  const hasNonRootRows = rowPathKeys.length > 0;
+  const hasNonRootCols = columnPathKeys.length > 0;
+  const rowExpansionKeys =
+    hasNonRootCols && !hasNonRootRows ? new Set<string>() : desired.row;
+  const colExpansionKeys =
+    hasNonRootRows && !hasNonRootCols ? new Set<string>() : desired.col;
+  const directCoverageTargets = selectMissingCoverageTargets({
+    targets: axisCoverageNeeds.map(need =>
+      buildAxisCoverageNeedTarget({
+        need,
+        program,
+        rowDepth: visibleRowDepth,
+        columnDepth: visibleColDepth,
+      }),
+    ),
+    factSelectors,
+    queryContextKey,
+  });
+  const factSelectorsWithPlannedCoverage = [
+    ...factSelectors,
+    ...directCoverageTargets.map(target =>
+      factSelectorFromTarget(target, queryContextKey),
+    ),
+  ];
+  const coverageDepths = {
+    rowDepth: visibleRowDepth,
+    columnDepth: visibleColDepth,
+  };
+  const rowTargets = dropRedundantAncestorExpansionTargets({
+    targets: selectMissingCoverageTargets({
+      targets: planExpansionForAxis({
+        axis: 'row',
+        program,
+        expandedKeys: rowExpansionKeys,
+        coverage: coverageDepths,
+      }),
+      factSelectors: factSelectorsWithPlannedCoverage,
+      queryContextKey,
+    }),
+    ...coverageDepths,
+  });
+  const colTargets = dropRedundantAncestorExpansionTargets({
+    targets: selectMissingCoverageTargets({
+      targets: planExpansionForAxis({
+        axis: 'col',
+        program,
+        expandedKeys: colExpansionKeys,
+        coverage: coverageDepths,
+      }),
+      factSelectors: factSelectorsWithPlannedCoverage,
+      queryContextKey,
+    }),
+    ...coverageDepths,
+  });
+
+  const shouldCheckIntersection =
+    visibleRowDepth > 0 &&
+    visibleColDepth > 0 &&
+    rowPathKeys.length > 0 &&
+    columnPathKeys.length > 0 &&
+    rowPathKeys.length * columnPathKeys.length > 1;
+  const intersectionCoverageTarget = shouldCheckIntersection
+    ? buildIntersectionCoverageTarget({
+        program,
+        rowDepth: visibleRowDepth,
+        columnDepth: visibleColDepth,
+        rowPathKeys,
+        columnPathKeys,
+      })
+    : undefined;
+  const intersectionTargets =
+    intersectionCoverageTarget &&
+    selectMissingCoverageTargets({
+      targets: [intersectionCoverageTarget],
+      factSelectors,
+      queryContextKey,
+    }).length > 0
+      ? [intersectionCoverageTarget]
+      : [];
+  const targets = [
+    ...directCoverageTargets,
+    ...rowTargets,
+    ...colTargets,
+    ...intersectionTargets,
+  ];
+
+  return targets.length === 0
+    ? { kind: 'complete' as const }
+    : { kind: 'fetch' as const, targets };
 };

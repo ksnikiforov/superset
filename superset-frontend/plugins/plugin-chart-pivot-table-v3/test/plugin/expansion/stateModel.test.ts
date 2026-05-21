@@ -27,6 +27,7 @@ import {
   coerceExpansionState,
   pruneExpandedToStablePrefix,
 } from '../../../src/pivot/expansion/stateModel';
+import { buildExpandedKeysForCoverageNeeds } from '../../../src/pivot/expansion/planner';
 import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
@@ -108,10 +109,10 @@ describe('expansionStateModel', () => {
       metrics: ['m1'],
       metricsLayout: MetricsLayoutEnum.ROWS,
     });
-
-    const expanded = buildDesiredExpandedKeys({
+    const tree = { rows: nodes, cols: {}, cells: {} };
+    const baseExpanded = buildExpandedKeysForCoverageNeeds({
       axis: 'row',
-      tree: { rows: nodes, cols: {}, cells: {} },
+      tree,
       axisCoverageNeeds: [
         {
           axis: 'row',
@@ -119,6 +120,12 @@ describe('expansionStateModel', () => {
           scope: { kind: 'scopedFull', ancestorPaths: [[]] },
         },
       ],
+      program,
+    });
+    const expanded = buildDesiredExpandedKeys({
+      axis: 'row',
+      nodes,
+      baseExpanded,
       program,
       manualExpanded: new Set(),
       manualCollapsed: new Set(),
@@ -170,7 +177,12 @@ describe('expansionStateModel', () => {
       cols: { [rootKey]: makeNode({ axis: 'col', path: [] }) },
       cells: {},
     };
-    const expanded = buildDesiredExpandedKeys({
+    const program = compilePivotProgram({
+      groupbyRows: ['r1', 'r2'],
+      groupbyColumns: [],
+      metrics: ['m1'],
+    });
+    const baseExpanded = buildExpandedKeysForCoverageNeeds({
       axis: 'row',
       tree,
       axisCoverageNeeds: [
@@ -180,11 +192,13 @@ describe('expansionStateModel', () => {
           scope: { kind: 'scopedFull', ancestorPaths: [[]] },
         },
       ],
-      program: compilePivotProgram({
-        groupbyRows: ['r1', 'r2'],
-        groupbyColumns: [],
-        metrics: ['m1'],
-      }),
+      program,
+    });
+    const expanded = buildDesiredExpandedKeys({
+      axis: 'row',
+      nodes: tree.rows,
+      baseExpanded,
+      program,
       manualExpanded: new Set([serializePath(['A'])]),
       manualCollapsed: new Set([serializePath(['B'])]),
     });

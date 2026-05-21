@@ -96,14 +96,14 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `26548` | `-6962` | `< 20000` |
-| Strict core pipeline | `12907` | `10558` | `-2349` | `< 8000` |
+| Full production `src` | `33510` | `26546` | `-6964` | `< 20000` |
+| Strict core pipeline | `12907` | `10556` | `-2351` | `< 8000` |
 
 Diagnostic scope only:
 
 | Scope | Baseline lines | Current lines | Delta |
 | --- | ---: | ---: | ---: |
-| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7779` | `-919` |
+| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7777` | `-921` |
 
 Core pipeline breakdown:
 
@@ -261,16 +261,35 @@ Completed structural cuts:
   It asks the same manifest hydration plan used by expansion fetches. If
   visible coverage is missing, the manifest fetches it; if fact-store coverage
   satisfies the visible need, no request is sent.
+- The expansion state model no longer receives coverage needs or scans the tree
+  to derive fetchable coverage. It only merges manual expanded/collapsed UI
+  intent over already-planned coverage-expanded keys.
+- Hydration planning moved out of `stateTransitions.ts` and into
+  `expansion/planner.ts`, next to coverage targets and
+  `diffCoverageManifest`.
+- Initial root-load coverage construction moved from `query/specs.ts` into the
+  coverage manifest layer, so query specs consume required root coverage instead
+  of carrying the initial-load branch list directly.
 
-Latest source delta for this slice: `-8` production `src` lines. The source cut
-is small, but it removes the remaining expansion reinitialization fetch gate that
-was outside `PivotCoverageNeed` / `diffCoverageManifest`.
+Latest source delta for this slice: `-2` production `src` lines.
 
 Coverage-manifest loading authority status: complete for root bootstrap,
 configured pre-expansion, persisted/manual expansion, expansion reinitialization,
 seamless runtime sync, and query-context-scoped fact-store matching. Remaining
 work below is pure-runtime simplification after that loading authority is in
 place.
+
+Completion checklist for the loading-authority plan:
+
+- Source code line count is lower than before the slice.
+- `query/specs.ts` has less initial-load special branching.
+- `stateModel.ts` no longer derives fetch needs from tree scans.
+- `stateTransitions.ts` no longer has a separate hydration planner authority.
+- `useExpansionEngine.ts` executes coverage diff through the manifest planner,
+  not tree repair.
+- `seamlessRuntimeUpdate.ts` keeps committed fact batches authoritative instead
+  of erasing expansion state and relying on later hydration.
+- No fallback, compatibility adapter, or duplicate loading planner was added.
 
 Remaining duplicate authority:
 

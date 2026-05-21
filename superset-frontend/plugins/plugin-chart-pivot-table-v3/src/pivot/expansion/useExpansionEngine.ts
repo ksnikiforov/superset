@@ -53,13 +53,16 @@ import {
 } from '../runtime/coverage';
 import {
   PIVOT_AXES,
-  planHydrationIteration,
   resolveCollapsedExpansionState,
   resolveExpansionToggleDecision,
   resolveReinitializedExpansionState,
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
   resolveLayoutTransition,
 } from './stateTransitions';
+import {
+  buildExpandedKeysForCoverageNeeds,
+  planHydrationIteration,
+} from './planner';
 import { useSyncRef } from '../shared/useSyncRef';
 import {
   createLatestRequestLifecycle,
@@ -357,15 +360,23 @@ export const useExpansionEngine = ({
   );
 
   const buildDesiredExpanded = useCallback(
-    (axis: PivotAxis, nextTree: PivotTreeData) =>
-      buildDesiredExpandedKeys({
+    (axis: PivotAxis, nextTree: PivotTreeData) => {
+      const nodes = axis === 'row' ? nextTree.rows : nextTree.cols;
+      const baseExpanded = buildExpandedKeysForCoverageNeeds({
         axis,
         tree: nextTree,
         axisCoverageNeeds,
         program: pivotProgram,
+      });
+      return buildDesiredExpandedKeys({
+        axis,
+        nodes,
+        baseExpanded,
+        program: pivotProgram,
         manualExpanded: expansionIntentRef.current.expanded[axis],
         manualCollapsed: expansionIntentRef.current.collapsed[axis],
-      }),
+      });
+    },
     [axisCoverageNeeds, pivotProgram],
   );
 

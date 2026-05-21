@@ -72,9 +72,9 @@ import {
 import { coerceValueForColumn, normalizeTemporalValue } from './pathFilters';
 import {
   buildFactCoverage,
+  buildInitialRootCoverageNeeds,
   normalizeFactValueKeys,
   pathsFromAxisScope,
-  type PivotCoverageNeed,
 } from '../runtime/coverage';
 import {
   buildFactValueKeys,
@@ -980,59 +980,16 @@ export const buildInitialQuerySpecs = (
     rowSubtotalLevels.length > 0 ||
     colSubtotalLevels.length > 0;
   const queryContextKey = buildPivotFactQueryContextKey(formData);
-  const rootVisibleDepth = (axis: PivotAxis, maxDepth: number) =>
-    Math.min(
-      layout.axisCoverageNeeds
-        .filter(
-          need =>
-            need.axis === axis &&
-            need.scope.kind === 'scopedFull' &&
-            need.scope.ancestorPaths.some(path => path.length === 0),
-        )
-        .reduce((depth, need) => Math.max(depth, need.depth), 0),
-      maxDepth,
-    );
-  const firstRowDepth =
-    rowGroupby.length > 0
-      ? Math.max(rootVisibleDepth('row', rowGroupby.length), 1)
-      : 0;
-  const firstColDepth =
-    colGroupby.length > 0
-      ? Math.max(rootVisibleDepth('col', colGroupby.length), 1)
-      : 0;
-  const buildRootNeed = (
-    rowDepth: number,
-    columnDepth: number,
-  ): PivotCoverageNeed => ({
-    rowDepth,
-    columnDepth,
-    rowDimensions: layout.pivotProgram.rowDimensions.slice(0, rowDepth),
-    columnDimensions: layout.pivotProgram.columnDimensions.slice(
-      0,
-      columnDepth,
-    ),
+  const hasMetrics = layout.pivotProgram.metricKeys.length > 0;
+  const rootNeeds = buildInitialRootCoverageNeeds({
+    program: layout.pivotProgram,
+    axisCoverageNeeds: layout.axisCoverageNeeds,
+    needsTotals,
     valueKeys: buildFactValueKeys({
       metricKeys: layout.pivotProgram.metricKeys,
       requiredTimeOffsets: layout.requiredTimeOffsets,
     }),
-    rowScope: { kind: 'root' },
-    columnScope: { kind: 'root' },
   });
-  const hasMetrics = layout.pivotProgram.metricKeys.length > 0;
-  const rootNeeds = [
-    needsTotals || !hasMetrics || (firstRowDepth === 0 && firstColDepth === 0)
-      ? buildRootNeed(0, 0)
-      : undefined,
-    hasMetrics && firstRowDepth > 0 && firstColDepth > 0
-      ? buildRootNeed(firstRowDepth, firstColDepth)
-      : undefined,
-    hasMetrics && rowGroupby.length > 0
-      ? buildRootNeed(firstRowDepth, 0)
-      : undefined,
-    hasMetrics && colGroupby.length > 0
-      ? buildRootNeed(0, firstColDepth)
-      : undefined,
-  ].filter((need): need is PivotCoverageNeed => need !== undefined);
 
   return rootNeeds.map(need => {
     const { rowDepth, columnDepth } = need;

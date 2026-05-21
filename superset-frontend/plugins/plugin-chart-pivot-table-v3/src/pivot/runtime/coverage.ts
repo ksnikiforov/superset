@@ -102,6 +102,67 @@ export const buildInitialAxisCoverageNeeds = ({
       : [],
   );
 
+export const buildInitialRootCoverageNeeds = ({
+  program,
+  axisCoverageNeeds,
+  needsTotals,
+  valueKeys,
+}: {
+  program: PivotProgram;
+  axisCoverageNeeds: PivotAxisCoverageNeed[];
+  needsTotals: boolean;
+  valueKeys: string[];
+}): PivotCoverageNeed[] => {
+  const dimensionCount = (axis: PivotAxis) =>
+    axis === 'row'
+      ? program.rowDimensions.length
+      : program.columnDimensions.length;
+  const rootDepth = (axis: PivotAxis) =>
+    Math.min(
+      axisCoverageNeeds
+        .filter(
+          need =>
+            need.axis === axis &&
+            need.scope.kind === 'scopedFull' &&
+            need.scope.ancestorPaths.some(path => path.length === 0),
+        )
+        .reduce((depth, need) => Math.max(depth, need.depth), 0),
+      dimensionCount(axis),
+    );
+  const rowDepth = dimensionCount('row') ? rootDepth('row') || 1 : 0;
+  const columnDepth = dimensionCount('col') ? rootDepth('col') || 1 : 0;
+  const depths = new Set<string>();
+  const add = (nextRowDepth: number, nextColumnDepth: number) =>
+    depths.add(`${nextRowDepth}|${nextColumnDepth}`);
+  const hasMetrics = program.metricKeys.length > 0;
+  if (needsTotals || !hasMetrics || (rowDepth === 0 && columnDepth === 0)) {
+    add(0, 0);
+  }
+  if (hasMetrics) {
+    if (rowDepth > 0 && columnDepth > 0) {
+      add(rowDepth, columnDepth);
+    }
+    if (dimensionCount('row')) {
+      add(rowDepth, 0);
+    }
+    if (dimensionCount('col')) {
+      add(0, columnDepth);
+    }
+  }
+  return Array.from(depths, key => {
+    const [nextRowDepth, nextColumnDepth] = key.split('|').map(Number);
+    return {
+      rowDepth: nextRowDepth,
+      columnDepth: nextColumnDepth,
+      rowDimensions: program.rowDimensions.slice(0, nextRowDepth),
+      columnDimensions: program.columnDimensions.slice(0, nextColumnDepth),
+      valueKeys,
+      rowScope: { kind: 'root' },
+      columnScope: { kind: 'root' },
+    };
+  });
+};
+
 export const normalizeFactValueKeys = (valueKeys: string[] = []) =>
   Array.from(new Set(valueKeys)).sort();
 

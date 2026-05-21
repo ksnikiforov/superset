@@ -17,12 +17,7 @@
  * under the License.
  */
 
-import {
-  type PivotAxis,
-  type PivotPath,
-  type PivotTreeData,
-  PivotTreeNode,
-} from '../../types';
+import { type PivotAxis, type PivotPath, PivotTreeNode } from '../../types';
 import {
   decodeMetricKey,
   isMetricTokenForKeys,
@@ -31,8 +26,6 @@ import {
 import { parsePath, serializePath } from '../core/path';
 import { countDimDepth } from '../metricsTotals';
 import { rootKey } from '../viewModel';
-import { isValuesFirstOnAxis } from '../runtime/projection';
-import type { AxisPathScope, PivotAxisCoverageNeed } from '../runtime/coverage';
 import type { PivotProgram } from '../runtime/types';
 
 export type PivotExpansionStateKeys = {
@@ -102,116 +95,22 @@ const resolveNodePath = (
   nodes: Record<string, PivotTreeNode>,
 ): PivotPath => nodes[key]?.path ?? parsePath(key);
 
-const addAncestors = (path: PivotPath, expanded: Set<string>) => {
-  for (let depth = 0; depth <= path.length; depth += 1) {
-    expanded.add(serializePath(path.slice(0, depth)));
-  }
-};
-
-const expandScopedFullCoverageNeed = ({
-  need,
-  nodes,
-  program,
-  metricLabelSet,
-}: {
-  need: PivotAxisCoverageNeed & {
-    scope: Extract<AxisPathScope, { kind: 'scopedFull' }>;
-  };
-  nodes: Record<string, PivotTreeNode>;
-  program: PivotProgram;
-  metricLabelSet: Set<string>;
-}) => {
-  const expanded = new Set<string>();
-  const includeMetricDepthZero =
-    program.metricKeys.length > 0 &&
-    isValuesFirstOnAxis(program, need.axis) &&
-    need.depth > 0;
-  need.scope.ancestorPaths.forEach(anchor => {
-    addAncestors(anchor, expanded);
-    Object.values(nodes).forEach(node => {
-      if (!pathStartsWith(node.path, anchor)) {
-        return;
-      }
-      const lastValue = node.path[node.path.length - 1];
-      const decodedMetric = decodeMetricKey(lastValue);
-      const isMetricNode = decodedMetric
-        ? metricLabelSet.has(decodedMetric)
-        : false;
-      const depth = countDimDepth(node.path, metricLabelSet);
-      if (
-        depth > 0 &&
-        (isMetricNode ? depth < need.depth : depth <= need.depth)
-      ) {
-        addAncestors(node.path, expanded);
-        return;
-      }
-      if (includeMetricDepthZero && depth === 0 && isMetricNode) {
-        addAncestors(node.path, expanded);
-      }
-    });
-  });
-  return expanded;
-};
-
-const expandAxisCoverageNeedKeys = ({
-  axis,
-  tree,
-  axisCoverageNeeds,
-  program,
-}: {
-  axis: PivotAxis;
-  tree: PivotTreeData;
-  axisCoverageNeeds: PivotAxisCoverageNeed[];
-  program: PivotProgram;
-}) => {
-  const nodes = axis === 'row' ? tree.rows : tree.cols;
-  const metricLabelSet = new Set(program.metricKeys);
-  const expanded = new Set<string>([rootKey]);
-  axisCoverageNeeds.forEach(need => {
-    if (need.axis !== axis) {
-      return;
-    }
-    if (need.scope.kind === 'root') {
-      expanded.add(rootKey);
-      return;
-    }
-    if (need.scope.kind === 'paths') {
-      need.scope.paths.forEach(path => addAncestors(path, expanded));
-      return;
-    }
-    expandScopedFullCoverageNeed({
-      need,
-      nodes,
-      program,
-      metricLabelSet,
-    }).forEach(key => expanded.add(key));
-  });
-  return expanded;
-};
-
 export const buildDesiredExpandedKeys = ({
   axis,
-  tree,
-  axisCoverageNeeds,
+  nodes,
   program,
+  baseExpanded = new Set<string>([rootKey]),
   manualExpanded,
   manualCollapsed,
 }: {
   axis: PivotAxis;
-  tree: PivotTreeData;
-  axisCoverageNeeds: PivotAxisCoverageNeed[];
+  nodes: Record<string, PivotTreeNode>;
   program: PivotProgram;
+  baseExpanded?: Set<string>;
   manualExpanded: Set<string>;
   manualCollapsed: Set<string>;
 }) => {
-  const needExpanded = expandAxisCoverageNeedKeys({
-    axis,
-    tree,
-    axisCoverageNeeds,
-    program,
-  });
-  const next = new Set<string>([...needExpanded, ...manualExpanded]);
-  const nodes = axis === 'row' ? tree.rows : tree.cols;
+  const next = new Set<string>([...baseExpanded, ...manualExpanded]);
   const metricLabelSet = new Set(program.metricKeys);
   manualCollapsed.forEach(key => {
     const collapsedPath = resolveNodePath(key, nodes);

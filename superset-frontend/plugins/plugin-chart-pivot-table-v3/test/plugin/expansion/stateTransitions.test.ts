@@ -18,11 +18,11 @@
  */
 
 import {
-  planHydrationIteration,
   resolveCollapsedExpansionState,
   resolveExpandedForMetrics,
   resolveExpansionToggleDecision,
 } from '../../../src/pivot/expansion/stateTransitions';
+import { planHydrationIteration } from '../../../src/pivot/expansion/planner';
 import { rootKey } from '../../../src/pivot/viewModel';
 import {
   encodeMetricKey,
