@@ -711,8 +711,10 @@ under the License.
               <td class="num">5</td>
               <td class="num">360</td>
               <td class="criteria">
-                Hook delegates fetch execution/lifecycle decisions to a smaller
-                manifest executor and loses meaningful local state/branches.
+                <code>useExpansionEngine.ts</code> no longer owns separate
+                request lifecycle, loading-key derivation, and hydration
+                execution branches; those live in a manifest executor with
+                focused tests, and the slice is deletion-positive.
               </td>
             </tr>
             <tr>
@@ -728,8 +730,9 @@ under the License.
               <td class="num">4</td>
               <td class="num">252</td>
               <td class="criteria">
-                One shared hydration execution path handles both axes without
-                duplicated row/column lifecycle code.
+                Row and column hydration/reinitialization use one shared
+                axis-parameterized execution path; any remaining axis branches
+                only select axis data, not lifecycle behavior.
               </td>
             </tr>
             <tr>
@@ -746,7 +749,8 @@ under the License.
               <td class="num">168</td>
               <td class="criteria">
                 Fact-tree construction can run without subtotal injection;
-                subtotal behavior is isolated and covered by focused tests.
+                subtotal injection is either folded into construction or isolated
+                behind one narrow tested projection step with no render repair.
               </td>
             </tr>
             <tr>
@@ -763,7 +767,8 @@ under the License.
               <td class="num">162</td>
               <td class="criteria">
                 Measure-axis projection has one tested owner; materialization no
-                longer duplicates or repairs measure-tier behavior elsewhere.
+                longer duplicates or repairs measure-tier behavior elsewhere,
+                and single-metric base-cell behavior is preserved by tests.
               </td>
             </tr>
             <tr>
@@ -780,7 +785,8 @@ under the License.
               <td class="num">245</td>
               <td class="criteria">
                 Semantic tree construction is independent from display labels
-                except for explicitly documented, tested projection boundaries.
+                except for explicitly documented projection boundaries; label
+                formatting changes do not affect tree shape or coverage needs.
               </td>
             </tr>
             <tr>
@@ -797,7 +803,8 @@ under the License.
               <td class="num">162</td>
               <td class="criteria">
                 Render model no longer invents metric/subtotal/header nodes;
-                tests prove behavior comes from materialized tree structure.
+                tests prove those structures are present before render traversal
+                and are not recovered in render code.
               </td>
             </tr>
             <tr>
@@ -814,7 +821,8 @@ under the License.
               <td class="num">135</td>
               <td class="criteria">
                 Render and export consume the same materialized semantic tree
-                with no divergent structural reconstruction.
+                with no divergent structural reconstruction, fallback subtotal
+                synthesis, or metric/header repair path.
               </td>
             </tr>
             <tr>
@@ -830,8 +838,10 @@ under the License.
               <td class="num">4</td>
               <td class="num">196</td>
               <td class="criteria">
-                Chart mostly wires hooks/props; runtime decisions live in
-                runtime, expansion, materialization, or interaction modules.
+                Chart code wires hooks and props only; loaded-state,
+                materialization, query-context, and expansion decisions live in
+                runtime, expansion, materialization, or interaction modules, and
+                the slice deletes more chart code than it adds.
               </td>
             </tr>
             <tr class="done-row">
@@ -1053,6 +1063,50 @@ under the License.
               </td>
             </tr>
             <tr>
+              <td class="item">Query planning only through coverage</td>
+              <td><span class="badge track-gap">Gap</span></td>
+              <td class="problem">
+                The tracker must prevent new direct query-planning branches from
+                bypassing coverage needs and manifest diffing.
+              </td>
+              <td>Manual/code review</td>
+              <td>Always true</td>
+              <td class="criteria">
+                No production query-planning path bypasses coverage needs,
+                <code>diffCoverageManifest</code>, or fact-store selectors.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Batching remains transport-only</td>
+              <td><span class="badge track-review">Review</span></td>
+              <td class="problem">
+                Batching can accidentally become another runtime state model
+                while fetch execution is simplified.
+              </td>
+              <td>Manual/code review</td>
+              <td>Always true</td>
+              <td class="criteria">
+                Batching only groups transport requests; loaded state remains
+                fact-store coverage selectors and never batch names or request
+                groups.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Materialization boundary is exclusive</td>
+              <td><span class="badge track-gap">Gap</span></td>
+              <td class="problem">
+                Semantic tree construction can leak into chart, render, or
+                query code during cleanup.
+              </td>
+              <td>Partially true</td>
+              <td>Always true</td>
+              <td class="criteria">
+                Semantic tree construction happens only through
+                <code>materializePivotTree</code> materializer paths; other code
+                consumes trees as projections.
+              </td>
+            </tr>
+            <tr>
               <td class="item">Render/export do not repair semantics</td>
               <td><span class="badge track-gap">Gap</span></td>
               <td class="problem">
@@ -1078,6 +1132,21 @@ under the License.
               <td class="criteria">
                 Any adapter added in a slice deletes a larger old surface in the
                 same slice.
+              </td>
+            </tr>
+            <tr>
+              <td class="item">Source reduction is authority reduction</td>
+              <td><span class="badge track-review">Review</span></td>
+              <td class="problem">
+                Line-count targets can be gamed by moving code instead of
+                deleting duplicate authority.
+              </td>
+              <td>Manual review</td>
+              <td>Always true</td>
+              <td class="criteria">
+                Source reductions delete or centralize authority; they do not
+                relocate it into controllers, adapters, fixtures, or chart-side
+                orchestration.
               </td>
             </tr>
             <tr>
