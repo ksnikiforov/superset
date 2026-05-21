@@ -399,6 +399,20 @@ export const useExpansionEngine = ({
     [commitExpansionState, persistExpansionState, resolveExpandedForMetrics],
   );
 
+  const planHydrationFromIntent = useCallback(() => {
+    const factStore = factStoreRef.current as PivotFactStore;
+    return planHydrationIteration({
+      desired: {
+        row: new Set([rootKey, ...expansionIntentRef.current.expanded.row]),
+        col: new Set([rootKey, ...expansionIntentRef.current.expanded.col]),
+      },
+      axisCoverageNeeds,
+      factSelectors: factStore.getCoverageSelectors(queryContextKey),
+      program: pivotProgram,
+      queryContextKey,
+    });
+  }, [axisCoverageNeeds, pivotProgram, queryContextKey]);
+
   const hydrateAtomic = useCallback(
     async (persistOnComplete = false) => {
       const requestScope = expansionRequestLifecycle.beginScope({
@@ -412,16 +426,7 @@ export const useExpansionEngine = ({
           return;
         }
         const factStore = factStoreRef.current as PivotFactStore;
-        const plan = planHydrationIteration({
-          desired: {
-            row: new Set([rootKey, ...expansionIntentRef.current.expanded.row]),
-            col: new Set([rootKey, ...expansionIntentRef.current.expanded.col]),
-          },
-          axisCoverageNeeds,
-          factSelectors: factStore.getCoverageSelectors(queryContextKey),
-          program: pivotProgram,
-          queryContextKey,
-        });
+        const plan = planHydrationFromIntent();
         let nextTree = treeRef.current;
         if (plan.kind === 'fetch') {
           setLoadingKeys(
@@ -488,16 +493,14 @@ export const useExpansionEngine = ({
     [
       buildDesiredExpanded,
       commitExpansionState,
-      axisCoverageNeeds,
       expansionRequestLifecycle,
       expansionInstanceId,
       fetchFormData,
       fetchLayout,
-      queryContextKey,
       addWarnings,
       onFactBatchesChange,
       persistExpansionState,
-      pivotProgram,
+      planHydrationFromIntent,
       resolveExpandedByAxisForMetrics,
     ],
   );
@@ -601,19 +604,7 @@ export const useExpansionEngine = ({
       expanded: resolvedExpanded,
     });
 
-    const layoutChangedOnlyByHiddenAppend =
-      !hasNewData &&
-      layoutChanged &&
-      (!layoutTransition.row.changed || layoutTransition.row.shouldExpand) &&
-      (!layoutTransition.col.changed || layoutTransition.col.shouldExpand);
-    const shouldHydrateExpansionIntent =
-      !layoutChangedOnlyByHiddenAppend &&
-      (axisCoverageNeeds.length > 0 ||
-        persistedState.rows.length > 0 ||
-        persistedState.cols.length > 0 ||
-        persistedState.collapsedRows.length > 0 ||
-        persistedState.collapsedCols.length > 0);
-    if (shouldHydrateExpansionIntent) {
+    if (planHydrationFromIntent().kind === 'fetch') {
       hydrateAtomic().catch(reportAsyncError);
     }
   }, [
@@ -626,6 +617,7 @@ export const useExpansionEngine = ({
     groupbyRowKeys,
     pivotProgram,
     hydrateAtomic,
+    planHydrationFromIntent,
     expansionRequestLifecycle,
     resolveExpandedByAxisForMetrics,
     reportAsyncError,

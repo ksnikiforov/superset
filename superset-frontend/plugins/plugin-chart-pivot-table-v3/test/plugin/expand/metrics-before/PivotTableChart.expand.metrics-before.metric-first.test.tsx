@@ -66,6 +66,13 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
     fetchPivotBranchMock.mockImplementation(resolveBranchData());
   });
 
+  const clearInitialManifestFetch = async () => {
+    await waitFor(() => {
+      expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(1);
+    });
+    fetchPivotBranchMock.mockClear();
+  };
+
   const treeWithMetricChildOnly: PivotTreeData = {
     rows: {
       '': {
@@ -414,6 +421,7 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
+    await clearInitialManifestFetch();
     const avgRow = within(tbody)
       .getByText('averageOrderValue')
       .closest('tr') as HTMLTableRowElement;
@@ -565,6 +573,7 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
+    await clearInitialManifestFetch();
     const avgRow = within(tbody)
       .getByText('averageOrderValue')
       .closest('tr') as HTMLTableRowElement;

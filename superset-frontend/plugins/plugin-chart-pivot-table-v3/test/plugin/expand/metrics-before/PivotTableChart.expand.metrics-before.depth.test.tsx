@@ -187,6 +187,10 @@ describe('PivotTableChart expansion with metrics before dimensions (depth)', () 
       );
 
       const tbody = container.querySelector('tbody') as HTMLElement;
+      await waitFor(() =>
+        expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1),
+      );
+      fetchPivotBranchMock.mockClear();
       const steps = Math.max(depth - 1, 1);
       await Array.from({ length: steps }, (_, index) => index + 1).reduce(
         async (promise, step) => {
@@ -251,6 +255,10 @@ describe('PivotTableChart expansion with metrics before dimensions (depth)', () 
       );
 
       const thead = container.querySelector('thead') as HTMLElement;
+      await waitFor(() =>
+        expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1),
+      );
+      fetchPivotBranchMock.mockClear();
       const steps = Math.max(depth - 1, 1);
       await Array.from({ length: steps }, (_, index) => index + 1).reduce(
         async (promise, step) => {

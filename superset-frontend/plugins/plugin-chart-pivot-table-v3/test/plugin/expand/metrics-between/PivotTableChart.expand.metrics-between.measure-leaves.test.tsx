@@ -129,7 +129,7 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
       record,
     });
 
-    fetchPivotBranchMock.mockImplementationOnce(
+    fetchPivotBranchMock.mockImplementation(
       resolveMockExpansionFetchResult({
         data: branchTree,
       }),
@@ -232,7 +232,7 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
       1,
     );
 
-    fetchPivotBranchMock.mockImplementationOnce(
+    fetchPivotBranchMock.mockImplementation(
       resolveMockExpansionFetchResult({
         data: branchTree,
       }),
@@ -342,7 +342,7 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
       1,
     );
 
-    fetchPivotBranchMock.mockImplementationOnce(
+    fetchPivotBranchMock.mockImplementation(
       resolveMockExpansionFetchResult({
         data: branchTree,
       }),

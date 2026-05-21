@@ -28,6 +28,7 @@ import {
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
+import { resolveMockExpansionFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
@@ -81,11 +82,14 @@ describe('PivotTableChart initial depth prefetch', () => {
     fetchPivotIntersectionMock.mockReset();
   });
 
-  it('does not repair missing bootstrap cells through expansion prefetch', async () => {
+  it('fetches missing visible bootstrap coverage through the manifest', async () => {
     const totalsTree = buildTree([{ r1: 'A', c1: 'B', m1: 30 }], 0, 0);
     const rowTree = buildTree([{ r1: 'A', c1: 'B', m1: 10 }], 1, 0);
     const colTree = buildTree([{ r1: 'A', c1: 'B', m1: 20 }], 0, 1);
     const baseTree = mergeTrees(mergeTrees(totalsTree, rowTree), colTree);
+    fetchPivotBranchMock.mockImplementation(
+      resolveMockExpansionFetchResult({ data: baseTree }),
+    );
 
     const { container } = render(
       <PivotTableChart
@@ -133,8 +137,7 @@ describe('PivotTableChart initial depth prefetch', () => {
     const tableScope = within(table as HTMLTableElement);
     await waitFor(() => expect(tableScope.getByText('A')).toBeInTheDocument());
     expect(tableScope.getByText('B')).toBeInTheDocument();
-    expect(fetchPivotBranchMock).not.toHaveBeenCalled();
-    expect(fetchPivotIntersectionMock).not.toHaveBeenCalled();
+    expect(fetchPivotBranchMock).toHaveBeenCalled();
     expect(tableScope.queryByText('100')).not.toBeInTheDocument();
   });
 });

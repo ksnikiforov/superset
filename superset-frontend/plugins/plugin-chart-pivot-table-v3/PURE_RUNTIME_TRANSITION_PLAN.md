@@ -96,14 +96,14 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `26556` | `-6954` | `< 20000` |
-| Strict core pipeline | `12907` | `10566` | `-2341` | `< 8000` |
+| Full production `src` | `33510` | `26548` | `-6962` | `< 20000` |
+| Strict core pipeline | `12907` | `10558` | `-2349` | `< 8000` |
 
 Diagnostic scope only:
 
 | Scope | Baseline lines | Current lines | Delta |
 | --- | ---: | ---: | ---: |
-| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7787` | `-911` |
+| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7779` | `-919` |
 
 Core pipeline breakdown:
 
@@ -256,11 +256,21 @@ Completed structural cuts:
   metrics, while the materializer preserves configured sibling leaf headers for
   loaded metrics and only projects expanded child branches when that leaf's
   value is present.
+- Expansion reinitialization no longer decides whether to fetch from layout
+  transition heuristics, persisted expansion flags, or hidden-append branches.
+  It asks the same manifest hydration plan used by expansion fetches. If
+  visible coverage is missing, the manifest fetches it; if fact-store coverage
+  satisfies the visible need, no request is sent.
 
-Latest source delta for this slice: `+79` production `src` lines. This is not a
-deletion-positive slice; it closes a fact-store authority bug and keeps
-measure-leaf fetches narrow. The next slice should be deletion-focused against
-remaining expansion scheduler/materializer branching.
+Latest source delta for this slice: `-8` production `src` lines. The source cut
+is small, but it removes the remaining expansion reinitialization fetch gate that
+was outside `PivotCoverageNeed` / `diffCoverageManifest`.
+
+Coverage-manifest loading authority status: complete for root bootstrap,
+configured pre-expansion, persisted/manual expansion, expansion reinitialization,
+seamless runtime sync, and query-context-scoped fact-store matching. Remaining
+work below is pure-runtime simplification after that loading authority is in
+place.
 
 Remaining duplicate authority:
 
@@ -283,30 +293,32 @@ Open behavior checkpoints:
 
 ## Execution Order
 
-Work from most impactful to least impactful. A commit is successful only if it
-removes or clearly centralizes an authority surface while staying
-deletion-conscious.
+There is one active priority: complete the pure runtime transition while
+shrinking production source. Work from the highest-impact authority surface to
+the lowest-impact cleanup. A commit is successful only if it removes or clearly
+centralizes an authority surface while staying deletion-conscious.
 
-| Priority | Chunk | Target |
-| --- | --- | --- |
-| 1 | Manifest query executor | Collapse private transport helper branches into coverage-phase planning while preserving batching. |
-| 2 | Expansion scheduler reduction | Delete duplicated row/column hydration, loading, pending, and reinitialization state. |
-| 3 | Materializer one-pass model | Separate semantic tree construction from display projection; delete post-processing where behavior allows. |
-| 4 | Render-policy deletion | Remove metric/header/subtotal inference from render/layout code. |
-| 5 | Chart runtime shrink | Delete chart-owned runtime decisions; avoid extraction-only controllers. |
+Current order:
+
+1. Expansion scheduler reduction: delete duplicated row/column hydration,
+   loading, pending, and request lifecycle state now that the manifest is the
+   loading authority.
+2. Materializer one-pass model: separate semantic tree construction from display
+   projection and delete post-processing where behavior allows.
+3. Render-policy deletion: remove metric/header/subtotal inference from
+   render/layout code.
+4. Chart runtime shrink: delete chart-owned runtime decisions; avoid
+   extraction-only controllers.
 
 ## Next Commits
 
-1. Finish the seamless/expansion interaction test rewrite around fact-store
-   authority. Keep old fetch-count expectations only where coverage is actually
-   missing; otherwise assert no fetch and stable visible state.
-2. Continue Priority 2 only where it deletes code: reduce the remaining
-   expansion hook scheduler state or fold it into manifest execution.
-3. Attack Priority 3 only with tests first: isolate subtotal and measure-axis
-   materialization behavior, then delete post-processing wrappers.
-4. Resume Priority 4 after materializer behavior is stable: render should stop
-   inferring metric/subtotal structure from tree shape.
-5. Shrink `PivotTableChart.tsx` only where code is deleted, not merely moved.
+1. Reduce the remaining expansion hook scheduler state or fold it into manifest
+   execution.
+2. Isolate subtotal and measure-axis materialization behavior, then delete
+   post-processing wrappers.
+3. Remove render metric/subtotal structure inference after materializer behavior
+   is stable.
+4. Shrink `PivotTableChart.tsx` only where code is deleted, not merely moved.
 
 ## Verification Standard
 
