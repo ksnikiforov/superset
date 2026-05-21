@@ -126,9 +126,27 @@ const LEAF_DIRECTION_OPTIONS: Array<{
 type AdhocMetricPopoverDatasource = ComponentProps<
   typeof AdhocMetricPopoverTrigger
 >['datasource'];
+type AdhocMetricInput = ConstructorParameters<typeof AdhocMetric>[0];
+type AdhocMetricColumn = NonNullable<AdhocMetricInput['column']>;
 
-const isDictionaryForAdhocMetric = (value: QueryFormMetric) =>
-  value &&
+const toAdhocMetricColumn = (column: ColumnMeta): AdhocMetricColumn => ({
+  ...column,
+  column_name: column.column_name,
+  verbose_name: column.verbose_name ?? undefined,
+});
+
+const toAdhocMetricInput = (
+  metric: Exclude<QueryFormMetric, string>,
+): AdhocMetricInput => metric as AdhocMetricInput;
+
+const normalizeAdhocExpressionType = (
+  metric: AdhocMetric,
+): 'SIMPLE' | 'SQL' => (metric.expressionType === 'SQL' ? 'SQL' : 'SIMPLE');
+
+const isDictionaryForAdhocMetric = (
+  value: QueryFormMetric,
+): value is Exclude<QueryFormMetric, string> =>
+  Boolean(value) &&
   typeof value !== 'string' &&
   !(value instanceof AdhocMetric) &&
   'expressionType' in value;
@@ -171,10 +189,13 @@ const coerceMetrics = (
         col => col.column_name === metric.column.column_name,
       );
       if (column) {
-        return new AdhocMetric({ ...metric, column });
+        return new AdhocMetric({
+          ...toAdhocMetricInput(metric),
+          column: toAdhocMetricColumn(column),
+        });
       }
     }
-    return new AdhocMetric(metric);
+    return new AdhocMetric(toAdhocMetricInput(metric));
   });
 };
 
@@ -229,19 +250,19 @@ const normalizeMetricReferenceValue = (metric: ValueType): QueryFormMetric => {
   }
   if (metric instanceof AdhocMetric) {
     return {
-      expressionType: metric.expressionType,
+      expressionType: normalizeAdhocExpressionType(metric),
       column: metric.column,
       aggregate: metric.aggregate,
       sqlExpression: metric.sqlExpression,
       label: metric.label,
       hasCustomLabel: metric.hasCustomLabel,
       optionName: metric.optionName,
-    };
+    } as QueryFormMetric;
   }
   if ('expressionType' in metric) {
-    const adhocMetric = new AdhocMetric(metric);
+    const adhocMetric = new AdhocMetric(toAdhocMetricInput(metric));
     return {
-      expressionType: adhocMetric.expressionType,
+      expressionType: normalizeAdhocExpressionType(adhocMetric),
       column: adhocMetric.column,
       aggregate: adhocMetric.aggregate,
       sqlExpression: adhocMetric.sqlExpression,
@@ -249,7 +270,7 @@ const normalizeMetricReferenceValue = (metric: ValueType): QueryFormMetric => {
       hasCustomLabel: metric.hasCustomLabel ?? adhocMetric.hasCustomLabel,
       optionName:
         typeof metric.optionName === 'string' ? metric.optionName : undefined,
-    };
+    } as QueryFormMetric;
   }
   return metric as unknown as QueryFormMetric;
 };
@@ -979,7 +1000,11 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
 
   const onMetricEdit = useCallback(
     (changedMetric: Metric | AdhocMetric, oldMetric: Metric | AdhocMetric) => {
-      if (oldMetric instanceof AdhocMetric && oldMetric.equals(changedMetric)) {
+      if (
+        oldMetric instanceof AdhocMetric &&
+        changedMetric instanceof AdhocMetric &&
+        oldMetric.equals(changedMetric)
+      ) {
         return;
       }
       if (setControlValue) {
@@ -1238,7 +1263,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
     ) {
       const itemValue = droppedItem.value as ColumnMeta;
       const config: Partial<AdhocMetric> = {
-        column: itemValue,
+        column: toAdhocMetricColumn(itemValue),
       };
       if (itemValue.type_generic === GenericDataType.Numeric) {
         config.aggregate = AGGREGATES.SUM;

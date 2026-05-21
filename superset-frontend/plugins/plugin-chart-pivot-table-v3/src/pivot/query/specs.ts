@@ -1045,7 +1045,7 @@ export const buildSelectionFilterClauses = ({
     return [];
   }
   const dimensionMap = new Map(
-    formData.dimensions.map(dimension => [
+    (formData.dimensions ?? []).map(dimension => [
       getStableColumnKey(dimension),
       dimension,
     ]),

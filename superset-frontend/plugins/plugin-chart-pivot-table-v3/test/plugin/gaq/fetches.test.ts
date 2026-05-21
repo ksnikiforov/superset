@@ -28,6 +28,7 @@ import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import {
   type PivotAxis,
   type PivotPath,
+  type PivotPathValue,
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../../src/types';
@@ -57,11 +58,14 @@ const waitForAsyncDataMock = waitForAsyncData as jest.MockedFunction<
 
 type TestBatchTarget = Pick<ExpansionCoverageTarget, 'axis' | 'pathKey'>;
 type TestBatchGroup = {
+  axis?: ExpansionCoverageTarget['axis'];
+  parentPathKey?: string;
+  siblingValues?: PivotPathValue[];
   targets: TestBatchTarget[];
 };
 
 const fetchBranch = (
-  params: Omit<FetchPivotExpansionRequest, 'layout' | 'targets'> & {
+  params: Omit<FetchPivotExpansionRequest, 'layout' | 'targets' | 'batch'> & {
     axis: PivotAxis;
     path: PivotPath;
     visibleRowDepth?: number;
@@ -98,7 +102,7 @@ const fetchBranch = (
 };
 
 const fetchBatch = (
-  params: Omit<FetchPivotExpansionRequest, 'layout' | 'targets'> & {
+  params: Omit<FetchPivotExpansionRequest, 'layout' | 'targets' | 'batch'> & {
     batch: TestBatchGroup;
     visibleRowDepth: number;
     visibleColDepth: number;

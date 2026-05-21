@@ -112,7 +112,10 @@ const buildFetchTarget = ({
 };
 
 const fetchBranch = (
-  params: Omit<FetchPivotExpansionRequest, 'kind' | 'layout' | 'target'> & {
+  params: Omit<
+    FetchPivotExpansionRequest,
+    'kind' | 'layout' | 'target' | 'targets'
+  > & {
     axis: PivotAxis;
     path: PivotPath;
     visibleRowDepth?: number;

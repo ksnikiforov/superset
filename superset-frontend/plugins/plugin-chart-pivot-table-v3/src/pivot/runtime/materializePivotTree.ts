@@ -83,8 +83,8 @@ type MaterializePivotTreeInput = {
 const emptyPivotTree = (): PivotTreeData => ({ rows: {}, cols: {}, cells: {} });
 
 const mergeValues = <T extends { isSubtotal?: boolean }>(
-  existingValues: Record<string, unknown> | undefined,
-  incomingValues: Record<string, unknown> | undefined,
+  existingValues: Record<string, DataRecordValue> | undefined,
+  incomingValues: Record<string, DataRecordValue> | undefined,
   existing: T,
   incoming: T,
 ) => {
@@ -98,7 +98,7 @@ const mergeValues = <T extends { isSubtotal?: boolean }>(
 };
 
 const mergeTreeValueMaps = <
-  T extends { values?: Record<string, unknown>; isSubtotal?: boolean },
+  T extends { values?: Record<string, DataRecordValue>; isSubtotal?: boolean },
 >(
   left?: Record<string, T>,
   right?: Record<string, T>,
@@ -716,7 +716,7 @@ const applyMeasureAxis = ({
         ? dateFormatters?.[dimensionKey]
         : undefined;
       if (formatter) {
-        label = formatter(rawValue);
+        label = (formatter as (value: DataRecordValue) => string)(rawValue);
       }
     }
     const isMetricNode = metricTokenSet.has(

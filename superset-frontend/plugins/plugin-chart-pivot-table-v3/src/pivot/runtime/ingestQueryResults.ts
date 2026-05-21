@@ -34,7 +34,6 @@ import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { type PivotFactCoverage } from './types';
 import {
   buildPivotFactQueryContextKey,
-  createPivotFactStore,
   createPivotFactStoreFromBatches,
   type PivotFact,
   type PivotFactStoreBatch,

@@ -23,7 +23,7 @@ import {
   METRICS_PLACEHOLDER,
   SUBTOTAL_TOKEN,
 } from '../../../src/pivot/core/tokens';
-import { MetricsLayoutEnum } from '../../../src/types';
+import { MetricsLayoutEnum, type PivotPathValue } from '../../../src/types';
 import { serializePath } from '../../../src/pivot/core/path';
 import { buildAxisExpansionCoverageTarget } from '../../../src/pivot/expansion/planner';
 import { buildFormData } from '../fixtures/pivotFormData';
@@ -37,7 +37,7 @@ const fetchTarget = ({
 }: {
   layout: ReturnType<typeof buildLayoutContext>;
   axis: 'row' | 'col';
-  path: unknown[];
+  path: PivotPathValue[];
   visibleRowDepth: number;
   visibleColDepth: number;
 }) => {

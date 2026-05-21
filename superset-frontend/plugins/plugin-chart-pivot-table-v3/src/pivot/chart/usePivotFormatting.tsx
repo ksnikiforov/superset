@@ -335,6 +335,7 @@ type ExcelFormattingMap<Field extends string> = Record<
 >;
 
 export type PivotFormattingResult = {
+  metricFormattingScope: MetricFormattingScope;
   metricDatabars: PivotMetricDatabarMap;
   databarColumnMinWidths: Map<string, number>;
   themeColor?: string;
@@ -474,7 +475,7 @@ export const usePivotFormatting = ({
   rowValuesMap,
   colValuesMap,
   getNodeDimDepth,
-  theme,
+  theme: inputTheme,
 }: {
   tree: PivotTreeData;
   renderModel: RenderModel;
@@ -486,6 +487,7 @@ export const usePivotFormatting = ({
   getNodeDimDepth: (node: PivotTreeNode) => number;
   theme: PivotTableProps['theme'];
 }): PivotFormattingResult => {
+  const theme = inputTheme ?? supersetTheme;
   const {
     allowRenderHtml,
     columnFormats,
@@ -609,7 +611,7 @@ export const usePivotFormatting = ({
             'd3Format',
             cell.values,
             currentValue,
-          ),
+          ) as DataRecordValue,
         ) ??
         (d3FormatKey ? normalizeD3Format(cell.values[d3FormatKey]) : undefined)
       );
@@ -1187,6 +1189,7 @@ export const usePivotFormatting = ({
   );
 
   return {
+    metricFormattingScope,
     metricDatabars,
     databarColumnMinWidths,
     themeColor,

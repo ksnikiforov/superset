@@ -514,10 +514,12 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     );
     expect(result.formData.colTypeMap?.row1).toBe(GenericDataType.Temporal);
     expect(result.formData.colTypeMap?.col1).toBe(GenericDataType.Numeric);
-    expect(result.queryFormData.colTypeMap?.row1).toBe(
+    expect(result.queryFormData?.colTypeMap?.row1).toBe(
       GenericDataType.Temporal,
     );
-    expect(result.queryFormData.colTypeMap?.col1).toBe(GenericDataType.Numeric);
+    expect(result.queryFormData?.colTypeMap?.col1).toBe(
+      GenericDataType.Numeric,
+    );
   });
 
   it('normalizes row and column subtotal selections', () => {
@@ -620,7 +622,7 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
           };
         }
       }
-      if (scopeKind === 'branch' || scopeKind === 'batch') {
+      if (String(scopeKind) === 'branch' || String(scopeKind) === 'batch') {
         return {
           query: { query_name: spec.queryName },
           data: [{ row1: 'A', row2: 'B', col1: 'C', metric1: 11 }],
@@ -659,7 +661,6 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
 
   it('uses the render chart id as export id when form data has no slice id', () => {
     const chartProps = new ChartProps({
-      chartId: 0,
       formData: baseFormData,
       width: 400,
       height: 300,

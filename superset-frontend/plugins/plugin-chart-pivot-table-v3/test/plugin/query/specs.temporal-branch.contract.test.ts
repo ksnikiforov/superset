@@ -17,7 +17,7 @@
  * under the License.
  */
 import { GenericDataType } from '@apache-superset/core/common';
-import { MetricsLayoutEnum } from '../../../src/types';
+import { MetricsLayoutEnum, type PivotPathValue } from '../../../src/types';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { formatQueryName } from '../../../src/pivot/query/specs';
 import { serializePath } from '../../../src/pivot/core/path';
@@ -50,7 +50,7 @@ const fetchTarget = ({
 }: {
   layout: ReturnType<typeof buildLayoutContext>;
   axis: 'row' | 'col';
-  path: unknown[];
+  path: PivotPathValue[];
   visibleRowDepth: number;
   visibleColDepth: number;
 }) => {

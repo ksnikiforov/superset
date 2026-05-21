@@ -121,6 +121,18 @@ export const usePivotLayout = ({
 }: {
   formData: PivotTableProps['formData'];
   pivotProgram?: PivotProgram;
+  metricsLayout?: PivotTableProps['metricsLayout'];
+  startCollapsed?: PivotTableProps['startCollapsed'];
+  initialDepth?: PivotTableProps['initialDepth'];
+  rowTotals?: PivotTableProps['rowTotals'];
+  colTotals?: PivotTableProps['colTotals'];
+  rowSubTotals?: PivotTableProps['rowSubTotals'];
+  rowSubtotalLevels?: PivotTableProps['rowSubtotalLevels'];
+  colSubtotalLevels?: PivotTableProps['colSubtotalLevels'];
+  rowTotalPosition?: PivotTableProps['rowTotalPosition'];
+  rowSubtotalPosition?: PivotTableProps['rowSubtotalPosition'];
+  colTotalPosition?: PivotTableProps['colTotalPosition'];
+  colSubtotalPosition?: PivotTableProps['colSubtotalPosition'];
 }): PivotLayoutResult => {
   const layout = useMemo(
     () =>

@@ -108,6 +108,15 @@ type SavedMetric = savedMetricType & { error_text?: string };
 type AdhocMetricPopoverDatasource = ComponentProps<
   typeof AdhocMetricPopoverTrigger
 >['datasource'];
+type AdhocMetricInput = ConstructorParameters<typeof AdhocMetric>[0];
+
+const toAdhocMetricInput = (
+  metric: Exclude<QueryFormMetric, string>,
+): AdhocMetricInput => metric as AdhocMetricInput;
+
+const normalizeAdhocExpressionType = (
+  metric: AdhocMetric,
+): 'SIMPLE' | 'SQL' => (metric.expressionType === 'SQL' ? 'SQL' : 'SIMPLE');
 
 const rgbToHex = (color: ColorValue): string => {
   const { r, g, b, a = 1 } = color.toRgb();
@@ -350,14 +359,14 @@ const normalizeFormattingMetric = (
   }
   if (metric instanceof AdhocMetric) {
     const normalized: QueryFormMetric = {
-      expressionType: metric.expressionType,
+      expressionType: normalizeAdhocExpressionType(metric),
       column: metric.column,
       aggregate: metric.aggregate,
       sqlExpression: metric.sqlExpression,
       label: metric.label,
       hasCustomLabel: metric.hasCustomLabel,
       optionName: metric.optionName,
-    };
+    } as QueryFormMetric;
     return normalized;
   }
   if (
@@ -366,7 +375,7 @@ const normalizeFormattingMetric = (
     'expressionType' in metric
   ) {
     const adhocMetricValue = metric as Exclude<QueryFormMetric, string>;
-    const adhocMetric = new AdhocMetric(adhocMetricValue);
+    const adhocMetric = new AdhocMetric(toAdhocMetricInput(adhocMetricValue));
     const rawLabel =
       typeof adhocMetricValue.label === 'string'
         ? adhocMetricValue.label
@@ -380,14 +389,14 @@ const normalizeFormattingMetric = (
         ? adhocMetricValue.optionName
         : undefined;
     const normalized: QueryFormMetric = {
-      expressionType: adhocMetric.expressionType,
+      expressionType: normalizeAdhocExpressionType(adhocMetric),
       column: adhocMetric.column,
       aggregate: adhocMetric.aggregate,
       sqlExpression: adhocMetric.sqlExpression,
       label: rawLabel || adhocMetric.label,
       hasCustomLabel: rawHasCustomLabel ?? adhocMetric.hasCustomLabel,
       optionName: rawOptionName,
-    };
+    } as QueryFormMetric;
     return normalized;
   }
   return metric as QueryFormMetric;
@@ -600,7 +609,7 @@ export const MetricFormatSelector = (props: MetricFormatSelectorProps) => {
           ? metricValue.hasCustomLabel
           : typeof rawLabel === 'string' && rawLabel.trim().length > 0;
       return new AdhocMetric({
-        ...metricValue,
+        ...toAdhocMetricInput(metricValue),
         hasCustomLabel: inferredHasCustomLabel,
       });
     }
@@ -1396,7 +1405,9 @@ export default function PivotMetricDefinitionValue(
       !isPivotExcelFormula(props.option) &&
       'expressionType' in props.option
     ) {
-      return new AdhocMetric(props.option as QueryFormMetric);
+      return new AdhocMetric(
+        toAdhocMetricInput(props.option as Exclude<QueryFormMetric, string>),
+      );
     }
     return props.option as Metric;
   }, [props.option]);

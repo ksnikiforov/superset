@@ -127,8 +127,20 @@ export const usePivotRenderModel = ({
   tree: PivotTreeData;
   expandedRows: Set<string>;
   expandedCols: Set<string>;
+  loadingKeys?: Set<string>;
+  isHydrating?: boolean;
   formData: PivotTableProps['formData'];
   layout: PivotLayoutResult;
+  rowOrder?: PivotTableProps['rowOrder'];
+  colOrder?: PivotTableProps['colOrder'];
+  groupbyRows?: PivotTableProps['groupbyRows'];
+  groupbyColumns?: PivotTableProps['groupbyColumns'];
+  colTypeMap?: PivotTableProps['formData']['colTypeMap'];
+  rowTotals?: PivotTableProps['rowTotals'];
+  colTotals?: PivotTableProps['colTotals'];
+  rowSubTotals?: PivotTableProps['rowSubTotals'];
+  rowSubtotalLevels?: PivotTableProps['rowSubtotalLevels'];
+  colSubtotalLevels?: PivotTableProps['colSubtotalLevels'];
 }): PivotRenderModelResult => {
   const {
     colOrder = 'key_a_to_z',

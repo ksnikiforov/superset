@@ -144,7 +144,7 @@ describe('pivot v3 export worksheet model', () => {
       formatLabel: node => node.formattedLabel,
       deriveMetricKey: (_row, col) => String(col.label),
       formatBodyCell: (_row, _col, resultCell, metricKey) =>
-        resultCell?.values[metricKey],
+        resultCell?.values[metricKey] as string | number | null | undefined,
       isGrandTotalLikeRow: () => false,
     });
 
@@ -186,7 +186,7 @@ describe('pivot v3 export worksheet model', () => {
       formatLabel: node => node.formattedLabel,
       deriveMetricKey: () => 'Sales',
       formatBodyCell: (_row, _col, resultCell, metricKey) =>
-        resultCell?.values[metricKey],
+        resultCell?.values[metricKey] as string | number | null | undefined,
       isGrandTotalLikeRow: () => false,
     });
 

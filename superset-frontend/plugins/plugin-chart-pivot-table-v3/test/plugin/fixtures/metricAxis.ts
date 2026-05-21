@@ -128,7 +128,7 @@ export function applyMeasureHierarchyAxis(
   measureHierarchy: MeasureHierarchy,
   programOrMetricsLayout: PivotProgram | MetricsLayoutEnum,
   metricLabelMapOrRowGroupby?: Record<string, string> | QueryFormColumn[],
-  colGroupby?: QueryFormColumn[],
+  colGroupby?: QueryFormColumn[] | Record<string, DateFormatter | undefined>,
   metricPosition?: number,
   legacyMetricLabelMap?: Record<string, string>,
   dateFormatters?: Record<string, DateFormatter | undefined>,
@@ -152,7 +152,7 @@ export function applyMeasureHierarchyAxis(
       rowGroupby: Array.isArray(metricLabelMapOrRowGroupby)
         ? metricLabelMapOrRowGroupby
         : [],
-      colGroupby: colGroupby ?? [],
+      colGroupby: Array.isArray(colGroupby) ? colGroupby : [],
       metricPosition,
     }),
     legacyMetricLabelMap,

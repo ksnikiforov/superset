@@ -82,7 +82,7 @@ const stripMockFactBatchesWithFetch = <T extends FetchPivotExpansionResult>(
 ): T => ({
   ...stripMockFactBatches(result),
   ...(factBatches.length > 0 ? { didFetch: true as const } : {}),
-});
+}) as T;
 
 const toFactPath = (path: PivotPath): PivotPath =>
   path.filter(
@@ -149,7 +149,7 @@ const buildFactsForCoverage = (
         rowPath,
         columnPath,
         valueKey,
-        value: undefined,
+        value: null,
       })),
     ),
   );

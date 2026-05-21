@@ -45,6 +45,7 @@ export type PivotCoverageNeed = {
   rowDimensions: PivotProgram['rowDimensions'];
   columnDimensions: PivotProgram['columnDimensions'];
   valueKeys: string[];
+  queryContextKey?: string;
   rowScope: AxisPathScope;
   columnScope: AxisPathScope;
 };

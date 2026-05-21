@@ -264,6 +264,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
         1,
       );
     };
+    void buildCollapsedBranch;
 
     const baseTree = buildTreeAtDepth(1);
     const shipModeBranch = buildTreeAtDepth(3);
@@ -591,6 +592,8 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
         (row.querySelector('div') as HTMLElement)?.style.paddingLeft || '0',
         10,
       );
+    void rows;
+    void getIndent;
     expect(within(tbody).getAllByText('COLLECT COD').length).toBeGreaterThan(0);
 
     const expandedMetricRows = within(tbody)
@@ -661,6 +664,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
         1,
       );
     };
+    void buildCollapsedBranch;
 
     const baseTree = buildTreeAtDepth(1);
     const shipModeBranch = buildTreeAtDepth(3);
@@ -1033,6 +1037,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
         1,
       );
     };
+    void buildCollapsedBranch;
 
     const baseTree = buildTreeAtDepth(records, 1);
     const shipModeBranch = buildTreeAtDepth(records, 3);
@@ -1226,6 +1231,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
         1,
       );
     };
+    void buildCollapsedBranch;
 
     const baseTree = buildTreeAtDepth(records, 1);
     const urgentRecords = records.filter(
@@ -1454,6 +1460,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
         1,
       );
     };
+    void buildCollapsedBranch;
 
     const baseTree = buildTreeAtDepth(records, 1);
     const shipInstructionBranch = buildTreeAtDepth(records, 4);

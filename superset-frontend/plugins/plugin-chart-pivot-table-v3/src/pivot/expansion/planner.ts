@@ -382,6 +382,8 @@ export const planExpansionForAxis = ({
   program: PivotProgram;
   expandedKeys: Set<string>;
   coverage: PivotExpansionCoverageDepths;
+  nodes?: Record<string, PivotTreeNode>;
+  factSelectors?: PivotFactSelector[];
 }): ExpansionCoverageTarget[] => {
   const fetchTargets = new Map<string, ExpansionCoverageTarget>();
   const hasNonRootExpanded =
@@ -510,13 +512,14 @@ export const planHydrationIteration = ({
   axisCoverageNeeds = [],
   factSelectors,
   program,
-  queryContextKey,
+  queryContextKey = '',
 }: {
   desired: Record<PivotAxis, Set<string>>;
   axisCoverageNeeds?: PivotAxisCoverageNeed[];
   factSelectors: PivotFactSelector[];
   program: PivotProgram;
-  queryContextKey: string;
+  queryContextKey?: string;
+  tree?: PivotTreeData;
 }) => {
   const visibleRowDepth = depthForExpansionKeys({
     axis: 'row',
@@ -619,6 +622,6 @@ export const planHydrationIteration = ({
   ];
 
   return targets.length === 0
-    ? { kind: 'complete' as const }
+    ? { kind: 'complete' as const, targets: [] }
     : { kind: 'fetch' as const, targets };
 };

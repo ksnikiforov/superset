@@ -384,6 +384,7 @@ describe('transferDimensionSettingsAcrossAxes', () => {
   it('keeps only canonical dimension keys for formatting and sorting', () => {
     const columns = [
       {
+        expressionType: 'SQL' as const,
         label: 'canonical_dimension',
         sqlExpression: 'UPPER(country)',
       },

@@ -19,6 +19,7 @@
 import { PATH_DIVIDER, serializePath } from '../../../src/pivot/core/path';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { buildAxisExpansionCoverageTarget } from '../../../src/pivot/expansion/planner';
+import { type PivotPathValue } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildExpansionQuerySpecs } from '../fixtures/querySpecs';
 
@@ -27,7 +28,7 @@ const branchQuerySpecs = ({
   path,
 }: {
   formData: ReturnType<typeof buildFormData>;
-  path: unknown[];
+  path: PivotPathValue[];
 }) => {
   const layout = buildLayoutContext(formData);
   const pathKey = serializePath(path);

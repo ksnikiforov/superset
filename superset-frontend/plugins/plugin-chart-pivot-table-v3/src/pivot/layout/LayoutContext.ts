@@ -63,11 +63,11 @@ export type PivotLayoutSpec = Pick<
   | 'colSubtotalLevels'
   | 'rowSubtotalPosition'
   | 'colSubtotalPosition'
-  | 'startCollapsed'
-  | 'initialDepth'
   | 'expandRowsLevel'
   | 'expandColumnsLevel'
 > & {
+  startCollapsed?: PivotTableQueryFormData['startCollapsed'];
+  initialDepth?: PivotTableQueryFormData['initialDepth'];
   lastMoved?: 'row' | 'col';
   pivotProgram?: PivotProgram;
 };

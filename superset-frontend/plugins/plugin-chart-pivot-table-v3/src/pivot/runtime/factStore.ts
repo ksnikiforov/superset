@@ -38,7 +38,7 @@ export type PivotFactSelector = {
   coverage: PivotFactCoverage;
   scope: PivotFactStoreBatchScope;
   valueKeys: string[];
-  queryContextKey: string;
+  queryContextKey?: string;
   materialization?: PivotFactMaterialization;
 };
 
@@ -49,6 +49,11 @@ export type PivotFactStoreBatch = PivotFactSelector & {
 export type PivotFactStoreBatchScope =
   | {
       kind: 'root';
+    }
+  | {
+      kind: 'branch';
+      axis: PivotAxis;
+      paths: PivotPath[];
     }
   | {
       kind: 'axisPaths';
@@ -85,7 +90,7 @@ const buildPivotFactRequestKey = ({
   valueKeys,
 }: PivotFactSelector) =>
   stableStringify([
-    queryContextKey,
+    queryContextKey ?? '',
     coverage,
     scope,
     materialization,

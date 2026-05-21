@@ -534,9 +534,9 @@ export const useExpansionEngine = ({
 
       if (toggleDecision.kind === 'expand') {
         expansionIntentRef.current.expanded[axis] =
-          toggleDecision.nextManualExpanded;
+          toggleDecision.nextManualExpanded ?? new Set<string>();
         expansionIntentRef.current.collapsed[axis] =
-          toggleDecision.nextManualCollapsed;
+          toggleDecision.nextManualCollapsed ?? new Set<string>();
         hydrateAtomic(true).catch(reportAsyncError);
       }
     },

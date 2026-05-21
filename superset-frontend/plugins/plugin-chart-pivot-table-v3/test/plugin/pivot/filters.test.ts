@@ -151,7 +151,10 @@ describe('selected filter state helpers', () => {
           region: ['EU'],
           Unknown: ['ignored'],
         },
-        dimensions: ['Country', { label: 'Region', sqlExpression: 'region' }],
+        dimensions: [
+          'Country',
+          { expressionType: 'SQL', label: 'Region', sqlExpression: 'region' },
+        ],
       }),
     ).toEqual({
       Country: ['France'],
@@ -167,7 +170,10 @@ describe('selected filter state helpers', () => {
   it('resolves runtime selection sync precedence for user-controlled charts', () => {
     expect(
       buildRuntimeSelectionSyncState({
-        dimensions: ['Country', { label: 'Region', sqlExpression: 'region' }],
+        dimensions: [
+          'Country',
+          { expressionType: 'SQL', label: 'Region', sqlExpression: 'region' },
+        ],
         selectedFiltersFromFormData: { Country: ['France'] },
         selectedFiltersFromOwnState: { region: ['EU'] },
         selectedFiltersFromProps: { Country: ['Germany'] },
@@ -217,7 +223,10 @@ describe('selected filter state helpers', () => {
 
     expect(
       buildTreeDimensionFilterValues({
-        dimensions: ['country', { label: 'Region', sqlExpression: 'region' }],
+        dimensions: [
+          'country',
+          { expressionType: 'SQL', label: 'Region', sqlExpression: 'region' },
+        ],
         rows,
         cols,
         program: testProgram({

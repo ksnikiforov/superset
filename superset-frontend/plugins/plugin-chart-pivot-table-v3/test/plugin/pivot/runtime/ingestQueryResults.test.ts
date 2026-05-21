@@ -27,6 +27,7 @@ import {
   materializeLoadedPivotTreeFromFactStoreAsync,
 } from '../../fixtures/metricAxis';
 import { buildLayoutContext } from '../../../../src/pivot/layout/LayoutContext';
+import { type DataRecordValue } from '@superset-ui/core';
 import { MetricsLayoutEnum } from '../../../../src/types';
 import {
   encodeMetricKey,
@@ -303,7 +304,8 @@ test('materializes projected date labels when values are before dimensions', () 
     metrics: ['sales'],
     metricsLayout: MetricsLayoutEnum.ROWS,
     dateFormatters: {
-      order_date: value => `date:${new Date(Number(value)).getUTCMonth() + 1}`,
+      order_date: (value: DataRecordValue) =>
+        `date:${new Date(Number(value)).getUTCMonth() + 1}`,
     },
   });
   const tree = materializeLoadedPivotTreeFromFactStore({

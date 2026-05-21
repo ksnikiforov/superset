@@ -203,7 +203,7 @@ export const resolveExpansionToggleDecision = ({
 }) => {
   const isOpen = expanded.has(node.key) || manualExpanded.has(node.key);
   if (isOpen) {
-    return { kind: 'collapse' };
+    return { kind: 'collapse' as const };
   }
 
   const nextManualExpanded = new Set(manualExpanded);
@@ -211,7 +211,7 @@ export const resolveExpansionToggleDecision = ({
   const nextManualCollapsed = new Set(manualCollapsed);
   nextManualCollapsed.delete(node.key);
   return {
-    kind: 'expand',
+    kind: 'expand' as const,
     nextManualExpanded,
     nextManualCollapsed,
   };

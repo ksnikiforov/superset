@@ -50,11 +50,9 @@ const baseTree: PivotTreeData = {
 const baseFormatting: PivotFormattingResult = {
   metricFormattingScope: 'values',
   metricDatabars: {},
-  formattingKeyMap: {},
-  evaluateExcelMetricFormatting: () => undefined,
   databarColumnMinWidths: new Map(),
-  treeDataSignature: '',
   resolveDimensionStyle: () => undefined,
+  resolveMetricCellFormatting: () => ({}),
   deriveMetricKey: () => '',
   renderCellContent: () => null,
   renderDatabarContent: () => null,

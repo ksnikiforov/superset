@@ -53,6 +53,7 @@ const baseQueryContextKey = buildPivotFactQueryContextKey(baseFormData);
 const emptyMetrics: PivotTableQueryFormData['metrics'] = [];
 const emptyGroupbyRows: PivotTableQueryFormData['groupbyRows'] = [];
 const emptyGroupbyColumns: PivotTableQueryFormData['groupbyColumns'] = [];
+type TestGroupby = PivotTableQueryFormData['groupbyRows'] | string[];
 
 const buildPreloadedQueryContextKey = (formData: PivotTableQueryFormData) =>
   buildPivotFactQueryContextKey(
@@ -64,8 +65,8 @@ const buildPreloadedQueryContextKey = (formData: PivotTableQueryFormData) =>
 
 type LegacyTestPivotProps = {
   metrics?: PivotTableQueryFormData['metrics'];
-  groupbyRows: PivotTableQueryFormData['groupbyRows'];
-  groupbyColumns: PivotTableQueryFormData['groupbyColumns'];
+  groupbyRows: TestGroupby;
+  groupbyColumns: TestGroupby;
   startCollapsed?: PivotTableQueryFormData['startCollapsed'];
   initialDepth?: PivotTableQueryFormData['initialDepth'];
   rowTotals?: PivotTableQueryFormData['rowTotals'];
@@ -77,10 +78,13 @@ type LegacyTestPivotProps = {
   rowSubtotalPosition?: PivotTableQueryFormData['rowSubtotalPosition'];
   colTotalPosition?: PivotTableQueryFormData['colTotalPosition'];
   colSubtotalPosition?: PivotTableQueryFormData['colSubtotalPosition'];
+  rowOrder?: PivotTableQueryFormData['rowOrder'];
+  colOrder?: PivotTableQueryFormData['colOrder'];
   aggregateFunction?: PivotTableQueryFormData['aggregateFunction'];
   valueFormat?: PivotTableQueryFormData['valueFormat'];
   columnFormats?: PivotTableQueryFormData['columnFormats'];
   currencyFormats?: PivotTableQueryFormData['currencyFormats'];
+  dateFormatters?: PivotTableQueryFormData['dateFormatters'];
   verboseMap?: PivotTableQueryFormData['verboseMap'];
   allowRenderHtml?: PivotTableQueryFormData['allowRenderHtml'];
   metricColorFormatters?: unknown[];
@@ -445,7 +449,7 @@ export const buildPreloadedRenderedBranchFactBatches = (
 
 export const buildPreloadedTreeFactBatches = (
   tree: PivotTreeData | undefined,
-  groupby: Pick<LegacyTestPivotProps, 'groupbyRows' | 'groupbyColumns'> = {
+  groupby: PreloadedFactBatchContext = {
     groupbyRows: [],
     groupbyColumns: [],
   },
@@ -456,7 +460,7 @@ export const buildPreloadedTreeFactBatches = (
 
 export const buildPreloadedRenderedTreeFactBatches = (
   tree: PivotTreeData | undefined,
-  groupby: Pick<LegacyTestPivotProps, 'groupbyRows' | 'groupbyColumns'> = {
+  groupby: PreloadedFactBatchContext = {
     groupbyRows: [],
     groupbyColumns: [],
   },
@@ -467,6 +471,7 @@ export const buildPreloadedRenderedTreeFactBatches = (
 
 const baseProps: PivotTableProps & LegacyTestPivotProps = {
   data: emptyTree,
+  factBatches: [],
   formData: baseFormData,
   rawFormData: baseFormData,
   sourceMetrics: emptyMetrics,
@@ -505,10 +510,13 @@ const LEGACY_FORM_DATA_KEYS = [
   'rowSubtotalPosition',
   'colTotalPosition',
   'colSubtotalPosition',
+  'rowOrder',
+  'colOrder',
   'aggregateFunction',
   'valueFormat',
   'columnFormats',
   'currencyFormats',
+  'dateFormatters',
   'allowRenderHtml',
   'verboseMap',
 ] as const satisfies readonly (keyof PivotTableQueryFormData &

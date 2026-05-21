@@ -28,11 +28,11 @@ import {
   QueryFormMetric,
   SetDataMaskHook,
   HandlerFunction,
-  SupersetTheme,
   TimeFormatter,
   TimeGranularity,
 } from '@superset-ui/core';
 import { GenericDataType } from '@apache-superset/core/common';
+import { type SupersetTheme } from '@apache-superset/core/theme';
 import { type PivotFactStoreBatch } from './pivot/runtime/factStore';
 
 export type PivotAxis = 'row' | 'col';
@@ -40,7 +40,7 @@ export type PivotPathValue = DataRecordValue | undefined;
 export type PivotPath = PivotPathValue[];
 export type TotalPosition = 'start' | 'end';
 export type PivotTheme = 'none' | 'blue' | 'peach' | 'grey' | 'custom';
-export type PivotInteractionMode = 'fixed' | 'user_controlled';
+export type PivotInteractionMode = 'fixed' | 'user_controlled' | 'standard';
 
 export type PivotRuntimeLayout = {
   version: 1;
@@ -209,6 +209,8 @@ export type PivotAxisValueRef = {
 };
 
 export type PivotExpansionState = {
+  rowKeys?: string[];
+  colKeys?: string[];
   rows: PivotPath[];
   cols: PivotPath[];
   collapsedRows?: PivotPath[];
@@ -291,9 +293,35 @@ export type PivotTableQueryFormData = QueryFormData &
 export interface PivotTableProps {
   width: number;
   height: number;
+  margin?: PivotTableQueryFormData['margin'];
   data: PivotTreeData;
   factBatches: PivotFactStoreBatch[];
   formData: PivotTableQueryFormData;
+  metrics?: PivotTableQueryFormData['metrics'];
+  groupbyRows?: PivotTableQueryFormData['groupbyRows'];
+  groupbyColumns?: PivotTableQueryFormData['groupbyColumns'];
+  startCollapsed?: PivotTableQueryFormData['startCollapsed'];
+  initialDepth?: PivotTableQueryFormData['initialDepth'];
+  rowTotals?: PivotTableQueryFormData['rowTotals'];
+  colTotals?: PivotTableQueryFormData['colTotals'];
+  rowSubTotals?: PivotTableQueryFormData['rowSubTotals'];
+  rowSubtotalLevels?: PivotTableQueryFormData['rowSubtotalLevels'];
+  colSubtotalLevels?: PivotTableQueryFormData['colSubtotalLevels'];
+  rowTotalPosition?: PivotTableQueryFormData['rowTotalPosition'];
+  rowSubtotalPosition?: PivotTableQueryFormData['rowSubtotalPosition'];
+  colTotalPosition?: PivotTableQueryFormData['colTotalPosition'];
+  colSubtotalPosition?: PivotTableQueryFormData['colSubtotalPosition'];
+  rowOrder?: PivotTableQueryFormData['rowOrder'];
+  colOrder?: PivotTableQueryFormData['colOrder'];
+  aggregateFunction?: PivotTableQueryFormData['aggregateFunction'];
+  valueFormat?: PivotTableQueryFormData['valueFormat'];
+  columnFormats?: PivotTableQueryFormData['columnFormats'];
+  currencyFormats?: PivotTableQueryFormData['currencyFormats'];
+  dateFormatters?: PivotTableQueryFormData['dateFormatters'];
+  allowRenderHtml?: PivotTableQueryFormData['allowRenderHtml'];
+  metricsLayout?: PivotTableQueryFormData['metricsLayout'];
+  verboseMap?: PivotTableQueryFormData['verboseMap'];
+  metricColorFormatters?: unknown[];
   treeDataSignature?: string;
   queryFormData?: PivotTableQueryFormData;
   persistExpansionState?: boolean;

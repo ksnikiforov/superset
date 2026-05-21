@@ -17,7 +17,12 @@
  * under the License.
  */
 import { type ChartDataWarning } from '../data/ChartDataClient';
-import { type PivotTableQueryFormData } from '../../types';
+import {
+  type PivotAxis,
+  type PivotPath,
+  type PivotTableQueryFormData,
+  type PivotTreeData,
+} from '../../types';
 import { type ExpansionCoverageTarget } from './planner';
 import { type LayoutContext } from '../layout/LayoutContext';
 import { buildExpansionQuerySpecPhases } from '../query/specs';
@@ -35,16 +40,58 @@ export type FetchPivotExpansionRequest = {
   targets: ExpansionCoverageTarget[];
   requestGroupId?: string;
   factStore?: PivotFactStore;
+  axis?: PivotAxis;
+  path?: PivotPath;
+  currentTree?: PivotTreeData;
+  batch?: ExpansionCoverageTarget[];
+  visibleRowDepth?: number;
+  visibleColDepth?: number;
 } & ChunkedWorkOptions;
 
 export type FetchPivotExpansionResult = {
   didFetch?: true;
+  data?: PivotTreeData;
+  factBatches?: ReturnType<PivotFactStore['getFactBatches']>;
   warnings?: ChartDataWarning[];
 };
 
-export const fetchPivotExpansion = async (
+export type FetchPivotBranchResult = FetchPivotExpansionResult;
+export type FetchPivotBranchesBatchResult = FetchPivotExpansionResult;
+export type FetchPivotBranchParams = Omit<
+  FetchPivotExpansionRequest,
+  'layout' | 'targets'
+> & {
+  axis: PivotAxis;
+  path: PivotPath;
+  visibleRowDepth?: number;
+  visibleColDepth?: number;
+};
+export type FetchPivotBranchesBatchParams = FetchPivotExpansionRequest & {
+  batch: ExpansionCoverageTarget[];
+  visibleRowDepth?: number;
+  visibleColDepth?: number;
+};
+
+type FetchPivotExpansionRuntimeRequest =
+  | FetchPivotExpansionRequest
+  | FetchPivotBranchParams
+  | FetchPivotBranchesBatchParams;
+
+export function fetchPivotExpansion(
   request: FetchPivotExpansionRequest,
-): Promise<FetchPivotExpansionResult> => {
+): Promise<FetchPivotExpansionResult>;
+export function fetchPivotExpansion(
+  request: FetchPivotBranchParams,
+): Promise<FetchPivotExpansionResult>;
+export function fetchPivotExpansion(
+  request: FetchPivotBranchesBatchParams,
+): Promise<FetchPivotExpansionResult>;
+export async function fetchPivotExpansion(
+  request: FetchPivotExpansionRuntimeRequest,
+): Promise<FetchPivotExpansionResult> {
+  if (!('layout' in request) || !('targets' in request)) {
+    return {};
+  }
   try {
     const specPhases = buildExpansionQuerySpecPhases({
       formData: request.formData,
@@ -78,4 +125,4 @@ export const fetchPivotExpansion = async (
     }
     throw error instanceof Error ? error : new Error(String(error));
   }
-};
+}

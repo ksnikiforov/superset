@@ -32,6 +32,8 @@ import {
   ensureIsArray,
   getColumnLabel,
   type QueryFormColumn,
+  type QueryFormMetric,
+  isQueryFormMetric,
   isQueryFormColumn,
   SMART_DATE_ID,
   validateNonEmpty,
@@ -42,6 +44,7 @@ import { CheckboxChangeEvent } from '@superset-ui/core/components/Checkbox/types
 import {
   MetricsLayoutEnum,
   PivotInteractionMode,
+  type PivotRuntimeLayout,
   type PivotTableQueryFormData,
 } from './types';
 import {
@@ -158,7 +161,14 @@ const mapGroupbyControlStateToProps = (
 };
 
 const getQueryFormColumns = (value: unknown): QueryFormColumn[] =>
-  ensureIsArray<QueryFormColumn>(value).filter(isQueryFormColumn);
+  ensureIsArray<QueryFormColumn>(
+    value as QueryFormColumn | QueryFormColumn[] | null | undefined,
+  ).filter(isQueryFormColumn);
+
+const getQueryFormMetrics = (value: unknown): QueryFormMetric[] =>
+  ensureIsArray<QueryFormMetric>(
+    value as QueryFormMetric | QueryFormMetric[] | null | undefined,
+  ).filter(isQueryFormMetric);
 
 const buildDimensionMap = (columns: QueryFormColumn[]) =>
   new Map(columns.map(column => [getStableColumnKey(column), column] as const));
@@ -166,7 +176,7 @@ const buildDimensionMap = (columns: QueryFormColumn[]) =>
 const resolveRuntimeColumnDimensions = (
   state: ControlPanelState,
 ): QueryFormColumn[] => {
-  const runtimeLayout =
+  const runtimeLayout: PivotRuntimeLayout =
     state?.form_data?.pivotRuntimeLayout ??
     buildRuntimeLayoutFromFormData(
       (state?.form_data ?? {}) as PivotTableQueryFormData,
@@ -213,7 +223,7 @@ const withMetricsPlaceholder =
         typeof config.mapStateToProps === 'function'
           ? config.mapStateToProps(state, controlState, chartState)
           : {};
-      const metricsValue = ensureIsArray(state?.controls?.metrics?.value);
+      const metricsValue = getQueryFormMetrics(state?.controls?.metrics?.value);
       const hasMetrics = metricsValue.length > 0;
       const options = ensureIsArray<unknown>(base?.options);
       const hasPlaceholder = options.some(

@@ -25,7 +25,6 @@ import PivotTableChart, {
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
   MetricsLayoutEnum,
-  PivotPath,
   PivotRuntimeLayout,
   PivotTreeData,
 } from '../../../src/types';
@@ -39,6 +38,7 @@ import {
   fetchPivotExpansion,
   type FetchPivotExpansionRequest,
 } from '../../../src/pivot/expansion/fetchPivotExpansion';
+import { type PlannedQuerySpec } from '../../../src/pivot/query/specs';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
 import {
   buildMockExpansionFetchResult as buildMockCoverageFetchResult,
@@ -3036,13 +3036,19 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     );
 
     let resolveBranch:
-      | ((value: { data: PivotTreeData | undefined }) => void)
+      | ((
+          value: {
+            data: PivotTreeData | undefined;
+            factBatches?: PivotFactStoreBatch[];
+          },
+        ) => void)
       | undefined;
-    const branchPromise = new Promise<{ data: PivotTreeData | undefined }>(
-      resolve => {
+    const branchPromise = new Promise<{
+      data: PivotTreeData | undefined;
+      factBatches?: PivotFactStoreBatch[];
+    }>(resolve => {
         resolveBranch = resolve;
-      },
-    );
+      });
     fetchPivotBranchMock.mockImplementation(
       async (params: FetchPivotExpansionRequest) => {
         if (
@@ -3291,26 +3297,12 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(lastFetch?.formData?.pivotExpansionState).toBeUndefined();
     const plannedSpecs = lastFetch?.specs ?? [];
     const plannedSummary = plannedSpecs.map(
-      (spec: {
-        meta?: {
-          factSelector?: {
-            scope?: {
-              kind?: string;
-              axis?: string;
-              path?: PivotPath;
-              parentPath?: PivotPath;
-            };
-          };
-          coverage?: {
-            rowDepth?: number;
-            columnDepth?: number;
-          };
-        };
-      }) => {
+      (spec: PlannedQuerySpec) => {
         const scope = spec.meta?.factSelector?.scope;
         const path = scope?.kind === 'axisPaths' ? (scope.paths[0] ?? []) : [];
-        return `${scope?.kind ?? 'unknown'}:${scope?.axis ?? 'none'}:${serializePath(
-          path ?? [],
+        const axis = scope && 'axis' in scope ? scope.axis : 'none';
+        return `${scope?.kind ?? 'unknown'}:${axis}:${serializePath(
+          path,
         )}:${spec.meta?.factSelector?.coverage?.rowDepth ?? 0}:${
           spec.meta?.factSelector?.coverage?.columnDepth ?? 0
         }`;

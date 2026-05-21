@@ -133,6 +133,12 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const baseTree = buildTreeAtDepth(records, 1);
     const metricBranch = buildCollapsedBranch(records, 2);
     const returnFlagBranch = buildCollapsedBranch(records, 3);
+    void metricBranch;
+    void returnFlagBranch;
+    void metricBranch;
+    void returnFlagBranch;
+    void metricBranch;
+    void returnFlagBranch;
     const shipModeBranch = buildTreeAtDepth(records, 2);
     const shipModeReturnFlagBranch = buildTreeAtDepth(records, 3);
     const shipInstructionBranch = buildTreeAtDepth(records, 4);
@@ -389,6 +395,8 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const baseTree = buildTreeAtDepth(records, 1);
     const metricBranch = buildCollapsedBranch(records, 2);
     const returnFlagBranch = buildCollapsedBranch(records, 3);
+    void metricBranch;
+    void returnFlagBranch;
     const shipModeBranch = buildTreeAtDepth(records, 2);
     const shipModeReturnFlagBranch = buildTreeAtDepth(records, 3);
     const shipInstructionBranch = buildTreeAtDepth(records, 4);
@@ -921,6 +929,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       'orderStatus',
       'orderClass',
     ]);
+    void orderStatusBranch;
     const orderClassBranch = buildCollapsedBranch(3, [
       'orderPriority',
       'orderStatus',
@@ -1000,6 +1009,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const statusRow = (await waitFor(() =>
       within(tbody).getByText(/^F$/).closest('tr'),
     )) as HTMLElement;
+    void statusRow;
 
     expect(within(tbody).getByText('A')).toBeInTheDocument();
   });

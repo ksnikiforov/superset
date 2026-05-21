@@ -22,7 +22,7 @@ import { buildFormData } from '../fixtures/pivotFormData';
 
 const specScopeKind = (
   spec: ReturnType<typeof buildInitialQuerySpecs>[number],
-) => spec.meta.factSelector.scope.kind;
+): string => spec.meta.factSelector.scope.kind;
 
 describe('buildInitialQuerySpecs (contracts)', () => {
   it('does not replay persisted expansion branches in the initial query plan', () => {

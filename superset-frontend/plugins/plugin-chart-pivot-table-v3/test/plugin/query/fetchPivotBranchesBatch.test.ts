@@ -33,6 +33,7 @@ import {
 import { serializeCellKey, serializePath } from '../../../src/pivot/core/path';
 import {
   MetricsLayoutEnum,
+  type PivotPathValue,
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../../src/types';
@@ -94,6 +95,9 @@ const mockPost = SupersetClient.post as jest.Mock;
 
 type TestBatchTarget = Pick<ExpansionCoverageTarget, 'axis' | 'pathKey'>;
 type TestBatchGroup = {
+  axis?: ExpansionCoverageTarget['axis'];
+  parentPathKey?: string;
+  siblingValues?: PivotPathValue[];
   targets: TestBatchTarget[];
 };
 
@@ -119,7 +123,7 @@ const withBatchCoverageTargets = ({
   }));
 
 const fetchBatch = (
-  params: Omit<FetchPivotExpansionRequest, 'layout' | 'targets'> & {
+  params: Omit<FetchPivotExpansionRequest, 'layout' | 'targets' | 'batch'> & {
     batch: TestBatchGroup;
     visibleRowDepth: number;
     visibleColDepth: number;

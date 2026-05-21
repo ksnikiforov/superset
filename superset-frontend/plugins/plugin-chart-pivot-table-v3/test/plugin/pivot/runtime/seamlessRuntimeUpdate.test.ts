@@ -17,7 +17,10 @@
  * under the License.
  */
 
-import { type PivotRuntimeLayout } from '../../../../src/types';
+import {
+  type PivotRuntimeLayout,
+  type PivotTableQueryFormData,
+} from '../../../../src/types';
 import {
   buildSeamlessRuntimeSyncSnapshot,
   buildSeamlessRuntimeUpstreamSignature,
@@ -51,7 +54,15 @@ test('builds stable upstream dashboard query-context signatures', () => {
   expect(buildSeamlessRuntimeUpstreamSignature()).toBeNull();
   expect(
     buildSeamlessRuntimeUpstreamSignature({
-      adhoc_filters: [{ col: 'country', op: '==', val: 'France' }],
+      adhoc_filters: [
+        {
+          clause: 'WHERE',
+          expressionType: 'SIMPLE',
+          subject: 'country',
+          operator: '==',
+          comparator: 'France',
+        } as const,
+      ],
       extra_form_data: {
         filters: [{ col: 'region', op: 'IN', val: ['EU'] }],
       },
@@ -61,7 +72,7 @@ test('builds stable upstream dashboard query-context signatures', () => {
       time_offsets: ['1 year ago'],
       time_range: 'No filter',
       viz_type: 'pivot_table_v3',
-    }),
+    } as unknown as PivotTableQueryFormData),
   ).toBe(
     '{"adhoc_filters":[{"col":"country","op":"==","val":"France"}],"extra_form_data":{"filters":[{"col":"region","op":"IN","val":["EU"]}]},"extras":{"time_grain_sqla":"P1D"},"granularity_sqla":"ds","time_grain_sqla":null,"time_offsets":["1 year ago"],"time_range":"No filter"}',
   );

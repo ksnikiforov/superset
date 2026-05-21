@@ -379,6 +379,7 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
       collapsedColGroupby,
       1,
     );
+    void metricBranch;
     const col1Branch = applyMetricAxis(
       buildTreeFromRecords(
         [expandedRecord],
@@ -448,6 +449,7 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
     const collapseMetricCell = within(thead)
       .getByText('measure1')
       .closest('th') as HTMLElement;
+    void collapseMetricCell;
     expect(await findByText('C2-A')).toBeInTheDocument();
     expect(within(thead).queryByText('C3-A')).not.toBeInTheDocument();
   });
