@@ -27,7 +27,6 @@ import { rootKey } from '../../../src/pivot/viewModel';
 import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
-  SUBTOTAL_TOKEN,
 } from '../../../src/pivot/core/tokens';
 import {
   parsePath,
@@ -301,7 +300,7 @@ describe('pivot/expansion/stateTransitions', () => {
   });
 
   test('plans fetch targets for expanded nodes', () => {
-    const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
+    const { aKey, xKey } = buildTree({ includeIntersectionCell: true });
     const loadedRootCoverage: PivotFactSelector = {
       coverage: {
         rowDepth: 1,
@@ -317,7 +316,6 @@ describe('pivot/expansion/stateTransitions', () => {
       valueKeys: ['sales'],
     };
     const plan = planHydrationIteration({
-      tree,
       desired: {
         row: new Set([rootKey, aKey]),
         col: new Set([rootKey, xKey]),
@@ -348,9 +346,8 @@ describe('pivot/expansion/stateTransitions', () => {
   });
 
   test('plans both visible axes through manifest coverage', () => {
-    const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
+    const { aKey, xKey } = buildTree({ includeIntersectionCell: true });
     const plan = planHydrationIteration({
-      tree,
       desired: {
         row: new Set([rootKey, aKey]),
         col: new Set([rootKey, xKey]),
@@ -397,9 +394,8 @@ describe('pivot/expansion/stateTransitions', () => {
   });
 
   test('suppresses redundant singleton intersection fetches', () => {
-    const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: false });
+    const { aKey, xKey } = buildTree({ includeIntersectionCell: false });
     const plan = planHydrationIteration({
-      tree,
       desired: {
         row: new Set([rootKey, aKey]),
         col: new Set([rootKey, xKey]),
@@ -420,7 +416,7 @@ describe('pivot/expansion/stateTransitions', () => {
   });
 
   test('does not fetch the opposite root branch for one-axis expansion', () => {
-    const { tree, xKey } = buildTree({ includeIntersectionCell: true });
+    const { xKey } = buildTree({ includeIntersectionCell: true });
     const loadedBootstrapCoverage: PivotFactSelector = {
       coverage: {
         rowDepth: 1,
@@ -432,7 +428,6 @@ describe('pivot/expansion/stateTransitions', () => {
       valueKeys: ['sales'],
     };
     const plan = planHydrationIteration({
-      tree,
       desired: {
         row: new Set([rootKey]),
         col: new Set([rootKey, xKey]),
@@ -459,7 +454,7 @@ describe('pivot/expansion/stateTransitions', () => {
   });
 
   test('does not fetch the opposite root branch for row-only expansion', () => {
-    const { tree, aKey } = buildTree({ includeIntersectionCell: true });
+    const { aKey } = buildTree({ includeIntersectionCell: true });
     const loadedBootstrapCoverage: PivotFactSelector = {
       coverage: {
         rowDepth: 1,
@@ -471,7 +466,6 @@ describe('pivot/expansion/stateTransitions', () => {
       valueKeys: ['sales'],
     };
     const plan = planHydrationIteration({
-      tree,
       desired: {
         row: new Set([rootKey, aKey]),
         col: new Set([rootKey]),
@@ -498,7 +492,7 @@ describe('pivot/expansion/stateTransitions', () => {
   });
 
   test('does not fetch the opposite root branch after the expanded branch is loaded', () => {
-    const { tree, xKey } = buildTree({ includeIntersectionCell: true });
+    const { xKey } = buildTree({ includeIntersectionCell: true });
     const loadedBootstrapCoverage: PivotFactSelector = {
       coverage: {
         rowDepth: 1,
@@ -524,7 +518,6 @@ describe('pivot/expansion/stateTransitions', () => {
       valueKeys: ['sales'],
     };
     const plan = planHydrationIteration({
-      tree,
       desired: {
         row: new Set([rootKey]),
         col: new Set([rootKey, xKey]),
@@ -536,12 +529,9 @@ describe('pivot/expansion/stateTransitions', () => {
     expect(plan.kind).toBe('complete');
   });
 
-  test('does not plan intersection fetches before both axis nodes are loaded', () => {
-    const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: false });
-    delete tree.rows[aKey];
-
+  test('does not plan intersection fetches before both axes have expanded paths', () => {
+    const { aKey, xKey } = buildTree({ includeIntersectionCell: false });
     const plan = planHydrationIteration({
-      tree,
       desired: {
         row: new Set([rootKey, aKey]),
         col: new Set([rootKey, xKey]),
@@ -563,28 +553,8 @@ describe('pivot/expansion/stateTransitions', () => {
   });
 
   test('fetches expanded row branches when only stale metric variants exist', () => {
-    const metricToken = encodeMetricKey('m1');
     const aKey = serializePath(['A']);
-    const aMetricKey = serializePath(['A', metricToken]);
     const xKey = serializePath(['X']);
-    const tree: PivotTreeData = {
-      rows: {
-        [rootKey]: makeNode('row', [], true),
-        [aKey]: makeNode('row', ['A'], true),
-        [aMetricKey]: makeNode('row', ['A', metricToken], false),
-      },
-      cols: {
-        [rootKey]: makeNode('col', [], true),
-        [xKey]: makeNode('col', ['X'], false),
-      },
-      cells: {
-        [serializeCellKey(aKey, xKey)]: {
-          rowKey: aKey,
-          colKey: xKey,
-          values: {},
-        },
-      },
-    };
     const metricProgram = compilePivotProgram({
       groupbyRows: ['country', 'city'],
       groupbyColumns: ['month', 'day', METRICS_PLACEHOLDER],
@@ -593,7 +563,6 @@ describe('pivot/expansion/stateTransitions', () => {
     });
 
     const plan = planHydrationIteration({
-      tree,
       desired: {
         row: new Set([rootKey, aKey]),
         col: new Set([rootKey, xKey]),
@@ -607,34 +576,8 @@ describe('pivot/expansion/stateTransitions', () => {
   });
 
   test('fetches expanded row branches when only subtotal+metric descendants exist at same base depth', () => {
-    const metricToken = encodeMetricKey('m1');
     const aKey = serializePath(['A']);
-    const subtotalKey = serializePath(['A', SUBTOTAL_TOKEN]);
-    const subtotalMetricKey = serializePath(['A', SUBTOTAL_TOKEN, metricToken]);
     const xKey = serializePath(['X']);
-    const tree: PivotTreeData = {
-      rows: {
-        [rootKey]: makeNode('row', [], true),
-        [aKey]: makeNode('row', ['A'], true),
-        [subtotalKey]: makeNode('row', ['A', SUBTOTAL_TOKEN], true),
-        [subtotalMetricKey]: makeNode(
-          'row',
-          ['A', SUBTOTAL_TOKEN, metricToken],
-          false,
-        ),
-      },
-      cols: {
-        [rootKey]: makeNode('col', [], true),
-        [xKey]: makeNode('col', ['X'], false),
-      },
-      cells: {
-        [serializeCellKey(subtotalMetricKey, xKey)]: {
-          rowKey: subtotalMetricKey,
-          colKey: xKey,
-          values: {},
-        },
-      },
-    };
     const metricProgram = compilePivotProgram({
       groupbyRows: ['country', 'city', METRICS_PLACEHOLDER],
       groupbyColumns: ['month', 'day'],
@@ -643,7 +586,6 @@ describe('pivot/expansion/stateTransitions', () => {
     });
 
     const plan = planHydrationIteration({
-      tree,
       desired: {
         row: new Set([rootKey, aKey]),
         col: new Set([rootKey, xKey]),

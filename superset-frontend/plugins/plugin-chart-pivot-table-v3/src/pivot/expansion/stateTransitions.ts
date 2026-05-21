@@ -40,6 +40,7 @@ import { isMetricTokenForKeys } from '../core/tokens';
 import { createMetricNodePolicy } from '../metricsTotals';
 
 export const PIVOT_AXES: PivotAxis[] = ['row', 'col'];
+type AxisSetMap = Record<PivotAxis, Set<string>>;
 
 const findMetricIndex = (
   path: PivotTreeNode['path'],
@@ -112,47 +113,28 @@ const expandMetricPatternExpansions = ({
   return resolved;
 };
 
-export const getStablePrefixLength = (prev: string[], next: string[]) => {
-  const max = Math.min(prev.length, next.length);
-  let prefix = 0;
-  while (prefix < max && prev[prefix] === next[prefix]) {
-    prefix += 1;
-  }
-  return prefix;
-};
-
-export const isSameLayout = (left?: string[], right?: string[]) =>
-  Boolean(
-    left &&
-    right &&
-    left.length === right.length &&
-    left.every((value, idx) => value === right[idx]),
-  );
-
-export type PivotLayoutKeyState = {
-  rows: string[];
-  cols: string[];
-};
-
-type ResolveLayoutTransitionInput = {
-  previousLayout: PivotLayoutKeyState;
-  currentLayout: PivotLayoutKeyState;
-};
-
-export const isPrefix = (prefix: string[], target: string[]) =>
-  prefix.length <= target.length &&
-  prefix.every((value, idx) => value === target[idx]);
+export type PivotLayoutKeyState = Record<'rows' | 'cols', string[]>;
+type ResolveLayoutTransitionInput = Record<
+  'previousLayout' | 'currentLayout',
+  PivotLayoutKeyState
+>;
 
 export const resolveLayoutTransition = ({
   previousLayout,
   currentLayout,
 }: ResolveLayoutTransitionInput) => {
-  const buildAxisTransition = (previous: string[], current: string[]) => ({
-    changed: !isSameLayout(previous, current),
-    shouldExpand:
-      current.length > previous.length && isPrefix(previous, current),
-    stablePrefix: getStablePrefixLength(previous, current),
-  });
+  const buildAxisTransition = (previous: string[], current: string[]) => {
+    const changedAt = previous.findIndex(
+      (value, idx) => value !== current[idx],
+    );
+    const stablePrefix =
+      changedAt < 0 ? Math.min(previous.length, current.length) : changedAt;
+    return {
+      changed: previous.length !== current.length || changedAt >= 0,
+      shouldExpand: current.length > previous.length && changedAt < 0,
+      stablePrefix,
+    };
+  };
   return {
     row: buildAxisTransition(previousLayout.rows, currentLayout.rows),
     col: buildAxisTransition(previousLayout.cols, currentLayout.cols),
@@ -298,6 +280,47 @@ export const resolveExpandedForMetrics = ({
   return next;
 };
 
+export const resolveExpandedByAxisForTree = ({
+  tree,
+  axisCoverageNeeds,
+  manualExpanded,
+  manualCollapsed,
+  program,
+  isLeafTierVisible = false,
+}: {
+  tree: PivotTreeData;
+  axisCoverageNeeds: PivotAxisCoverageNeed[];
+  manualExpanded: AxisSetMap;
+  manualCollapsed: AxisSetMap;
+  program: PivotProgram;
+  isLeafTierVisible?: boolean;
+}) =>
+  Object.fromEntries(
+    PIVOT_AXES.map(axis => [
+      axis,
+      resolveExpandedForMetrics({
+        axis,
+        tree,
+        collapsed: manualCollapsed[axis],
+        program,
+        isLeafTierVisible,
+        expanded: buildDesiredExpandedKeys({
+          axis,
+          nodes: axis === 'row' ? tree.rows : tree.cols,
+          baseExpanded: buildExpandedKeysForCoverageNeeds({
+            axis,
+            tree,
+            axisCoverageNeeds,
+            program,
+          }),
+          program,
+          manualExpanded: manualExpanded[axis],
+          manualCollapsed: manualCollapsed[axis],
+        }),
+      }),
+    ]),
+  ) as AxisSetMap;
+
 type ExpansionReinitAxis = {
   axis: PivotAxis;
   axisCoverageNeeds: PivotAxisCoverageNeed[];
@@ -371,63 +394,103 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
   };
 };
 
-export const resolveReinitializedExpansionState = (params: {
-  tree: PivotTreeData;
+export const resolveExpansionReinitializationPlan = (params: {
+  previousSemanticSignature: string | null;
+  nextSemanticSignature: string;
+  previousData: PivotTreeData | null;
+  data: PivotTreeData;
+  currentTree: PivotTreeData;
+  previousLayout: PivotLayoutKeyState;
+  currentLayout: PivotLayoutKeyState;
   sessionState: PivotExpansionStateKeys;
   axisCoverageNeeds: PivotAxisCoverageNeed[];
-  layoutTransition: ReturnType<typeof resolveLayoutTransition>;
-  resetExpanded: Record<PivotAxis, boolean>;
-  hasNewData: boolean;
   program: PivotProgram;
+  isLeafTierVisible?: boolean;
 }) => {
-  const { tree, sessionState } = params;
+  const hasNewData = params.previousData !== params.data;
+  const tree = hasNewData ? params.data : params.currentTree;
+  const layoutTransition = resolveLayoutTransition({
+    previousLayout: params.previousLayout,
+    currentLayout: params.currentLayout,
+  });
+  const layoutChanged = PIVOT_AXES.some(axis => layoutTransition[axis].changed);
+  const isInitialMount = params.previousSemanticSignature === null;
+  const semanticSignatureChanged =
+    params.previousSemanticSignature !== params.nextSemanticSignature;
+  if (
+    !isInitialMount &&
+    !semanticSignatureChanged &&
+    !layoutChanged &&
+    !hasNewData
+  ) {
+    return undefined;
+  }
+  const resetExpanded = Object.fromEntries(
+    PIVOT_AXES.map(axis => [
+      axis,
+      semanticSignatureChanged ||
+        (layoutTransition[axis].changed &&
+          !layoutTransition[axis].shouldExpand),
+    ]),
+  ) as Record<PivotAxis, boolean>;
   const includeMetricDepth = (axis: PivotAxis) => {
     const metricIndex = getValuesLevelIndex(params.program, axis);
     const dimensionCount = getAxisDimensionCount(params.program, axis);
     return metricIndex !== undefined && metricIndex < dimensionCount;
   };
-  const axisInputs = {
-    row: {
-      keys: sessionState.rows ?? [],
-      collapsed: sessionState.collapsedRows ?? [],
-      nodes: tree.rows,
-      stablePrefix: params.layoutTransition.row.stablePrefix,
-      reset: params.resetExpanded.row,
-      changed: params.layoutTransition.row.changed,
-    },
-    col: {
-      keys: sessionState.cols ?? [],
-      collapsed: sessionState.collapsedCols ?? [],
-      nodes: tree.cols,
-      stablePrefix: params.layoutTransition.col.stablePrefix,
-      reset: params.resetExpanded.col,
-      changed: params.layoutTransition.col.changed,
-    },
-  };
+  const { sessionState } = params;
   const axisState = Object.fromEntries(
     PIVOT_AXES.map(axis => [
       axis,
       resolveExpansionCacheAxis({
-        ...axisInputs[axis],
         axis,
+        keys:
+          axis === 'row'
+            ? (sessionState.rows ?? [])
+            : (sessionState.cols ?? []),
+        collapsed:
+          axis === 'row'
+            ? (sessionState.collapsedRows ?? [])
+            : (sessionState.collapsedCols ?? []),
+        nodes: axis === 'row' ? tree.rows : tree.cols,
+        stablePrefix: layoutTransition[axis].stablePrefix,
+        reset: resetExpanded[axis],
+        changed: layoutTransition[axis].changed,
         axisCoverageNeeds: params.axisCoverageNeeds,
         tree,
         program: params.program,
-        hasNewData: params.hasNewData,
+        hasNewData,
         includeMetricDepth: includeMetricDepth(axis),
       }),
     ]),
   ) as Record<PivotAxis, ReturnType<typeof resolveExpansionCacheAxis>>;
+  const persistedState = {
+    rows: axisState.row.prunedManualKeys,
+    cols: axisState.col.prunedManualKeys,
+    collapsedRows: axisState.row.prunedCollapsedKeys,
+    collapsedCols: axisState.col.prunedCollapsedKeys,
+  };
   return {
-    persistedState: {
-      rows: axisState.row.prunedManualKeys,
-      cols: axisState.col.prunedManualKeys,
-      collapsedRows: axisState.row.prunedCollapsedKeys,
-      collapsedCols: axisState.col.prunedCollapsedKeys,
-    },
-    expanded: {
-      row: axisState.row.expandedKeys,
-      col: axisState.col.expandedKeys,
-    },
+    tree,
+    persistedState,
+    expanded: Object.fromEntries(
+      PIVOT_AXES.map(axis => [
+        axis,
+        resolveExpandedForMetrics({
+          axis,
+          expanded: axisState[axis].expandedKeys,
+          tree,
+          collapsed: new Set(
+            axis === 'row'
+              ? persistedState.collapsedRows
+              : persistedState.collapsedCols,
+          ),
+          program: params.program,
+          isLeafTierVisible: params.isLeafTierVisible,
+        }),
+      ]),
+    ) as AxisSetMap,
+    shouldPersistReset:
+      !isInitialMount && PIVOT_AXES.some(axis => resetExpanded[axis]),
   };
 };

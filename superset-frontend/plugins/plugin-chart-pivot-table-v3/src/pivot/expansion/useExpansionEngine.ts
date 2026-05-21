@@ -32,7 +32,6 @@ import {
   type PivotTreeNode,
 } from '../../types';
 import {
-  buildDesiredExpandedKeys,
   type PivotExpansionStateKeys,
   coerceExpansionState,
 } from './stateModel';
@@ -51,15 +50,12 @@ import { type PivotAxisCoverageNeed } from '../runtime/coverage';
 import {
   PIVOT_AXES,
   resolveCollapsedExpansionState,
+  resolveExpandedByAxisForTree,
   resolveExpansionToggleDecision,
-  resolveReinitializedExpansionState,
+  resolveExpansionReinitializationPlan,
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
-  resolveLayoutTransition,
 } from './stateTransitions';
-import {
-  buildExpandedKeysForCoverageNeeds,
-  planHydrationIteration,
-} from './planner';
+import { planHydrationIteration } from './planner';
 import { useSyncRef } from '../shared/useSyncRef';
 import { createLatestRequestLifecycle } from '../runtime/requestLifecycle';
 import { StaleChunkedWorkError } from '../runtime/chunkedWork';
@@ -327,52 +323,6 @@ export const useExpansionEngine = ({
     );
   }, []);
 
-  const resolveExpandedForMetrics = useCallback(
-    (axis: PivotAxis, nextExpanded: Set<string>, nextTree: PivotTreeData) =>
-      resolveExpandedForMetricsBase({
-        axis,
-        expanded: nextExpanded,
-        tree: nextTree,
-        collapsed: expansionIntentRef.current.collapsed[axis],
-        program: pivotProgram,
-        isLeafTierVisible:
-          fetchLayout.measureHierarchy.leafTierVisibility === 'visible',
-      }),
-    [fetchLayout.measureHierarchy.leafTierVisibility, pivotProgram],
-  );
-
-  const resolveExpandedByAxisForMetrics = useCallback(
-    (expanded: AxisSetMap, nextTree: PivotTreeData): AxisSetMap =>
-      Object.fromEntries(
-        PIVOT_AXES.map(axis => [
-          axis,
-          resolveExpandedForMetrics(axis, expanded[axis], nextTree),
-        ]),
-      ) as AxisSetMap,
-    [resolveExpandedForMetrics],
-  );
-
-  const buildDesiredExpanded = useCallback(
-    (axis: PivotAxis, nextTree: PivotTreeData) => {
-      const nodes = axis === 'row' ? nextTree.rows : nextTree.cols;
-      const baseExpanded = buildExpandedKeysForCoverageNeeds({
-        axis,
-        tree: nextTree,
-        axisCoverageNeeds,
-        program: pivotProgram,
-      });
-      return buildDesiredExpandedKeys({
-        axis,
-        nodes,
-        baseExpanded,
-        program: pivotProgram,
-        manualExpanded: expansionIntentRef.current.expanded[axis],
-        manualCollapsed: expansionIntentRef.current.collapsed[axis],
-      });
-    },
-    [axisCoverageNeeds, pivotProgram],
-  );
-
   const collapseNode = useCallback(
     (axis: PivotAxis, node: PivotTreeNode) => {
       const expanded = expandedRef.current[axis];
@@ -390,17 +340,26 @@ export const useExpansionEngine = ({
       expansionIntentRef.current.collapsed[axis] =
         collapsedState.nextManualCollapsed;
 
-      const resolvedExpanded = resolveExpandedForMetrics(
+      const resolvedExpanded = resolveExpandedForMetricsBase({
         axis,
-        collapsedState.nextExpanded,
-        treeRef.current,
-      );
+        expanded: collapsedState.nextExpanded,
+        tree: treeRef.current,
+        collapsed: expansionIntentRef.current.collapsed[axis],
+        program: pivotProgram,
+        isLeafTierVisible:
+          fetchLayout.measureHierarchy.leafTierVisibility === 'visible',
+      });
       commitExpansionState({
         expanded: { [axis]: resolvedExpanded },
       });
       persistExpansionState();
     },
-    [commitExpansionState, persistExpansionState, resolveExpandedForMetrics],
+    [
+      commitExpansionState,
+      fetchLayout.measureHierarchy.leafTierVisibility,
+      persistExpansionState,
+      pivotProgram,
+    ],
   );
 
   const planHydrationFromIntent = useCallback(() => {
@@ -441,20 +400,22 @@ export const useExpansionEngine = ({
       onFactBatchesChange?.(factStore.getFactBatches());
       commitExpansionState({
         tree: result.tree,
-        expanded: resolveExpandedByAxisForMetrics(
-          {
-            row: buildDesiredExpanded('row', result.tree),
-            col: buildDesiredExpanded('col', result.tree),
-          },
-          result.tree,
-        ),
+        expanded: resolveExpandedByAxisForTree({
+          tree: result.tree,
+          axisCoverageNeeds,
+          manualExpanded: expansionIntentRef.current.expanded,
+          manualCollapsed: expansionIntentRef.current.collapsed,
+          program: pivotProgram,
+          isLeafTierVisible:
+            fetchLayout.measureHierarchy.leafTierVisibility === 'visible',
+        }),
       });
       if (persistOnComplete) {
         persistExpansionState();
       }
     },
     [
-      buildDesiredExpanded,
+      axisCoverageNeeds,
       commitExpansionState,
       expansionRequestLifecycle,
       expansionInstanceId,
@@ -463,8 +424,8 @@ export const useExpansionEngine = ({
       addWarnings,
       onFactBatchesChange,
       persistExpansionState,
+      pivotProgram,
       planHydrationFromIntent,
-      resolveExpandedByAxisForMetrics,
     ],
   );
 
@@ -498,73 +459,48 @@ export const useExpansionEngine = ({
   useEffect(() => {
     const previousSemanticSignature = expansionSemanticSignatureRef.current;
     expansionSemanticSignatureRef.current = expansionSemanticSignature;
-    const hasNewData = previousDataRef.current !== data;
-    const sessionExpansionState = expansionIntentToStateKeys(
-      expansionIntentRef.current,
-    );
     const currentLayout = {
       rows: groupbyRowKeys,
       cols: groupbyColumnKeys,
     };
-    const previousLayout = previousLayoutRef.current;
-    const normalizedTree = hasNewData ? data : treeRef.current;
-    const layoutTransition = resolveLayoutTransition({
-      previousLayout,
+    const reinitializationPlan = resolveExpansionReinitializationPlan({
+      previousSemanticSignature,
+      nextSemanticSignature: expansionSemanticSignature,
+      previousData: previousDataRef.current,
+      data,
+      currentTree: treeRef.current,
+      previousLayout: previousLayoutRef.current,
       currentLayout,
+      sessionState: expansionIntentToStateKeys(expansionIntentRef.current),
+      axisCoverageNeeds,
+      program: pivotProgram,
+      isLeafTierVisible:
+        fetchLayout.measureHierarchy.leafTierVisibility === 'visible',
     });
-    const layoutChanged = PIVOT_AXES.some(
-      axis => layoutTransition[axis].changed,
-    );
-    const isInitialMount = previousSemanticSignature === null;
-    const semanticSignatureChanged =
-      previousSemanticSignature !== expansionSemanticSignature;
-    const shouldReinitialize =
-      isInitialMount || semanticSignatureChanged || layoutChanged || hasNewData;
-    if (!shouldReinitialize) {
+    if (!reinitializationPlan) {
       return;
     }
     previousLayoutRef.current = currentLayout;
     previousDataRef.current = data;
-    const shouldResetAxis = (axis: PivotAxis) =>
-      semanticSignatureChanged ||
-      (layoutTransition[axis].changed && !layoutTransition[axis].shouldExpand);
-    const resetExpanded = {
-      row: shouldResetAxis('row'),
-      col: shouldResetAxis('col'),
-    };
-    const shouldResetExpanded = PIVOT_AXES.some(axis => resetExpanded[axis]);
 
     expansionRequestLifecycle.invalidate();
     factStoreRef.current = createPivotFactStoreFromBatches(factBatches);
     setWarnings([]);
     setErrorMessage(undefined);
     setLoadingKeys(new Set());
-    const reinitializedExpansion = resolveReinitializedExpansionState({
-      tree: normalizedTree,
-      sessionState: sessionExpansionState,
-      axisCoverageNeeds,
-      layoutTransition,
-      resetExpanded,
-      hasNewData,
-      program: pivotProgram,
-    });
-    const { persistedState } = reinitializedExpansion;
-    expansionIntentRef.current = expansionStateKeysToIntent(persistedState);
-    if (!isInitialMount && shouldResetExpanded) {
+    expansionIntentRef.current = expansionStateKeysToIntent(
+      reinitializationPlan.persistedState,
+    );
+    if (reinitializationPlan.shouldPersistReset) {
       persistExpansionStateKeys(
-        persistedState,
+        reinitializationPlan.persistedState,
         expansionPersistenceDepsRef.current,
       );
     }
 
-    const resolvedExpanded = resolveExpandedByAxisForMetrics(
-      reinitializedExpansion.expanded,
-      normalizedTree,
-    );
-
     commitExpansionState({
-      tree: normalizedTree,
-      expanded: resolvedExpanded,
+      tree: reinitializationPlan.tree,
+      expanded: reinitializationPlan.expanded,
     });
 
     if (planHydrationFromIntent().kind === 'fetch') {
@@ -579,10 +515,10 @@ export const useExpansionEngine = ({
     groupbyColumnKeys,
     groupbyRowKeys,
     pivotProgram,
+    fetchLayout.measureHierarchy.leafTierVisibility,
     hydrateAtomic,
     planHydrationFromIntent,
     expansionRequestLifecycle,
-    resolveExpandedByAxisForMetrics,
     reportAsyncError,
   ]);
 

@@ -524,7 +524,6 @@ export const planHydrationIteration = ({
   factSelectors: PivotFactSelector[];
   program: PivotProgram;
   queryContextKey?: string;
-  tree?: PivotTreeData;
 }) => {
   const coverageDepths = Object.fromEntries(
     PIVOT_EXPANSION_AXES.map(axis => [
