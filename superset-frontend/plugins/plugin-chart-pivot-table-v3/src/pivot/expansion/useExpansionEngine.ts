@@ -55,13 +55,12 @@ import {
   resolveExpansionReinitializationPlan,
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
 } from './stateTransitions';
-import { planHydrationIteration } from './planner';
 import { useSyncRef } from '../shared/useSyncRef';
 import { createLatestRequestLifecycle } from '../runtime/requestLifecycle';
 import { StaleChunkedWorkError } from '../runtime/chunkedWork';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { getStableColumnKey } from '../../utils';
-import { executeExpansionHydration } from './hydrationExecutor';
+import { executeExpansionHydrationForIntent } from './hydrationExecutor';
 import { rootKey } from '../viewModel';
 
 type AxisSetMap = Record<PivotAxis, Set<string>>;
@@ -362,37 +361,29 @@ export const useExpansionEngine = ({
     ],
   );
 
-  const planHydrationFromIntent = useCallback(() => {
-    const factStore = factStoreRef.current as PivotFactStore;
-    return planHydrationIteration({
-      desired: {
-        row: new Set([rootKey, ...expansionIntentRef.current.expanded.row]),
-        col: new Set([rootKey, ...expansionIntentRef.current.expanded.col]),
-      },
-      axisCoverageNeeds,
-      factSelectors: factStore.getCoverageSelectors(queryContextKey),
-      program: pivotProgram,
-      queryContextKey,
-    });
-  }, [axisCoverageNeeds, pivotProgram, queryContextKey]);
-
   const hydrateAtomic = useCallback(
-    async (persistOnComplete = false) => {
+    async ({
+      persistOnComplete = false,
+      skipWhenComplete = false,
+    }: {
+      persistOnComplete?: boolean;
+      skipWhenComplete?: boolean;
+    } = {}) => {
       const factStore = factStoreRef.current as PivotFactStore;
-      const plan = planHydrationFromIntent();
-
-      const result =
-        plan.kind === 'complete'
-          ? { tree: treeRef.current }
-          : await executeExpansionHydration({
-              expansionInstanceId,
-              factStore,
-              fetchFormData,
-              fetchLayout,
-              onLoadingKeys: setLoadingKeys,
-              targets: plan.targets,
-              lifecycle: expansionRequestLifecycle,
-            });
+      const result = await executeExpansionHydrationForIntent({
+        axisCoverageNeeds,
+        completeBehavior: skipWhenComplete ? 'skip' : 'returnTree',
+        currentTree: treeRef.current,
+        expanded: expansionIntentRef.current.expanded,
+        expansionInstanceId,
+        factStore,
+        fetchFormData,
+        fetchLayout,
+        lifecycle: expansionRequestLifecycle,
+        onLoadingKeys: setLoadingKeys,
+        program: pivotProgram,
+        queryContextKey,
+      });
       if (!result.tree) {
         return;
       }
@@ -425,7 +416,7 @@ export const useExpansionEngine = ({
       onFactBatchesChange,
       persistExpansionState,
       pivotProgram,
-      planHydrationFromIntent,
+      queryContextKey,
     ],
   );
 
@@ -450,7 +441,7 @@ export const useExpansionEngine = ({
           toggleDecision.nextManualExpanded ?? new Set<string>();
         expansionIntentRef.current.collapsed[axis] =
           toggleDecision.nextManualCollapsed ?? new Set<string>();
-        hydrateAtomic(true).catch(reportAsyncError);
+        hydrateAtomic({ persistOnComplete: true }).catch(reportAsyncError);
       }
     },
     [collapseNode, expansionRequestLifecycle, hydrateAtomic, reportAsyncError],
@@ -503,9 +494,7 @@ export const useExpansionEngine = ({
       expanded: reinitializationPlan.expanded,
     });
 
-    if (planHydrationFromIntent().kind === 'fetch') {
-      hydrateAtomic().catch(reportAsyncError);
-    }
+    hydrateAtomic({ skipWhenComplete: true }).catch(reportAsyncError);
   }, [
     commitExpansionState,
     data,
@@ -517,7 +506,6 @@ export const useExpansionEngine = ({
     pivotProgram,
     fetchLayout.measureHierarchy.leafTierVisibility,
     hydrateAtomic,
-    planHydrationFromIntent,
     expansionRequestLifecycle,
     reportAsyncError,
   ]);

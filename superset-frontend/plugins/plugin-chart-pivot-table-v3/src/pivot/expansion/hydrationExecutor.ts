@@ -16,18 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { type PivotTableQueryFormData } from '../../types';
+import {
+  type PivotAxis,
+  type PivotTableQueryFormData,
+  type PivotTreeData,
+} from '../../types';
 import { serializePath } from '../core/path';
 import { type LayoutContext } from '../layout/LayoutContext';
-import { pathsFromAxisScope } from '../runtime/coverage';
+import {
+  pathsFromAxisScope,
+  type PivotAxisCoverageNeed,
+} from '../runtime/coverage';
 import { type PivotFactStore } from '../runtime/factStore';
 import { materializeLoadedPivotTreeFromFactStoreAsync } from '../runtime/materializePivotTree';
+import type { PivotProgram } from '../runtime/types';
 import {
   type LatestRequestLifecycle,
   yieldToMainThread,
 } from '../runtime/requestLifecycle';
+import { rootKey } from '../viewModel';
 import { fetchPivotExpansion } from './fetchPivotExpansion';
-import { type ExpansionCoverageTarget } from './planner';
+import {
+  type ExpansionCoverageTarget,
+  planHydrationIteration,
+} from './planner';
+
+type AxisSetMap = Record<PivotAxis, Set<string>>;
 
 export const buildExpansionHydrationLoadingKeys = (
   targets: ExpansionCoverageTarget[],
@@ -42,23 +56,47 @@ export const buildExpansionHydrationLoadingKeys = (
     ),
   );
 
-export const executeExpansionHydration = async ({
+export const executeExpansionHydrationForIntent = async ({
+  axisCoverageNeeds,
+  completeBehavior = 'returnTree',
+  currentTree,
+  expanded,
   expansionInstanceId,
   factStore,
   fetchFormData,
   fetchLayout,
-  onLoadingKeys,
-  targets,
   lifecycle,
+  onLoadingKeys,
+  program,
+  queryContextKey,
 }: {
+  axisCoverageNeeds: PivotAxisCoverageNeed[];
+  completeBehavior?: 'returnTree' | 'skip';
+  currentTree: PivotTreeData;
+  expanded: AxisSetMap;
   expansionInstanceId: string;
   factStore: PivotFactStore;
   fetchFormData: PivotTableQueryFormData;
   fetchLayout: LayoutContext;
-  onLoadingKeys: (loadingKeys: Set<string>) => void;
-  targets: ExpansionCoverageTarget[];
   lifecycle: LatestRequestLifecycle;
+  onLoadingKeys: (loadingKeys: Set<string>) => void;
+  program: PivotProgram;
+  queryContextKey: string;
 }) => {
+  const plan = planHydrationIteration({
+    desired: {
+      row: new Set([rootKey, ...expanded.row]),
+      col: new Set([rootKey, ...expanded.col]),
+    },
+    axisCoverageNeeds,
+    factSelectors: factStore.getCoverageSelectors(queryContextKey),
+    program,
+    queryContextKey,
+  });
+  if (plan.kind === 'complete') {
+    return completeBehavior === 'returnTree' ? { tree: currentTree } : {};
+  }
+
   const scope = lifecycle.beginScope({
     cancelActive: false,
     latestOnly: false,
@@ -70,12 +108,12 @@ export const executeExpansionHydration = async ({
       return {};
     }
 
-    onLoadingKeys(buildExpansionHydrationLoadingKeys(targets));
+    onLoadingKeys(buildExpansionHydrationLoadingKeys(plan.targets));
     const requestGroupId = `${expansionInstanceId}:${scope.id}`;
     scope.beginRequest(requestGroupId);
     try {
       const { warnings } = await fetchPivotExpansion({
-        targets,
+        targets: plan.targets,
         layout: fetchLayout,
         requestGroupId,
         formData: fetchFormData,
