@@ -49,6 +49,7 @@ import {
 } from '@superset-ui/core/components';
 import { useShareMenuItems } from 'src/dashboard/components/menu/ShareMenuItems';
 import downloadAsImage from 'src/utils/downloadAsImage';
+import { exportPivotV3ExcelForChart } from 'src/utils/exportPivotV3Excel';
 import { getSliceHeaderTooltip } from 'src/dashboard/util/getSliceHeaderTooltip';
 import { Icons } from '@superset-ui/core/components/Icons';
 import ViewQueryModal from 'src/explore/components/controls/ViewQueryModal';
@@ -327,10 +328,17 @@ const SliceHeaderControls = (
       }
       case MenuKeys.ExportPivotXlsx: {
         const sliceSelector = `#chart-id-${props.slice.slice_id}`;
-        props.exportPivotExcel?.(
-          `${sliceSelector} .pvtTable`,
-          props.slice.slice_name,
-        );
+        if (props.slice.viz_type === VizType.PivotTableV3) {
+          exportPivotV3ExcelForChart(
+            props.slice.slice_id,
+            props.slice.slice_name,
+          );
+        } else {
+          props.exportPivotExcel?.(
+            `${sliceSelector} .pvtTable`,
+            props.slice.slice_name,
+          );
+        }
         break;
       }
       case MenuKeys.CrossFilterScoping: {
@@ -374,6 +382,7 @@ const SliceHeaderControls = (
   } = props;
   const isTable = slice.viz_type === VizType.Table;
   const isPivotTable = slice.viz_type === VizType.PivotTable;
+  const isPivotTableV3 = slice.viz_type === VizType.PivotTableV3;
   const cachedWhen = (cachedDttm || []).map(itemCachedDttm =>
     (extendedDayjs.utc(itemCachedDttm) as any).fromNow(),
   );
@@ -579,11 +588,21 @@ const SliceHeaderControls = (
               },
             ]
           : []),
-        {
-          key: MenuKeys.ExportXlsx,
-          label: t('Export to Excel'),
-          icon: <Icons.FileOutlined css={dropdownIconsStyles} />,
-        },
+        ...(isPivotTableV3
+          ? [
+              {
+                key: MenuKeys.ExportPivotXlsx,
+                label: t('Export to Excel'),
+                icon: <Icons.FileOutlined css={dropdownIconsStyles} />,
+              },
+            ]
+          : [
+              {
+                key: MenuKeys.ExportXlsx,
+                label: t('Export to Excel'),
+                icon: <Icons.FileOutlined css={dropdownIconsStyles} />,
+              },
+            ]),
         ...(isFeatureEnabled(FeatureFlag.AllowFullCsvExport) &&
         props.supersetCanCSV &&
         isTable

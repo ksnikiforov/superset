@@ -38,7 +38,7 @@ describe('exportPivotV3Excel', () => {
     jest.clearAllMocks();
   });
 
-  it('writes a workbook directly from worksheet data without reading the DOM', () => {
+  test('writes a workbook directly from worksheet data without reading the DOM', () => {
     exportPivotV3ExcelFromSheetData(
       [
         [{ value: 'Revenue', type: 'string', isHeader: true }],
@@ -58,7 +58,7 @@ describe('exportPivotV3Excel', () => {
     );
   });
 
-  it('exports worksheet data registered for a chart without reading the DOM', () => {
+  test('exports worksheet data registered for a chart without reading the DOM', () => {
     registerPivotV3ExportSheetDataForChart(371, [
       [{ value: 'Revenue', type: 'string', isHeader: true }],
       [{ value: 84, type: 'number', isHeader: false }],
@@ -77,7 +77,7 @@ describe('exportPivotV3Excel', () => {
     );
   });
 
-  it('exports worksheet data registered for unsaved Explore charts', () => {
+  test('exports worksheet data registered for unsaved Explore charts', () => {
     registerPivotV3ExportSheetDataForChart(0, [
       [{ value: 'Registered', type: 'string', isHeader: true }],
       [{ value: 7, type: 'number', isHeader: false }],
