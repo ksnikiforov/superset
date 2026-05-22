@@ -30,16 +30,8 @@ import { type PivotTableProps, PivotRuntimeLayout } from './types';
 import { useExpansionEngine } from './pivot/expansion/useExpansionEngine';
 import { usePivotLayout } from './pivot/chart/usePivotLayout';
 import { usePivotRenderModel } from './pivot/chart/usePivotRenderModel';
-import { useStickyHeaders } from './pivot/chart/useStickyHeaders';
-import { usePivotFormatting } from './pivot/chart/usePivotFormatting';
-import { usePivotInteractions } from './pivot/chart/usePivotInteractions';
 import { usePivotRuntimeLayoutState } from './pivot/chart/usePivotRuntimeLayoutState';
-import {
-  INTERACTION_PANEL_WIDTH,
-  INTERACTION_SIDE_CHIPS_WIDTH,
-  INTERACTION_TOP_CHIPS_HEIGHT,
-  PivotInteractionLayout,
-} from './pivot/chart/PivotInteractionLayout';
+import { PivotInteractionLayout } from './pivot/chart/PivotInteractionLayout';
 import { PivotInteractionPanel } from './pivot/chart/PivotInteractionPanel';
 import {
   buildRuntimeLayoutFromFormData,
@@ -59,6 +51,7 @@ import {
 } from './pivot/runtime/seamlessRuntimeUpdate';
 import { usePivotSeamlessRuntimeUpdate } from './pivot/chart/usePivotSeamlessRuntimeUpdate';
 import { PivotTableView } from './pivot/render/PivotTableView';
+import { usePivotTableViewSurface } from './pivot/chart/usePivotTableViewSurface';
 
 const EMPTY_SELECTED_FILTERS: Record<string, DataRecordValue[]> = {};
 
@@ -375,92 +368,36 @@ function PivotTableChart(props: PivotTableProps) {
     colTypeMap: fetchFormDataBaseWithFormatters.colTypeMap,
   });
 
-  const tableWidth = Math.max(
-    0,
-    isUserControlledMode
-      ? width - INTERACTION_PANEL_WIDTH - INTERACTION_SIDE_CHIPS_WIDTH
-      : width,
-  );
-
-  const { headerOffset, headerRowOffsets, headerRef } = useStickyHeaders({
-    enabled: resolvedStickyHeaders,
-    columnHeaderRows: renderModelResult.renderModel.columnHeaderRows,
-    width: tableWidth,
-  });
-
-  const formatting = usePivotFormatting({
+  const { tableWidth, tableHeight, pivotViewProps } = usePivotTableViewSurface({
+    width,
+    height,
+    isUserControlledMode,
+    stickyHeaders: resolvedStickyHeaders,
     tree,
-    renderModel: renderModelResult.renderModel,
     expandedRows,
-    formData: appliedLayoutFormData,
+    expandedCols,
+    loadingKeys,
+    errorMessage,
+    warnings,
+    seamlessLoading,
+    seamlessWarnings,
+    seamlessError,
+    formData,
+    appliedLayoutFormData,
     layout: layoutResult,
-    rowValuesMap: renderModelResult.rowValuesMap,
-    colValuesMap: renderModelResult.colValuesMap,
-    getNodeDimDepth: renderModelResult.getNodeDimDepth,
-    theme,
-  });
-
-  const interactions = usePivotInteractions({
+    renderModelResult,
     emitCrossFilters,
     setDataMask,
     mergeOwnState,
     treeDataSignature,
-    layout: layoutResult,
     onContextMenu,
     ownState,
     dateFormatters: resolvedDateFormatters,
-    timeGrainSqla:
-      appliedLayoutFormData.timeGrainSqla ??
-      appliedLayoutFormData.time_grain_sqla,
-  });
-
-  const combinedWarnings = useMemo(
-    () => [...warnings, ...seamlessWarnings],
-    [seamlessWarnings, warnings],
-  );
-  const activeErrorMessage = seamlessError ?? errorMessage;
-  const tableHeight = Math.max(
-    0,
-    isUserControlledMode ? height - INTERACTION_TOP_CHIPS_HEIGHT : height,
-  );
-  const exportChartId =
-    typeof formData.slice_id === 'number' ||
-    typeof formData.slice_id === 'string'
-      ? formData.slice_id
-      : undefined;
-  const sharedPivotViewProps = {
-    renderModel: renderModelResult.renderModel,
-    tree,
-    expandedRows,
-    expandedCols,
-    errorMessage: activeErrorMessage,
-    onRetry: handleRetry,
-    warnings: combinedWarnings,
-    showGlobalLoader: false,
-    showCornerLoader: seamlessLoading,
-    stickyHeaders: resolvedStickyHeaders,
-    headerOffset,
-    headerRowOffsets,
-    headerRef,
-    colTotalPosition: layoutResult.layout.colTotalPosition,
-    formatting,
+    theme,
     onToggleNode: handleToggle,
-    onSortColumn: renderModelResult.handleColumnSort,
-    isColumnSortable: renderModelResult.isColumnSortable,
-    getColumnSortOrder: renderModelResult.getColumnSortOrder,
-    shouldShowToggle: renderModelResult.shouldShowToggle,
-    showSpinner: (key: string) => !seamlessLoading && loadingKeys.has(key),
-    isRowAggregateBold: renderModelResult.isRowAggregateBold,
-    isColAggregateBold: renderModelResult.isColAggregateBold,
-    getNodeDimDepth: renderModelResult.getNodeDimDepth,
-    pivotProgram: layoutResult.layout.pivotProgram,
-    emitCrossFilters,
-    handleCellClick: interactions.handleCellClick,
-    handleCellKeyDown: interactions.handleCellKeyDown,
-    handleCellContextMenu: interactions.handleCellContextMenu,
+    onRetry: handleRetry,
     rowAxisLabels,
-    exportChartId,
-  };
+  });
   const rowChips = useMemo(
     () =>
       buildInteractionChips({
@@ -486,7 +423,7 @@ function PivotTableChart(props: PivotTableProps) {
   if (!isUserControlledMode) {
     return (
       <PivotTableView
-        {...sharedPivotViewProps}
+        {...pivotViewProps}
         height={tableHeight}
         width={tableWidth}
       />
@@ -524,7 +461,7 @@ function PivotTableChart(props: PivotTableProps) {
       }
     >
       <PivotTableView
-        {...sharedPivotViewProps}
+        {...pivotViewProps}
         height={tableHeight}
         width={tableWidth}
       />
