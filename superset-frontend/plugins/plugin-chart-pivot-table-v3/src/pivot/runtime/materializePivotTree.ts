@@ -250,6 +250,36 @@ const applyMeasureLeafValues = (
   return next;
 };
 
+const createDimensionDisplayLabels = (
+  path: PivotPath,
+  totalLabel: string,
+  dateFormatters?: PivotTableQueryFormData['dateFormatters'],
+  dimensionKey?: string,
+  sourceLabel?: string,
+) => {
+  const rawValue = path[path.length - 1];
+  const label =
+    sourceLabel ??
+    (path.length === 0
+      ? 'Grand total'
+      : formatPivotLabelValue(rawValue ?? null, totalLabel));
+  const formatter =
+    path.length > 0 &&
+    rawValue !== null &&
+    rawValue !== undefined &&
+    dimensionKey !== undefined
+      ? dateFormatters?.[dimensionKey]
+      : undefined;
+  return {
+    label,
+    formattedLabel: formatter
+      ? (formatter as (value: DataRecordValue) => string)(
+          rawValue as DataRecordValue,
+        )
+      : label,
+  };
+};
+
 type FactTreeBuilderInput = {
   rowColumns: QueryFormColumn[];
   columnColumns: QueryFormColumn[];
@@ -279,23 +309,14 @@ const createFactTreeBuilder = ({
     if (nodes[key]) {
       return;
     }
-    const rawValue = path[path.length - 1];
-    const label =
-      path.length === 0
-        ? 'Grand total'
-        : formatPivotLabelValue(rawValue ?? null, totalLabel);
     const groupby = axis === 'row' ? rowColumns : columnColumns;
     const column = groupby[path.length - 1];
-    const columnLabel = column ? getColumnLabel(column) : undefined;
-    const formatter = columnLabel ? dateFormatters?.[columnLabel] : undefined;
-    const formattedLabel =
-      path.length === 0 || rawValue === null || rawValue === undefined
-        ? label
-        : formatter
-          ? (formatter as (value: NonNullable<typeof rawValue>) => string)(
-              rawValue,
-            )
-          : label;
+    const { label, formattedLabel } = createDimensionDisplayLabels(
+      path,
+      totalLabel,
+      dateFormatters,
+      column ? getColumnLabel(column) : undefined,
+    );
     nodes[key] = {
       axis,
       key,
@@ -587,12 +608,7 @@ type ApplyMeasureAxisInput = {
   colSubtotalLevels: number[];
   metricLabelMap?: Record<string, string>;
   dateFormatters?: PivotTableQueryFormData['dateFormatters'];
-  preserveValueAxisSourceNodes: boolean;
-  promoteExistingNodes: boolean;
 };
-
-const getAxisDimensions = (program: PivotProgram, axis: 'row' | 'col') =>
-  axis === 'row' ? program.rowDimensions : program.columnDimensions;
 
 const applyMeasureAxis = ({
   tree,
@@ -602,8 +618,6 @@ const applyMeasureAxis = ({
   colSubtotalLevels,
   metricLabelMap,
   dateFormatters,
-  preserveValueAxisSourceNodes,
-  promoteExistingNodes,
 }: ApplyMeasureAxisInput): PivotTreeData => {
   if (groups.length === 0) {
     return tree;
@@ -618,6 +632,11 @@ const applyMeasureAxis = ({
     valueAxis === 'row' ? rowGroupby.length : colGroupby.length;
   const valuesAtEnd = insertIndex >= valueAxisDepth;
   const metricKeys = groups.map(group => group.metricKey);
+  const hasSingleMetric = groups.length === 1;
+  const preserveValueAxisSourceNodes =
+    leafTierVisible ||
+    (hasSingleMetric && (insertIndex === 0 || insertIndex >= valueAxisDepth));
+  const promoteExistingNodes = !leafTierVisible;
   const metricNodePolicy = createMetricNodePolicy(program);
   const metricTokenSet = new Set(metricKeys.map(encodeMetricKey));
   const leafLabelMap = new Map<string, string>();
@@ -672,16 +691,25 @@ const applyMeasureAxis = ({
     const sourceNodes = axis === 'row' ? tree.rows : tree.cols;
     const sourceNode = sourceNodes[key];
     const rawValue = path[path.length - 1];
-    const rawLabel =
-      path.length === 0
-        ? 'Grand total'
-        : formatPivotLabelValue(rawValue ?? null, 'Grand total');
-    const baseLabel = sourceNode?.formattedLabel ?? rawLabel;
     const metricKey = decodeMetricKey(rawValue);
+    const leafId = decodeMeasureLeafId(rawValue);
+    const dimension = (axis === 'row' ? rowGroupby : colGroupby)[
+      metricNodePolicy.getNonMetricPathParts(path).length - 1
+    ];
+    const dimensionKey =
+      !metricKey && !leafId && !isSubtotalToken(rawValue) && dimension
+        ? getColumnLabel(dimension)
+        : undefined;
+    const { formattedLabel: baseLabel } = createDimensionDisplayLabels(
+      path,
+      'Grand total',
+      dateFormatters,
+      dimensionKey,
+      sourceNode?.formattedLabel,
+    );
     const metricDisplayLabel = metricKey
       ? (metricLabelMap?.[metricKey] ?? metricKey)
       : undefined;
-    const leafId = decodeMeasureLeafId(rawValue);
     let label = metricDisplayLabel || baseLabel;
     if (leafId) {
       label = leafLabelMap.get(leafId) ?? baseLabel;
@@ -692,36 +720,7 @@ const applyMeasureAxis = ({
         label = `${metricDisplayLabel ?? metricKey} ${leaf.label}`;
       }
     }
-    if (
-      !metricKey &&
-      !leafId &&
-      !isSubtotalToken(rawValue) &&
-      rawValue !== null &&
-      rawValue !== undefined
-    ) {
-      const dimensionKey = metricNodePolicy.getDimensionKeyForNode(
-        {
-          axis,
-          key,
-          path,
-          label,
-          formattedLabel: label,
-          level: path.length,
-          hasChildren: false,
-          isSubtotal: false,
-        },
-        axis,
-      );
-      const formatter = dimensionKey
-        ? dateFormatters?.[dimensionKey]
-        : undefined;
-      if (formatter) {
-        label = (formatter as (value: DataRecordValue) => string)(rawValue);
-      }
-    }
-    const isMetricNode = metricTokenSet.has(
-      String(path[path.length - 1] ?? ''),
-    );
+    const isMetricNode = metricTokenSet.has(String(rawValue ?? ''));
     const isLeafNode = leafId !== undefined;
     const isConfiguredColumnMetricSubtotal =
       axis === 'col' &&
@@ -1012,9 +1011,6 @@ export const applyMeasureHierarchyAxis = (
   colSubtotalLevels: number[] = [],
 ): PivotTreeData => {
   const leafTierVisible = measureHierarchy.leafTierVisibility === 'visible';
-  const { valueAxis, metricInsertIndex: insertIndex } = program;
-  const axisDepth = getAxisDimensions(program, valueAxis).length;
-  const hasSingleMetric = measureHierarchy.groups.length === 1;
   return applyMeasureAxis({
     tree,
     groups: measureHierarchy.groups,
@@ -1023,10 +1019,6 @@ export const applyMeasureHierarchyAxis = (
     colSubtotalLevels,
     metricLabelMap,
     dateFormatters,
-    preserveValueAxisSourceNodes:
-      leafTierVisible ||
-      (hasSingleMetric && (insertIndex === 0 || insertIndex >= axisDepth)),
-    promoteExistingNodes: !leafTierVisible,
   });
 };
 
