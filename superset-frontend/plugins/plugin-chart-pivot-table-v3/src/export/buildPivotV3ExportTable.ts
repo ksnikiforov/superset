@@ -18,8 +18,9 @@
  */
 
 import { type PivotResultCell, type PivotTreeNode } from '../types';
-import { serializeCellKey } from '../pivot/core/path';
-import { type HeaderCellInfo } from '../pivot/viewModel';
+import { type VisibleCellEntry } from '../pivot/cellUtils';
+import { getNodeParentKey } from '../pivot/viewModel';
+import { type RenderModel } from '../pivot/render/renderModel';
 
 const getText = (value: string | null | undefined) =>
   (value ?? '').replace(/\s+/g, ' ').trim();
@@ -98,44 +99,71 @@ export const buildPivotV3RowExportModel = ({
     };
   });
 
-  const rowHasVisibleChildren = (rowIndex: number) => {
-    const current = rows[rowIndex];
-    if (!current?.isSubtotal) {
-      return false;
-    }
-    for (let index = rowIndex + 1; index < rows.length; index += 1) {
-      const next = rows[index];
-      if (next.isGrandTotal) {
-        continue;
+  const rowsByKey = new Map(rows.map(entry => [entry.row.key, entry]));
+  const isVisibleDescendant = (
+    ancestor: PivotTreeNode,
+    candidate: PivotTreeNode,
+  ) => {
+    let parentKey =
+      candidate.path.length > 0 ? getNodeParentKey(candidate) : undefined;
+    while (parentKey) {
+      if (parentKey === ancestor.key) {
+        return true;
       }
-      if (next.depth <= current.depth) {
-        return false;
-      }
-      return true;
+      const parent = rowsByKey.get(parentKey)?.row;
+      parentKey =
+        parent && parent.path.length > 0 ? getNodeParentKey(parent) : undefined;
     }
     return false;
   };
 
-  const activePath: string[] = [];
+  const rowHasVisibleChildren = (current: (typeof rows)[number]) => {
+    if (!current.isSubtotal) {
+      return false;
+    }
+    return rows.some(
+      next =>
+        !next.isGrandTotal &&
+        next.depth > current.depth &&
+        isVisibleDescendant(current.row, next.row),
+    );
+  };
+
+  const getRowHeaderValues = (entry: (typeof rows)[number]) => {
+    if (entry.isGrandTotal) {
+      return Array.from({ length: rowExportDepthCount }, (_, idx) =>
+        idx === 0 ? entry.label : '',
+      );
+    }
+    const values = Array.from({ length: rowExportDepthCount }, () => '');
+    const ancestors: typeof rows = [];
+    let parentKey =
+      entry.row.path.length > 0 ? getNodeParentKey(entry.row) : undefined;
+    while (parentKey) {
+      const parent = rowsByKey.get(parentKey);
+      if (!parent || parent.isGrandTotal) {
+        break;
+      }
+      ancestors.unshift(parent);
+      parentKey =
+        parent.row.path.length > 0 ? getNodeParentKey(parent.row) : undefined;
+    }
+    [...ancestors, entry].forEach(item => {
+      if (item.depth < rowExportDepthCount) {
+        values[item.depth] = item.label;
+      }
+    });
+    return values;
+  };
+
   return {
     rowExportDepthCount,
     rowExportRows: new Map(
-      rows.map((entry, index) => {
-        if (entry.isGrandTotal) {
-          activePath.length = 0;
-        } else {
-          activePath.length = entry.depth;
-          activePath[entry.depth] = entry.label;
-        }
-        const values = Array.from({ length: rowExportDepthCount }, (_, idx) => {
-          if (entry.isGrandTotal) {
-            return idx === 0 ? entry.label : '';
-          }
-          return idx <= entry.depth ? (activePath[idx] ?? '') : '';
-        });
+      rows.map(entry => {
+        const values = getRowHeaderValues(entry);
         const isSubtotal =
           entry.isSubtotal &&
-          rowHasVisibleChildren(index) &&
+          rowHasVisibleChildren(entry) &&
           entry.depth + 1 < rowExportDepthCount;
         if (isSubtotal) {
           values[entry.depth + 1] = rowTotalLabel;
@@ -197,10 +225,10 @@ type BuildPivotV3ExportSheetModelParams = {
   rowCornerLabel: string;
   rowExportDepthCount: number;
   rowExportRows: Map<string, PivotV3RowExportEntry>;
-  columnHeaderRows: HeaderCellInfo[][];
-  visibleRows: PivotTreeNode[];
-  visibleCols: PivotTreeNode[];
-  cells: Record<string, PivotResultCell>;
+  renderModel: Pick<
+    RenderModel,
+    'columnHeaderRows' | 'visibleRows' | 'visibleCols' | 'visibleCellEntries'
+  >;
   formatLabel: (node: PivotTreeNode, axis: 'row' | 'col') => string;
   deriveMetricKey: (rowNode: PivotTreeNode, colNode: PivotTreeNode) => string;
   formatBodyCell: (
@@ -220,12 +248,10 @@ const buildModelHeaderRows = ({
   formatLabel,
 }: Pick<
   BuildPivotV3ExportSheetModelParams,
-  | 'rowAxisLabels'
-  | 'rowCornerLabel'
-  | 'rowExportDepthCount'
-  | 'columnHeaderRows'
-  | 'formatLabel'
->): PivotV3ExportSheetCell[][] => {
+  'rowAxisLabels' | 'rowCornerLabel' | 'rowExportDepthCount' | 'formatLabel'
+> & {
+  columnHeaderRows: RenderModel['columnHeaderRows'];
+}): PivotV3ExportSheetCell[][] => {
   if (columnHeaderRows.length === 0) {
     return [
       rowExportDepthCount > 0
@@ -257,20 +283,33 @@ const buildModelHeaderRows = ({
   });
 };
 
+const buildVisibleCellLookup = (visibleCellEntries: VisibleCellEntry[]) => {
+  const cellLookup = new Map<string, Map<string, PivotResultCell>>();
+  visibleCellEntries.forEach(({ rowNode, colNode, cell }) => {
+    const rowCells = cellLookup.get(rowNode.key);
+    if (rowCells) {
+      rowCells.set(colNode.key, cell);
+      return;
+    }
+    cellLookup.set(rowNode.key, new Map([[colNode.key, cell]]));
+  });
+  return cellLookup;
+};
+
 export const buildPivotV3ExportSheetModel = ({
   rowAxisLabels,
   rowCornerLabel,
   rowExportDepthCount,
   rowExportRows,
-  columnHeaderRows,
-  visibleRows,
-  visibleCols,
-  cells,
+  renderModel,
   formatLabel,
   deriveMetricKey,
   formatBodyCell,
   isGrandTotalLikeRow,
 }: BuildPivotV3ExportSheetModelParams): PivotV3ExportSheetCell[][] => {
+  const { columnHeaderRows, visibleRows, visibleCols, visibleCellEntries } =
+    renderModel;
+  const visibleCellLookup = buildVisibleCellLookup(visibleCellEntries);
   const headerRows = buildModelHeaderRows({
     rowAxisLabels,
     rowCornerLabel,
@@ -285,7 +324,7 @@ export const buildPivotV3ExportSheetModel = ({
       textCell(value, true),
     );
     visibleCols.forEach(col => {
-      const cell = cells[serializeCellKey(row.key, col.key)];
+      const cell = visibleCellLookup.get(row.key)?.get(col.key);
       const metricKey = deriveMetricKey(row, col);
       rowCells.push(
         toExportSheetCell(formatBodyCell(row, col, cell, metricKey), isHeader),

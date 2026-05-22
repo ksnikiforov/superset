@@ -47,6 +47,9 @@ const childLookupCache = new WeakMap<
   Map<string, PivotTreeNode[]>
 >();
 
+export const getNodeParentKey = (node: PivotTreeNode) =>
+  node.parentKey ?? serializePath(node.path.slice(0, -1));
+
 const getChildLookup = (nodes: Record<string, PivotTreeNode>) => {
   const cached = childLookupCache.get(nodes);
   if (cached) {
@@ -57,7 +60,7 @@ const getChildLookup = (nodes: Record<string, PivotTreeNode>) => {
     if (child.path.length === 0) {
       return;
     }
-    const parentKey = child.parentKey ?? serializePath(child.path.slice(0, -1));
+    const parentKey = getNodeParentKey(child);
     const children = lookup.get(parentKey);
     if (children) {
       children.push(child);

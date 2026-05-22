@@ -22,6 +22,7 @@ import {
   buildPivotV3RowExportModel,
 } from '../../../src/export/buildPivotV3ExportTable';
 import { type PivotResultCell, type PivotTreeNode } from '../../../src/types';
+import { type VisibleCellEntry } from '../../../src/pivot/cellUtils';
 import { serializeCellKey, serializePath } from '../../../src/pivot/core/path';
 
 const rowNode = (
@@ -66,8 +67,24 @@ const cell = (
   },
 ];
 
+const visibleCellEntries = (
+  cells: Record<string, PivotResultCell>,
+  visibleRows: PivotTreeNode[],
+  visibleCols: PivotTreeNode[],
+): VisibleCellEntry[] => {
+  const rowsByKey = new Map(visibleRows.map(row => [row.key, row]));
+  const colsByKey = new Map(visibleCols.map(col => [col.key, col]));
+  return Object.entries(cells).flatMap(([cellKey, resultCell]) => {
+    const rowNode = rowsByKey.get(resultCell.rowKey);
+    const colNode = colsByKey.get(resultCell.colKey);
+    return rowNode && colNode
+      ? [{ cellKey, cell: resultCell, rowNode, colNode }]
+      : [];
+  });
+};
+
 describe('pivot v3 export worksheet model', () => {
-  it('projects visible row hierarchy values without DOM metadata', () => {
+  test('projects visible row hierarchy values without DOM metadata', () => {
     const grandTotal = rowNode([], { key: 'grand-total' });
     const west = rowNode(['West'], { hasChildren: true });
     const sf = rowNode(['West', 'San Francisco']);
@@ -94,7 +111,28 @@ describe('pivot v3 export worksheet model', () => {
     ]);
   });
 
-  it('builds worksheet cells from render rows, headers, and raw metric values', () => {
+  test('projects row hierarchy from materialized parents instead of visible order', () => {
+    const west = rowNode(['West'], { hasChildren: true });
+    const east = rowNode(['East'], { hasChildren: true });
+    const sf = rowNode(['West', 'San Francisco']);
+
+    const { rowExportRows } = buildPivotV3RowExportModel({
+      visibleRows: [west, east, sf],
+      rowAxisLabels: ['Region', 'City'],
+      rowTotalLabel: 'Total',
+      getNodeDimDepth: node => node.path.length,
+      formatLabel: node => node.formattedLabel,
+      isGrandTotalLikeRow: () => false,
+      isRowAggregateBold: () => false,
+    });
+
+    expect(rowExportRows.get(sf.key)?.values).toEqual([
+      'West',
+      'San Francisco',
+    ]);
+  });
+
+  test('builds worksheet cells from render rows, headers, and visible cells', () => {
     const west = rowNode(['West']);
     const sf = rowNode(['West', 'San Francisco']);
     const sales = colNode(['2025', 'Sales']);
@@ -110,6 +148,8 @@ describe('pivot v3 export worksheet model', () => {
       isGrandTotalLikeRow: () => false,
       isRowAggregateBold: () => false,
     });
+    const visibleRows = [west, sf];
+    const visibleCols = [sales, profit, totalSales, totalProfit];
     const cells = Object.fromEntries([
       cell(west, sales, 'Sales', 10),
       cell(west, profit, 'Profit', 1),
@@ -126,21 +166,23 @@ describe('pivot v3 export worksheet model', () => {
       rowCornerLabel: 'Rows',
       rowExportDepthCount,
       rowExportRows,
-      columnHeaderRows: [
-        [
-          { node: colNode(['2025']), colSpan: 2, rowSpan: 1 },
-          { node: colNode(['Grand Total']), colSpan: 2, rowSpan: 1 },
+      renderModel: {
+        columnHeaderRows: [
+          [
+            { node: colNode(['2025']), colSpan: 2, rowSpan: 1 },
+            { node: colNode(['Grand Total']), colSpan: 2, rowSpan: 1 },
+          ],
+          [
+            { node: sales, colSpan: 1, rowSpan: 1 },
+            { node: profit, colSpan: 1, rowSpan: 1 },
+            { node: totalSales, colSpan: 1, rowSpan: 1 },
+            { node: totalProfit, colSpan: 1, rowSpan: 1 },
+          ],
         ],
-        [
-          { node: sales, colSpan: 1, rowSpan: 1 },
-          { node: profit, colSpan: 1, rowSpan: 1 },
-          { node: totalSales, colSpan: 1, rowSpan: 1 },
-          { node: totalProfit, colSpan: 1, rowSpan: 1 },
-        ],
-      ],
-      visibleRows: [west, sf],
-      visibleCols: [sales, profit, totalSales, totalProfit],
-      cells,
+        visibleRows,
+        visibleCols,
+        visibleCellEntries: visibleCellEntries(cells, visibleRows, visibleCols),
+      },
       formatLabel: node => node.formattedLabel,
       deriveMetricKey: (_row, col) => String(col.label),
       formatBodyCell: (_row, _col, resultCell, metricKey) =>
@@ -157,7 +199,7 @@ describe('pivot v3 export worksheet model', () => {
     expect(sheet[2][2]).toMatchObject({ type: 'number', value: 10 });
   });
 
-  it('marks subtotal worksheet rows as headers', () => {
+  test('marks subtotal worksheet rows as headers', () => {
     const parent = rowNode(['A'], { isSubtotal: true, hasChildren: true });
     const child = rowNode(['A', 'Road-150']);
     const sales = colNode(['Sales']);
@@ -171,18 +213,24 @@ describe('pivot v3 export worksheet model', () => {
       isRowAggregateBold: node => node === parent,
     });
 
+    const visibleRows = [parent, child];
+    const visibleCols = [sales];
+    const cells = Object.fromEntries([
+      cell(parent, sales, 'Sales', 100),
+      cell(child, sales, 'Sales', 60),
+    ]);
+
     const sheet = buildPivotV3ExportSheetModel({
       rowAxisLabels: ['Store', 'Product'],
       rowCornerLabel: 'Rows',
       rowExportDepthCount,
       rowExportRows,
-      columnHeaderRows: [[{ node: sales, colSpan: 1, rowSpan: 1 }]],
-      visibleRows: [parent, child],
-      visibleCols: [sales],
-      cells: Object.fromEntries([
-        cell(parent, sales, 'Sales', 100),
-        cell(child, sales, 'Sales', 60),
-      ]),
+      renderModel: {
+        columnHeaderRows: [[{ node: sales, colSpan: 1, rowSpan: 1 }]],
+        visibleRows,
+        visibleCols,
+        visibleCellEntries: visibleCellEntries(cells, visibleRows, visibleCols),
+      },
       formatLabel: node => node.formattedLabel,
       deriveMetricKey: () => 'Sales',
       formatBodyCell: (_row, _col, resultCell, metricKey) =>
