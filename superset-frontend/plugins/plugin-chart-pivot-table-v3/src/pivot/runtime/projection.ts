@@ -20,7 +20,6 @@ import { type PivotAxis, type PivotPath } from '../../types';
 import {
   decodeMeasureLeafId,
   decodeMetricKey,
-  encodeMetricKey,
   isMeasureLeafToken,
   isSubtotalToken,
 } from '../core/tokens';
@@ -43,21 +42,6 @@ export type ResolveAxisProjectionInput = {
   program: PivotProgram;
   axis: PivotAxis;
   path: PivotPath;
-};
-
-export type CollapsedValuesMetricProjection = {
-  metricKey: string;
-  metricToken: string;
-  metricPath: PivotPath;
-  sourceMetricPath: PivotPath;
-  hasProjectedChildren: boolean;
-};
-
-export type ResolveCollapsedValuesProjectionInput = {
-  program: PivotProgram;
-  axis: PivotAxis;
-  parentPath: PivotPath;
-  sourceMetricPaths: PivotPath[];
 };
 
 export type AxisChildProjection = {
@@ -320,49 +304,4 @@ export const resolveAxisChildProjection = ({
       childProjection.valuesLevelSeen &&
       isCanonicalValuesPathToken(firstChildValue, program),
   };
-};
-
-export const resolveCollapsedValuesProjection = ({
-  program,
-  axis,
-  parentPath,
-  sourceMetricPaths,
-}: ResolveCollapsedValuesProjectionInput): CollapsedValuesMetricProjection[] => {
-  const parentProjection = resolveAxisProjection({
-    program,
-    axis,
-    path: parentPath,
-  });
-  if (parentProjection.valuesLevelSeen) {
-    return [];
-  }
-
-  const metricKeySet = new Set(program.metricKeys);
-  const seen = new Set<string>();
-  const collapsedMetrics: CollapsedValuesMetricProjection[] = [];
-  sourceMetricPaths.forEach(sourceMetricPath => {
-    const metricKey = collectPathMetricKeys(sourceMetricPath, metricKeySet)[0];
-    if (!metricKey || seen.has(metricKey)) {
-      return;
-    }
-    seen.add(metricKey);
-    const metricToken = encodeMetricKey(metricKey);
-    const metricPath = [...parentPath, metricToken];
-    const metricProjection = resolveAxisProjection({
-      program,
-      axis,
-      path: metricPath,
-    });
-    if (!metricProjection.valuesLevelSeen) {
-      return;
-    }
-    collapsedMetrics.push({
-      metricKey,
-      metricToken,
-      metricPath,
-      sourceMetricPath,
-      hasProjectedChildren: metricProjection.nextLevelKind === 'dimension',
-    });
-  });
-  return collapsedMetrics;
 };

@@ -57,7 +57,7 @@ const getChildLookup = (nodes: Record<string, PivotTreeNode>) => {
     if (child.path.length === 0) {
       return;
     }
-    const parentKey = serializePath(child.path.slice(0, -1));
+    const parentKey = child.parentKey ?? serializePath(child.path.slice(0, -1));
     const children = lookup.get(parentKey);
     if (children) {
       children.push(child);

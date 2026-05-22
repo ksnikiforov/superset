@@ -579,9 +579,21 @@ export const labelRowSubtotalLeaves = (
     const nextLabel = useMetricLabel
       ? `${resolvedBaseLabel} ${getDisplayLabel(metricLabel ?? '')}`
       : `${resolvedBaseLabel} Total`;
-    if (node.label !== nextLabel || node.formattedLabel !== nextLabel) {
+    const nextParentKey =
+      metricLabelIndex !== undefined &&
+      metricLabelIndex > subtotalIndex &&
+      basePath &&
+      basePath.length > 0
+        ? serializePath(basePath)
+        : node.parentKey;
+    if (
+      node.label !== nextLabel ||
+      node.formattedLabel !== nextLabel ||
+      node.parentKey !== nextParentKey
+    ) {
       nextRows[node.key] = {
         ...node,
+        parentKey: nextParentKey,
         label: nextLabel,
         formattedLabel: nextLabel,
       };
@@ -678,7 +690,8 @@ const applyMeasureAxis = ({
       if (
         promoteExistingNodes &&
         path.length < fullDepth &&
-        !existing.hasChildren
+        !existing.hasChildren &&
+        !existing.isCollapsedMetricAlias
       ) {
         nodes[key] = {
           ...existing,
@@ -884,9 +897,61 @@ const applyMeasureAxis = ({
     const valuePrefix = valuePath.slice(0, insertIndex);
     const valueSuffix = valuePath.slice(insertIndex);
     const cellValues = applyMeasureLeafValues(cell.values, groups);
+    const ensureValueAxisNode = (path: PivotPath) =>
+      ensureNode(
+        valueAxis,
+        path,
+        valueDepthWithMeasures,
+        valueNode?.isSubtotal || undefined,
+      );
+    const updateValueAxisNode = (
+      path: PivotPath,
+      updates: Partial<PivotTreeNode>,
+    ) => {
+      const node = ensureValueAxisNode(path);
+      const valueNodes = valueAxis === 'row' ? result.rows : result.cols;
+      valueNodes[node.key] = { ...node, ...updates };
+    };
+    const ensureCollapsedMetricAlias = (path: PivotPath, isAlias: boolean) => {
+      const key = serializePath(path);
+      const valueNodes = valueAxis === 'row' ? result.rows : result.cols;
+      if (valueNodes[key]?.isSubtotal) {
+        return;
+      }
+      updateValueAxisNode(path, {
+        hasChildren:
+          valueAxis === 'row' && path.length < valueDepthWithMeasures,
+        isSubtotal: false,
+        isCollapsedMetric: true,
+        isCollapsedMetricAlias: isAlias || undefined,
+      });
+    };
+    const addColumnSubtotalMetricAlias = (
+      path: PivotPath,
+      values: Record<string, DataRecordValue>,
+    ) => {
+      updateValueAxisNode(path, {
+        hasChildren: false,
+        isSubtotal: true,
+        isCollapsedMetric: undefined,
+      });
+      addCell({
+        rowPath: oppositePath,
+        colPath: path,
+        values,
+        isSubtotal: true,
+        overwrite: true,
+      });
+    };
 
     const isTotalValuePath =
       valuePath.length === 0 || valuePath.some(isSubtotalToken);
+    const skipProjectedMetricsForPartialRow =
+      valueAxis === 'row' &&
+      valuesAtEnd &&
+      valuePath.length < rowGroupby.length &&
+      !isTotalValuePath &&
+      oppositeAxisDepth > 1;
     if (
       valueAxis === 'row' &&
       valuesAtEnd &&
@@ -911,7 +976,9 @@ const applyMeasureAxis = ({
         values: cellValues,
         isSubtotal: cell.isSubtotal,
       });
-      return;
+      if (skipProjectedMetricsForPartialRow) {
+        return;
+      }
     }
 
     groups.forEach(group => {
@@ -933,6 +1000,25 @@ const applyMeasureAxis = ({
         : valueSuffix;
       const leafTargets = leafTierVisible ? group.leaves : [group.leaves[0]];
 
+      if (
+        (valueAxis === 'row' || !cell.isSubtotal) &&
+        !valuePath.some(isSubtotalToken) &&
+        (valueAxis === 'row' || oppositeAxisDepth <= 1)
+      ) {
+        const aliasDepthLimit =
+          valueAxis === 'row'
+            ? valuesAtEnd
+              ? (valuePrefix.length - 1) * Number(oppositeAxisDepth <= 1)
+              : valuePrefix.length
+            : valuePrefix.length - 1;
+        for (let depth = 1; depth <= aliasDepthLimit; depth += 1) {
+          ensureCollapsedMetricAlias(
+            [...valuePrefix.slice(0, depth), metricToken],
+            valuesAtEnd || depth < valuePrefix.length,
+          );
+        }
+      }
+
       leafTargets.forEach(leaf => {
         const leafPath = leafTierVisible
           ? [...metricAxisPath, encodeMeasureLeafKey(leaf.id)]
@@ -948,12 +1034,7 @@ const applyMeasureAxis = ({
           leafValue === undefined
         ) {
           for (let depth = 0; depth <= leafPath.length; depth += 1) {
-            ensureNode(
-              valueAxis,
-              leafPath.slice(0, depth),
-              valueDepthWithMeasures,
-              valueNode?.isSubtotal || undefined,
-            );
+            ensureValueAxisNode(leafPath.slice(0, depth));
           }
           ensureNode(
             oppositeAxis,
@@ -967,12 +1048,7 @@ const applyMeasureAxis = ({
           ? [...leafPath, ...valueTail]
           : [...metricAxisPath, ...valueTail];
         for (let depth = 0; depth <= projectedValuePath.length; depth += 1) {
-          ensureNode(
-            valueAxis,
-            projectedValuePath.slice(0, depth),
-            valueDepthWithMeasures,
-            valueNode?.isSubtotal || undefined,
-          );
+          ensureValueAxisNode(projectedValuePath.slice(0, depth));
         }
         ensureNode(
           oppositeAxis,
@@ -988,6 +1064,31 @@ const applyMeasureAxis = ({
           isSubtotal: cell.isSubtotal,
           overwrite: true,
         });
+        if (
+          valueAxis === 'row' &&
+          cell.isSubtotal &&
+          valuePath.length > 0 &&
+          valueTail.length === 0 &&
+          !valuePath.some(isSubtotalToken)
+        ) {
+          updateValueAxisNode(projectedValuePath, {
+            isSubtotal: false,
+            ...(!valuesAtEnd && !leafTierVisible
+              ? { isCollapsedMetric: true }
+              : {}),
+          });
+        }
+        if (valueAxis === 'col' && !leafTierVisible && cell.isSubtotal) {
+          const subtotalIndex = valuePath.findIndex(isSubtotalToken);
+          if (subtotalIndex > 0 && colSubtotalLevels.includes(subtotalIndex)) {
+            addColumnSubtotalMetricAlias(
+              [...valuePath.slice(0, subtotalIndex), metricToken],
+              mergedValues,
+            );
+          } else if (colSubtotalLevels.includes(valuePath.length)) {
+            addColumnSubtotalMetricAlias(metricAxisPath, mergedValues);
+          }
+        }
         addSingleMetricBaseCells({
           valuePath,
           oppositePath,

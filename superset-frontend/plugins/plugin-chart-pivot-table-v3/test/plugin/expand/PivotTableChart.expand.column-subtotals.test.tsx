@@ -153,6 +153,9 @@ describe('PivotTableChart column subtotal placement during expansion', () => {
       rowGroupby,
       colGroupby,
       colGroupby.length,
+      undefined,
+      undefined,
+      [1, 2, 3],
     );
 
   const buildTreeWithDepths = (depths: number[]) => {
@@ -175,7 +178,7 @@ describe('PivotTableChart column subtotal placement during expansion', () => {
   };
 
   beforeEach(() => {
-    fetchPivotBranchMock.mockClear();
+    fetchPivotBranchMock.mockReset();
     fetchPivotBranchMock.mockImplementation(resolveMockBranchFetchResult());
   });
 

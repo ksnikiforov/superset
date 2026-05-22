@@ -38,12 +38,14 @@ const makeNode = ({
   path,
   label,
   hasChildren = false,
+  isCollapsedMetric,
 }: {
   axis: 'row' | 'col';
   key: string;
   path: PivotTreeNode['path'];
   label: string;
   hasChildren?: boolean;
+  isCollapsedMetric?: boolean;
 }): PivotTreeNode => ({
   axis,
   key,
@@ -52,6 +54,7 @@ const makeNode = ({
   formattedLabel: label,
   level: path.length,
   hasChildren,
+  isCollapsedMetric,
 });
 
 describe('findChildren', () => {
@@ -277,6 +280,7 @@ describe('buildRenderModel', () => {
           path: ['1-URGENT', 'AIR', encodeMetricKey('averageOrderValue')],
           label: 'averageOrderValue',
           hasChildren: true,
+          isCollapsedMetric: true,
         }),
         [statusKey]: makeNode({
           axis: 'row',

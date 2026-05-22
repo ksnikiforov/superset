@@ -372,6 +372,7 @@ export const usePivotRenderModel = ({
         ),
         getMetricDisplayLabelForKey: layout.getMetricDisplayLabelForKey,
         isExpanded: node => expandedCols.has(node.key),
+        isPathExpanded: path => expandedCols.has(serializePath(path)),
       }),
     [expandedCols, layout],
   );

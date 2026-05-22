@@ -458,6 +458,9 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       ['region'],
       ['year', 'shipMode'],
       2,
+      undefined,
+      undefined,
+      [1],
     );
 
     const { container } = render(
@@ -591,6 +594,9 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       ['region'],
       ['year', 'shipMode'],
       2,
+      undefined,
+      undefined,
+      [1],
     );
 
     const { container } = render(
@@ -758,6 +764,9 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       ['region'],
       ['year', 'shipMode'],
       2,
+      undefined,
+      undefined,
+      [1],
     );
 
     const { container } = render(

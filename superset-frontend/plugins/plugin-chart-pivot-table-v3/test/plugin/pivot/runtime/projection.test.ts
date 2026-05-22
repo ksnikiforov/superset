@@ -27,7 +27,6 @@ import {
   canRequestAxisExpansion,
   resolveAxisProjection,
   resolveAxisChildProjection,
-  resolveCollapsedValuesProjection,
 } from '../../../../src/pivot/runtime/projection';
 import { MetricsLayoutEnum } from '../../../../src/types';
 
@@ -35,7 +34,7 @@ const skippedColumns = (projection: ReturnType<typeof resolveAxisProjection>) =>
   projection.skippedPreValuesDimensions;
 
 describe('resolveAxisProjection', () => {
-  it.each([
+  test.each([
     ['row', MetricsLayoutEnum.ROWS],
     ['col', MetricsLayoutEnum.COLUMNS],
   ] as const)(
@@ -70,7 +69,7 @@ describe('resolveAxisProjection', () => {
     },
   );
 
-  it('does not mark pre-Values dimensions as skipped when they are visible', () => {
+  test('does not mark pre-Values dimensions as skipped when they are visible', () => {
     const program = compilePivotProgram({
       groupbyRows: [
         'orderPriority',
@@ -97,7 +96,7 @@ describe('resolveAxisProjection', () => {
     expect(skippedColumns(projection)).toEqual([]);
   });
 
-  it('extracts metric scope from the projected axis path', () => {
+  test('extracts metric scope from the projected axis path', () => {
     const program = compilePivotProgram({
       groupbyColumns: ['segment', METRICS_PLACEHOLDER, 'month'],
       metrics: ['revenue', 'orders'],
@@ -120,96 +119,7 @@ describe('resolveAxisProjection', () => {
     expect(projection.metricKeys).toEqual(['revenue']);
   });
 
-  it.each([
-    ['row', MetricsLayoutEnum.ROWS],
-    ['col', MetricsLayoutEnum.COLUMNS],
-  ] as const)(
-    'projects collapsed Values metric leaves on %s without deciding presentation',
-    (axis, metricsLayout) => {
-      const program = compilePivotProgram({
-        [axis === 'row' ? 'groupbyRows' : 'groupbyColumns']: [
-          'orderPriority',
-          'shipMode',
-          METRICS_PLACEHOLDER,
-          'returnFlag',
-        ],
-        metrics: ['revenue', 'orders'],
-        metricsLayout,
-      });
-
-      const collapsedMetrics = resolveCollapsedValuesProjection({
-        program,
-        axis,
-        parentPath: ['1-URGENT'],
-        sourceMetricPaths: [
-          ['1-URGENT', encodeMetricKey('revenue')],
-          ['1-URGENT', encodeMetricKey('orders')],
-          ['1-URGENT', encodeMetricKey('revenue'), 'Returned'],
-        ],
-      });
-
-      expect(collapsedMetrics).toEqual([
-        {
-          metricKey: 'revenue',
-          metricToken: encodeMetricKey('revenue'),
-          metricPath: ['1-URGENT', encodeMetricKey('revenue')],
-          sourceMetricPath: ['1-URGENT', encodeMetricKey('revenue')],
-          hasProjectedChildren: true,
-        },
-        {
-          metricKey: 'orders',
-          metricToken: encodeMetricKey('orders'),
-          metricPath: ['1-URGENT', encodeMetricKey('orders')],
-          sourceMetricPath: ['1-URGENT', encodeMetricKey('orders')],
-          hasProjectedChildren: true,
-        },
-      ]);
-    },
-  );
-
-  it('marks collapsed metric paths at Values end as leaf projections', () => {
-    const program = compilePivotProgram({
-      groupbyRows: ['orderPriority', METRICS_PLACEHOLDER],
-      metrics: ['revenue'],
-      metricsLayout: MetricsLayoutEnum.ROWS,
-    });
-
-    const [metric] = resolveCollapsedValuesProjection({
-      program,
-      axis: 'row',
-      parentPath: ['1-URGENT'],
-      sourceMetricPaths: [['1-URGENT', encodeMetricKey('revenue')]],
-    });
-
-    expect(metric).toEqual({
-      metricKey: 'revenue',
-      metricToken: encodeMetricKey('revenue'),
-      metricPath: ['1-URGENT', encodeMetricKey('revenue')],
-      sourceMetricPath: ['1-URGENT', encodeMetricKey('revenue')],
-      hasProjectedChildren: false,
-    });
-  });
-
-  it('does not project another collapsed Values tier below a metric path', () => {
-    const program = compilePivotProgram({
-      groupbyColumns: ['segment', METRICS_PLACEHOLDER, 'month'],
-      metrics: ['revenue'],
-      metricsLayout: MetricsLayoutEnum.COLUMNS,
-    });
-
-    expect(
-      resolveCollapsedValuesProjection({
-        program,
-        axis: 'col',
-        parentPath: ['Consumer', encodeMetricKey('revenue')],
-        sourceMetricPaths: [
-          ['Consumer', encodeMetricKey('revenue'), '2024-01'],
-        ],
-      }),
-    ).toEqual([]);
-  });
-
-  it.each([
+  test.each([
     ['row', MetricsLayoutEnum.ROWS],
     ['col', MetricsLayoutEnum.COLUMNS],
   ] as const)(
@@ -263,7 +173,7 @@ describe('resolveAxisProjection', () => {
     },
   );
 
-  it('keeps the Values token index distinct from projected dimension order', () => {
+  test('keeps the Values token index distinct from projected dimension order', () => {
     const program = compilePivotProgram({
       groupbyColumns: [METRICS_PLACEHOLDER, 'segment'],
       metrics: ['revenue'],
@@ -283,7 +193,7 @@ describe('resolveAxisProjection', () => {
     });
   });
 
-  it('keeps raw Values index for subtotal header placement', () => {
+  test('keeps raw Values index for subtotal header placement', () => {
     const program = compilePivotProgram({
       groupbyColumns: ['year', 'shipMode', METRICS_PLACEHOLDER],
       metrics: ['revenue'],
@@ -303,7 +213,7 @@ describe('resolveAxisProjection', () => {
     });
   });
 
-  it('keeps expansion requestability program-owned and rejects synthetic subtotal paths', () => {
+  test('keeps expansion requestability program-owned and rejects synthetic subtotal paths', () => {
     const program = compilePivotProgram({
       groupbyRows: [
         'orderPriority',

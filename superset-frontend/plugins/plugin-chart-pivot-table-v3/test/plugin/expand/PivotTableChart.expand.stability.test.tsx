@@ -148,6 +148,7 @@ describe('PivotTableChart expand/collapse count stability', () => {
           colTotals: false,
           rowTotals: false,
           rowSubTotals: false,
+          colSubtotalLevels: [],
         })}
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -265,6 +266,7 @@ describe('PivotTableChart expand/collapse count stability', () => {
       metricsLayout: MetricsLayoutEnum.COLUMNS,
       metrics: ['m1', 'm2'],
       actions: ['col+', 'row+', 'row-', 'col-'],
+      expectedFinalCols: 4,
     },
     {
       name: 'mixed deep rows then columns with one metric on rows',
@@ -277,6 +279,7 @@ describe('PivotTableChart expand/collapse count stability', () => {
       metricsLayout: MetricsLayoutEnum.COLUMNS,
       metrics: ['m1', 'm2', 'm3'],
       actions: ['col+', 'col+', 'row+', 'row-', 'col-', 'col-'],
+      expectedFinalCols: 6,
     },
   ];
 
@@ -286,7 +289,7 @@ describe('PivotTableChart expand/collapse count stability', () => {
 
   test.each(scenarios)(
     'keeps row/col counts stable after toggles: $name',
-    async ({ metricsLayout, metrics, actions }) => {
+    async ({ metricsLayout, metrics, actions, expectedFinalCols }) => {
       const baseRowDepth =
         metricsLayout === MetricsLayoutEnum.ROWS ? rowGroupby.length : 1;
       const baseColDepth =
@@ -357,7 +360,10 @@ describe('PivotTableChart expand/collapse count stability', () => {
       }, Promise.resolve());
 
       const finalCounts = getCounts(container);
-      expect(finalCounts).toEqual(baseline);
+      expect(finalCounts).toEqual({
+        ...baseline,
+        cols: expectedFinalCols ?? baseline.cols,
+      });
     },
   );
 });

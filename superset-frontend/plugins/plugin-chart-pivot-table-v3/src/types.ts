@@ -61,11 +61,14 @@ export interface PivotTableStylesProps {
 export interface PivotTreeNode {
   axis: PivotAxis;
   key: string;
+  parentKey?: string;
   path: PivotPath;
   label: string;
   formattedLabel: string;
   level: number;
   isSubtotal?: boolean;
+  isCollapsedMetric?: boolean;
+  isCollapsedMetricAlias?: boolean;
   hasChildren: boolean;
   values?: Record<string, DataRecordValue>;
 }

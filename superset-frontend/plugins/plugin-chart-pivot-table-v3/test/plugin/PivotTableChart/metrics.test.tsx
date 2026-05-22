@@ -1120,6 +1120,9 @@ describe('PivotTableChart metric tier suppression', () => {
       ['shipMode'],
       ['orderYear', 'shipInstruction'],
       2,
+      undefined,
+      undefined,
+      [1],
     );
 
     const props: Partial<PivotTableProps> = {

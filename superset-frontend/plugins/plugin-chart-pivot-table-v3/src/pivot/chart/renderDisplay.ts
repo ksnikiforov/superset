@@ -20,6 +20,7 @@ import { type DataRecordValue } from '@superset-ui/core';
 import {
   type MeasureHierarchy,
   type PivotAxis,
+  type PivotPath,
   type PivotTreeNode,
 } from '../../types';
 import {
@@ -50,6 +51,7 @@ export type ColumnDisplayConfig = {
   allowMetricSubtotalLabels: boolean;
   getMetricDisplayLabelForKey: (metricKey: string) => string;
   isExpanded?: (node: PivotTreeNode) => boolean;
+  isPathExpanded?: (path: PivotPath) => boolean;
 };
 
 export const buildColumnDisplayPath = (
@@ -62,6 +64,7 @@ export const buildColumnDisplayPath = (
     allowMetricSubtotalLabels,
     getMetricDisplayLabelForKey,
     isExpanded,
+    isPathExpanded,
   } = config;
   const {
     metricLabelSet,
@@ -129,12 +132,15 @@ export const buildColumnDisplayPath = (
   const metricIsLeaf =
     (decodeMetricKey(col.path[col.path.length - 1]) ??
       String(col.path[col.path.length - 1] ?? '')) === metricKey;
+  const isMetricSubtotalAncestorExpanded =
+    nonMetricParts.length === 0 || (isPathExpanded?.(nonMetricParts) ?? true);
   if (
     metricIsLeaf &&
     nonMetricParts.length > 0 &&
     metricsAtColEnd &&
     allowMetricSubtotalLabels &&
     isMetricSubtotalNode(col) &&
+    isMetricSubtotalAncestorExpanded &&
     (col.hasChildren || nonMetricParts.length > 1)
   ) {
     return buildMetricSubtotalPathAtEnd();

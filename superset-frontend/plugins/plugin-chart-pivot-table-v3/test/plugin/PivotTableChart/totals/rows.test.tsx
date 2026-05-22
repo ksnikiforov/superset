@@ -1300,11 +1300,13 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       label: string,
       hasChildren: boolean,
       isSubtotal = false,
+      parentKey?: string,
     ) => {
       const key = serializePath(path);
       rows[key] = {
         axis: 'row',
         key,
+        parentKey,
         path,
         label,
         formattedLabel: label,
@@ -1333,6 +1335,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
           `${product} ${metric}`,
           false,
           true,
+          serializePath([group, product]),
         );
         cells[serializeCellKey(productSubtotalKey, colKey)] = {
           rowKey: productSubtotalKey,
@@ -1350,6 +1353,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         `${group} ${metric}`,
         false,
         true,
+        serializePath([group]),
       );
       cells[serializeCellKey(groupSubtotalKey, colKey)] = {
         rowKey: groupSubtotalKey,

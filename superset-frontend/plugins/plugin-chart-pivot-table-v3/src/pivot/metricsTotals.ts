@@ -155,46 +155,6 @@ export const isExplicitSubtotalNode = (node?: PivotTreeNode) => {
   return node.path.some(isSubtotalToken);
 };
 
-export const getMetricDepthForParent = (
-  nodes: Record<string, PivotTreeNode>,
-  parent: PivotTreeNode,
-  metricLabelSet: Set<string>,
-) => {
-  let minIndex: number | undefined;
-  Object.values(nodes).forEach(node => {
-    if (
-      node.path.length <= parent.path.length ||
-      !parent.path.every((val, idx) => val === node.path[idx])
-    ) {
-      return;
-    }
-    const idx = node.path.findIndex(val => {
-      const decoded = decodeMetricKey(val);
-      return decoded !== undefined && metricLabelSet.has(decoded);
-    });
-    if (idx >= 0) {
-      minIndex = minIndex === undefined ? idx : Math.min(minIndex, idx);
-    }
-  });
-  return minIndex;
-};
-
-export const getMetricTierNodes = (
-  nodes: Record<string, PivotTreeNode>,
-  parent: PivotTreeNode,
-  metricDepth: number,
-  metricLabelSet: Set<string>,
-) =>
-  Object.values(nodes).filter(
-    node =>
-      node.path.length === metricDepth + 1 &&
-      parent.path.every((val, idx) => val === node.path[idx]) &&
-      (() => {
-        const decoded = decodeMetricKey(node.path[metricDepth]);
-        return decoded !== undefined && metricLabelSet.has(decoded);
-      })(),
-  );
-
 export const countDimDepth = (
   path: PivotTreeNode['path'],
   metricLabelSet: Set<string>,
