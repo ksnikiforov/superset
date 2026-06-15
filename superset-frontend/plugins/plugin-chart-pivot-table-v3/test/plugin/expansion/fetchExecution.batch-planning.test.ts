@@ -21,7 +21,10 @@ import {
   MAX_EXPANSION_BATCH_SIBLINGS,
 } from '../../../src/pivot/query/specs';
 import { type ExpansionCoverageTarget } from '../../../src/pivot/expansion/planner';
-import { buildExpansionHydrationLoadingKeys } from '../../../src/pivot/expansion/hydrationExecutor';
+import {
+  buildExpansionHydrationLoadingKeys,
+  resolveExpansionHydrationLoadingKeys,
+} from '../../../src/pivot/expansion/hydrationExecutor';
 import { parsePath, serializePath } from '../../../src/pivot/core/path';
 import { encodeMetricKey } from '../../../src/pivot/core/tokens';
 import { type PivotPathValue } from '../../../src/types';
@@ -187,5 +190,16 @@ describe('fetchPlanOptimizer', () => {
         serializePath(['Q1']),
       ]),
     );
+  });
+
+  test('uses visible loading keys when provided', () => {
+    const clickedKey = serializePath(['US']);
+
+    expect(
+      resolveExpansionHydrationLoadingKeys({
+        targets: [makeTarget(['US', 'CA']), makeTarget(['US', 'NY'])],
+        visibleLoadingKeys: new Set([clickedKey]),
+      }),
+    ).toEqual(new Set([clickedKey]));
   });
 });

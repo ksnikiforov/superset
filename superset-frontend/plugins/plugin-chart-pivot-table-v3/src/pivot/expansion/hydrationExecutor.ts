@@ -56,6 +56,14 @@ export const buildExpansionHydrationLoadingKeys = (
     ),
   );
 
+export const resolveExpansionHydrationLoadingKeys = ({
+  targets,
+  visibleLoadingKeys,
+}: {
+  targets: ExpansionCoverageTarget[];
+  visibleLoadingKeys?: Set<string>;
+}) => visibleLoadingKeys ?? buildExpansionHydrationLoadingKeys(targets);
+
 export const executeExpansionHydrationForIntent = async ({
   axisCoverageNeeds,
   completeBehavior = 'returnTree',
@@ -69,6 +77,7 @@ export const executeExpansionHydrationForIntent = async ({
   onLoadingKeys,
   program,
   queryContextKey,
+  visibleLoadingKeys,
 }: {
   axisCoverageNeeds: PivotAxisCoverageNeed[];
   completeBehavior?: 'returnTree' | 'skip';
@@ -82,6 +91,7 @@ export const executeExpansionHydrationForIntent = async ({
   onLoadingKeys: (loadingKeys: Set<string>) => void;
   program: PivotProgram;
   queryContextKey: string;
+  visibleLoadingKeys?: Set<string>;
 }) => {
   const plan = planHydrationIteration({
     desired: {
@@ -108,7 +118,12 @@ export const executeExpansionHydrationForIntent = async ({
       return {};
     }
 
-    onLoadingKeys(buildExpansionHydrationLoadingKeys(plan.targets));
+    onLoadingKeys(
+      resolveExpansionHydrationLoadingKeys({
+        targets: plan.targets,
+        visibleLoadingKeys,
+      }),
+    );
     const requestGroupId = `${expansionInstanceId}:${scope.id}`;
     scope.beginRequest(requestGroupId);
     try {

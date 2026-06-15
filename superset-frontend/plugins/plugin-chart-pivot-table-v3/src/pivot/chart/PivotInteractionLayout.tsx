@@ -17,6 +17,7 @@
  * under the License.
  */
 import { memo, useCallback, useEffect, useRef, type ReactNode } from 'react';
+import ReactDOM from 'react-dom';
 import { t } from '@apache-superset/core/translation';
 import { styled } from '@apache-superset/core/theme';
 import { Icons } from '@superset-ui/core/components/Icons';
@@ -372,7 +373,7 @@ const PivotDragLayer = memo(() => {
     return null;
   }
 
-  return (
+  return ReactDOM.createPortal(
     <DragPreviewWrap
       style={{
         transform: `translate(${dragLayer.currentOffset.x}px, ${dragLayer.currentOffset.y}px) translate(-50%, -50%)`,
@@ -387,7 +388,8 @@ const PivotDragLayer = memo(() => {
           <ChipLabel>{dragLayer.item.label}</ChipLabel>
         </DragPreviewChip>
       )}
-    </DragPreviewWrap>
+    </DragPreviewWrap>,
+    document.body,
   );
 });
 

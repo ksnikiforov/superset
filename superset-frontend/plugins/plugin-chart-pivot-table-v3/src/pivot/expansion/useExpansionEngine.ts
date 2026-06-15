@@ -365,9 +365,11 @@ export const useExpansionEngine = ({
     async ({
       persistOnComplete = false,
       skipWhenComplete = false,
+      visibleLoadingKeys,
     }: {
       persistOnComplete?: boolean;
       skipWhenComplete?: boolean;
+      visibleLoadingKeys?: Set<string>;
     } = {}) => {
       const factStore = factStoreRef.current as PivotFactStore;
       const result = await executeExpansionHydrationForIntent({
@@ -383,6 +385,7 @@ export const useExpansionEngine = ({
         onLoadingKeys: setLoadingKeys,
         program: pivotProgram,
         queryContextKey,
+        visibleLoadingKeys,
       });
       if (!result.tree) {
         return;
@@ -441,7 +444,10 @@ export const useExpansionEngine = ({
           toggleDecision.nextManualExpanded ?? new Set<string>();
         expansionIntentRef.current.collapsed[axis] =
           toggleDecision.nextManualCollapsed ?? new Set<string>();
-        hydrateAtomic({ persistOnComplete: true }).catch(reportAsyncError);
+        hydrateAtomic({
+          persistOnComplete: true,
+          visibleLoadingKeys: new Set([node.key]),
+        }).catch(reportAsyncError);
       }
     },
     [collapseNode, expansionRequestLifecycle, hydrateAtomic, reportAsyncError],
