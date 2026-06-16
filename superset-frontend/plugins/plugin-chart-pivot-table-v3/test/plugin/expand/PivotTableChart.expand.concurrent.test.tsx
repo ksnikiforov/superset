@@ -195,15 +195,24 @@ describe('PivotTableChart concurrent expands', () => {
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
+    await waitFor(() => {
+      expect(getToggleForRow('A')).toBeDisabled();
+    });
     fireEvent.click(getToggleForRow('B'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
     });
+    expect(getToggleForRow('A')).toBeDisabled();
+    expect(getToggleForRow('B')).toBeDisabled();
 
     expect(paramsA).toBeDefined();
     expect(paramsB).toBeDefined();
     deferredB.resolve(buildMockBranchFetchResult(paramsB!, { data: branchB }));
+    await waitFor(() => {
+      expect(getToggleForRow('A')).toBeDisabled();
+      expect(getToggleForRow('B')).not.toBeDisabled();
+    });
     deferredA.resolve(buildMockBranchFetchResult(paramsA!, { data: branchA }));
 
     await waitFor(() => {
@@ -278,6 +287,8 @@ describe('PivotTableChart concurrent expands', () => {
     await waitFor(() => {
       expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
+    expect(getToggleForRow('A')).toBeDisabled();
+    expect(getToggleForRow('B')).toBeDisabled();
 
     expect(paramsA).toBeDefined();
     deferredA.resolve(buildMockBranchFetchResult(paramsA!, { data: branchA }));
@@ -291,6 +302,7 @@ describe('PivotTableChart concurrent expands', () => {
       expect(scoped.getByText('X')).toBeInTheDocument();
       expect(scoped.queryByText('Z')).not.toBeInTheDocument();
     });
+    expect(getToggleForRow('B')).toBeDisabled();
 
     expect(paramsB).toBeDefined();
     deferredB.resolve(buildMockBranchFetchResult(paramsB!, { data: branchB }));

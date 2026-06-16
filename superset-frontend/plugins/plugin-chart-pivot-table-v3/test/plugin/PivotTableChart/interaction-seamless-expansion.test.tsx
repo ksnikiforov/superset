@@ -88,6 +88,14 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     fetchPivotBranchMock.mockImplementation(resolveExpansionData());
   });
 
+  const createDeferred = <T,>() => {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>(res => {
+      resolve = res;
+    });
+    return { promise, resolve };
+  };
+
   const hasColumnKey = (
     columns: Array<string | QueryFormColumn> | undefined,
     key: string,
@@ -3814,6 +3822,173 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       ).map(th => th.textContent ?? '');
       expect(headerLabels).toEqual(expect.arrayContaining(['m2']));
     });
+  });
+
+  it('shows the corner loader while a measure selection fetch is pending', async () => {
+    const metrics = ['m1', 'm2'];
+    const columns = ['c1', 'c2'];
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: [],
+      cols: columns,
+      metrics: ['m1'],
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: columns,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: false,
+      initialDepth: 2,
+    });
+    const queryFormData = buildFormData({
+      ...formData,
+      metrics: ['m1'],
+    });
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(
+        [{ c1: 'A', c2: 'B', m1: 10 }],
+        ['m1'],
+        [],
+        columns,
+        0,
+        2,
+      ),
+      ['m1'],
+      MetricsLayoutEnum.COLUMNS,
+      [],
+      columns,
+      1,
+    );
+    const deferred = createDeferred<Array<{ data: unknown[] }>>();
+    fetchMock.mockImplementation(() => deferred.promise);
+
+    render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={queryFormData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={columns}
+        width={600}
+        height={300}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Select measures'));
+    fireEvent.click(screen.getByLabelText('Toggle measure m2'));
+    fireEvent.click(screen.getByText('Select measures'));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(screen.getByLabelText('Loading')).toBeInTheDocument();
+
+    deferred.resolve([{ data: [{ c1: 'A', c2: 'B', m1: 10, m2: 20 }] }]);
+  });
+
+  it('does not show row loaders for already expanded rows after measure data loads', async () => {
+    const metrics = ['m1', 'm2'];
+    const rows = ['r1', 'r2'];
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows,
+      cols: [],
+      metrics: ['m1'],
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: rows,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      pivotExpansionState: {
+        rowKeys: rows,
+        colKeys: [],
+        rows: [['A']],
+        cols: [],
+        collapsedRows: [],
+        collapsedCols: [],
+      },
+      startCollapsed: true,
+      initialDepth: 2,
+    });
+    const queryFormData = buildFormData({
+      ...formData,
+      metrics: ['m1'],
+    });
+    const baseRecords = [
+      { r1: 'A', r2: 'B', m1: 10 },
+      { r1: 'A', r2: 'C', m1: 12 },
+    ];
+    const nextRecords = baseRecords.map(record => ({
+      ...record,
+      m2: record.m1 * 2,
+    }));
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(baseRecords, ['m1'], rows, [], 2, 0),
+      ['m1'],
+      MetricsLayoutEnum.COLUMNS,
+      rows,
+      [],
+    );
+    let resolveMeasureFetch:
+      | ((results: Array<{ data: typeof nextRecords }>) => void)
+      | undefined;
+    fetchMock.mockImplementation(({ specs }: { specs: Array<unknown> }) => {
+      return new Promise(resolve => {
+        resolveMeasureFetch = () =>
+          resolve(specs.map(() => ({ data: nextRecords })));
+      });
+    });
+    fetchPivotBranchMock.mockImplementation(() => new Promise(() => undefined));
+
+    render(
+      <PivotTableChart
+        data={baseTree}
+        factBatches={buildPreloadedTreeFactBatches(baseTree, {
+          groupbyRows: rows,
+          groupbyColumns: [],
+        })}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={queryFormData}
+        metrics={metrics}
+        groupbyRows={rows}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('B')).toBeInTheDocument());
+    const expandedRow = screen.getByText('A').closest('tr') as HTMLElement;
+    expect(within(expandedRow).getByLabelText('minus-square')).toBeVisible();
+
+    fireEvent.click(screen.getByText('Select measures'));
+    fireEvent.click(screen.getByLabelText('Toggle measure m2'));
+    fireEvent.click(screen.getByText('Select measures'));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    resolveMeasureFetch?.([]);
+
+    await waitFor(() =>
+      expect(screen.getAllByText('m2').length).toBeGreaterThan(0),
+    );
+    const expandedRowAfterMeasure = screen
+      .getByText('A')
+      .closest('tr') as HTMLElement;
+    const expandedToggle =
+      within(expandedRowAfterMeasure).getByLabelText('minus-square');
+    expect(expandedToggle.closest('button')).not.toBeDisabled();
   });
 
   it('reuses current expansion state during seamless metric updates to avoid rubber-banding', async () => {

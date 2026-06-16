@@ -135,6 +135,7 @@ export const usePivotSeamlessRuntimeUpdate = (
     persistRuntimeState,
   } = config;
   const [loading, setLoading] = useState(false);
+  const [cornerLoading, setCornerLoading] = useState(false);
   const [warnings, setWarnings] = useState<ChartDataWarning[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
   const [committedTree, setCommittedTree] = useState<PivotTreeData>(data);
@@ -188,10 +189,12 @@ export const usePivotSeamlessRuntimeUpdate = (
       nextFilters: RuntimeSelection,
       {
         showLoading = true,
+        showCornerLoading = showLoading,
         syncControlValues = true,
         syncOwnState = true,
       }: {
         showLoading?: boolean;
+        showCornerLoading?: boolean;
         syncControlValues?: boolean;
         syncOwnState?: boolean;
       } = {},
@@ -202,6 +205,7 @@ export const usePivotSeamlessRuntimeUpdate = (
         metricKeys,
       );
       setLoading(showLoading);
+      setCornerLoading(showCornerLoading);
       setError(undefined);
       const upstreamAdoptionEpoch = upstreamAdoptionEpochRef.current;
       const updateResult = await fetchAndMaterializeSeamlessRuntimeUpdate({
@@ -218,11 +222,13 @@ export const usePivotSeamlessRuntimeUpdate = (
         upstreamAdoptionEpoch !== upstreamAdoptionEpochRef.current
       ) {
         setLoading(false);
+        setCornerLoading(false);
         return;
       }
       if (updateResult.status !== 'success') {
         setError(runtimeErrorMessage(updateResult.error));
         setLoading(false);
+        setCornerLoading(false);
         return;
       }
 
@@ -244,6 +250,7 @@ export const usePivotSeamlessRuntimeUpdate = (
         upstreamSignature,
       });
       setLoading(false);
+      setCornerLoading(false);
     },
     [
       baseFormData,
@@ -372,6 +379,7 @@ export const usePivotSeamlessRuntimeUpdate = (
       seamlessSyncRef.current = syncSnapshot;
       applySeamlessUpdate(runtimeLayout, uiSelectedFilters, {
         showLoading: false,
+        showCornerLoading: true,
         syncControlValues: syncControlValuesOnInteraction,
         syncOwnState: false,
       });
@@ -551,6 +559,7 @@ export const usePivotSeamlessRuntimeUpdate = (
     dataForRender: committedTree,
     factBatchesForRender: committedFactBatches,
     seamlessLoading: loading,
+    seamlessCornerLoading: cornerLoading,
     seamlessWarnings: warnings,
     seamlessError: error,
     applyRuntimeLayoutChange,

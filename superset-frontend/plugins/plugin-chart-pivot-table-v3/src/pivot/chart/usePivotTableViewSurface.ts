@@ -48,6 +48,7 @@ type UsePivotTableViewSurfaceInput = {
   errorMessage?: string;
   warnings: ChartDataWarning[];
   seamlessLoading: boolean;
+  seamlessCornerLoading: boolean;
   seamlessWarnings: ChartDataWarning[];
   seamlessError?: string;
   formData: PivotTableProps['formData'];
@@ -79,6 +80,7 @@ export const usePivotTableViewSurface = ({
   errorMessage,
   warnings,
   seamlessLoading,
+  seamlessCornerLoading,
   seamlessWarnings,
   seamlessError,
   formData,
@@ -160,7 +162,7 @@ export const usePivotTableViewSurface = ({
     onRetry,
     warnings: combinedWarnings,
     showGlobalLoader: false,
-    showCornerLoader: seamlessLoading,
+    showCornerLoader: seamlessCornerLoading,
     stickyHeaders,
     headerOffset,
     headerRowOffsets,
@@ -172,7 +174,7 @@ export const usePivotTableViewSurface = ({
     isColumnSortable: renderModelResult.isColumnSortable,
     getColumnSortOrder: renderModelResult.getColumnSortOrder,
     shouldShowToggle: renderModelResult.shouldShowToggle,
-    showSpinner: (key: string) => !seamlessLoading && loadingKeys.has(key),
+    showSpinner: (key: string) => loadingKeys.has(key),
     isRowAggregateBold: renderModelResult.isRowAggregateBold,
     isColAggregateBold: renderModelResult.isColAggregateBold,
     getNodeDimDepth: renderModelResult.getNodeDimDepth,

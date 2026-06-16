@@ -88,7 +88,7 @@ export const executeExpansionHydrationForIntent = async ({
   fetchFormData: PivotTableQueryFormData;
   fetchLayout: LayoutContext;
   lifecycle: LatestRequestLifecycle;
-  onLoadingKeys: (loadingKeys: Set<string>) => void;
+  onLoadingKeys: (scopeId: number, loadingKeys: Set<string>) => void;
   program: PivotProgram;
   queryContextKey: string;
   visibleLoadingKeys?: Set<string>;
@@ -111,7 +111,6 @@ export const executeExpansionHydrationForIntent = async ({
     cancelActive: false,
     latestOnly: false,
   });
-  onLoadingKeys(new Set());
 
   try {
     if (!scope.isCurrent()) {
@@ -119,6 +118,7 @@ export const executeExpansionHydrationForIntent = async ({
     }
 
     onLoadingKeys(
+      scope.id,
       resolveExpansionHydrationLoadingKeys({
         targets: plan.targets,
         visibleLoadingKeys,
@@ -148,6 +148,6 @@ export const executeExpansionHydrationForIntent = async ({
       scope.finish(requestGroupId);
     }
   } finally {
-    onLoadingKeys(new Set());
+    onLoadingKeys(scope.id, new Set());
   }
 };

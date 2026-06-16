@@ -221,6 +221,7 @@ export const useExpansionEngine = ({
   const { row: expandedRows, col: expandedCols } = expandedByAxis;
   const expandedRef = useRef(expandedByAxis);
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(() => new Set());
+  const loadingScopesRef = useRef<Map<number, Set<string>>>(new Map());
   const groupbyRowKeys = useMemo(
     () => pivotProgram.rowDimensions.map(getStableColumnKey),
     [pivotProgram.rowDimensions],
@@ -311,6 +312,29 @@ export const useExpansionEngine = ({
     [],
   );
 
+  const updateLoadingScope = useCallback(
+    (scopeId: number, nextScopeKeys: Set<string>) => {
+      if (nextScopeKeys.size === 0) {
+        loadingScopesRef.current.delete(scopeId);
+      } else {
+        loadingScopesRef.current.set(scopeId, new Set(nextScopeKeys));
+      }
+      setLoadingKeys(
+        new Set(
+          Array.from(loadingScopesRef.current.values()).flatMap(scopeKeys =>
+            Array.from(scopeKeys),
+          ),
+        ),
+      );
+    },
+    [],
+  );
+
+  const clearLoadingKeys = useCallback(() => {
+    loadingScopesRef.current.clear();
+    setLoadingKeys(new Set());
+  }, []);
+
   const reportAsyncError = useCallback(
     (error: unknown) => {
       if (error instanceof StaleChunkedWorkError) {
@@ -318,10 +342,10 @@ export const useExpansionEngine = ({
       }
       const message = error instanceof Error ? error.message : String(error);
       expansionRequestLifecycle.invalidate();
-      setLoadingKeys(new Set());
+      clearLoadingKeys();
       setErrorMessage(message);
     },
-    [expansionRequestLifecycle],
+    [clearLoadingKeys, expansionRequestLifecycle],
   );
 
   const addWarnings = useCallback((nextWarnings?: ChartDataWarning[]) => {
@@ -414,7 +438,7 @@ export const useExpansionEngine = ({
         fetchFormData,
         fetchLayout,
         lifecycle: expansionRequestLifecycle,
-        onLoadingKeys: setLoadingKeys,
+        onLoadingKeys: updateLoadingScope,
         program: pivotProgram,
         queryContextKey,
         visibleLoadingKeys,
@@ -460,6 +484,7 @@ export const useExpansionEngine = ({
       persistExpansionState,
       pivotProgram,
       queryContextKey,
+      updateLoadingScope,
     ],
   );
 
@@ -474,7 +499,7 @@ export const useExpansionEngine = ({
       });
       if (toggleDecision.kind === 'collapse') {
         expansionRequestLifecycle.invalidate();
-        setLoadingKeys(new Set());
+        clearLoadingKeys();
         collapseNode(axis, node);
         return;
       }
@@ -490,7 +515,13 @@ export const useExpansionEngine = ({
         }).catch(reportAsyncError);
       }
     },
-    [collapseNode, expansionRequestLifecycle, hydrateAtomic, reportAsyncError],
+    [
+      clearLoadingKeys,
+      collapseNode,
+      expansionRequestLifecycle,
+      hydrateAtomic,
+      reportAsyncError,
+    ],
   );
 
   useEffect(() => {
@@ -524,7 +555,7 @@ export const useExpansionEngine = ({
     factStoreRef.current = createPivotFactStoreFromBatches(currentFactBatches);
     setWarnings([]);
     setErrorMessage(undefined);
-    setLoadingKeys(new Set());
+    clearLoadingKeys();
     expansionIntentRef.current = expansionStateKeysToIntent(
       reinitializationPlan.persistedState,
     );
@@ -541,7 +572,11 @@ export const useExpansionEngine = ({
       expanded: reinitializationPlan.expanded,
     });
 
-    hydrateAtomic({ skipWhenComplete: true }).catch(reportAsyncError);
+    hydrateAtomic({
+      skipWhenComplete: true,
+      visibleLoadingKeys:
+        previousSemanticSignature === null ? undefined : new Set(),
+    }).catch(reportAsyncError);
   }, [
     commitExpansionState,
     data,
@@ -555,6 +590,7 @@ export const useExpansionEngine = ({
     hydrateAtomic,
     expansionRequestLifecycle,
     reportAsyncError,
+    clearLoadingKeys,
   ]);
 
   const handleRetry = useCallback(() => {
