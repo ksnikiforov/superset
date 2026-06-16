@@ -16,19 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { buildQueryContext, QueryFormOrderBy } from '@superset-ui/core';
+import {
+  buildQueryContext,
+  type BuildQuery,
+  QueryFormOrderBy,
+} from '@superset-ui/core';
 import { PivotTableQueryFormData } from './types';
 import {
   buildInitialPivotUpdatePlan,
   toChartDataQueries,
 } from './pivot/query/specs';
 
-export default function buildQuery(formData: PivotTableQueryFormData) {
+export default function buildQuery(
+  formData: PivotTableQueryFormData,
+  options?: Parameters<BuildQuery<PivotTableQueryFormData>>[1],
+) {
+  const pivotExpansionState =
+    (options?.ownState?.pivotExpansionState as
+      | PivotTableQueryFormData['pivotExpansionState']
+      | undefined) ?? formData.pivotExpansionState;
   const {
     formData: resolvedFormData,
     layout,
     specs,
-  } = buildInitialPivotUpdatePlan({ formData });
+  } = buildInitialPivotUpdatePlan({
+    formData: { ...formData, pivotExpansionState },
+  });
   return buildQueryContext(resolvedFormData, baseQueryObject => {
     const { series_limit_metric, order_desc } = baseQueryObject;
     const queryMetrics =

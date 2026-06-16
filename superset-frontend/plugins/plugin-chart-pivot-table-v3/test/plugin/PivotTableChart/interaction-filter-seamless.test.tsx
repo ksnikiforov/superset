@@ -17,6 +17,7 @@
  * under the License.
  */
 import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
+import { AppSection } from '@superset-ui/core';
 import PivotTableChart, {
   buildPreloadedTreeFactBatches,
 } from '../fixtures/TestPivotTableChart';
@@ -85,7 +86,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
     });
   });
 
-  it('does not restore stale persisted filter after clear-all acknowledgement', async () => {
+  test('does not restore stale persisted filter after clear-all acknowledgement', async () => {
     const metrics = ['m1'];
     const rows = ['row1'];
     const records = [
@@ -94,6 +95,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
     ];
     const filteredRecords = [{ row1: 'A', m1: 10 }];
     const setControlValue = jest.fn();
+    const setDataMask = jest.fn();
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,
       rows,
@@ -175,6 +177,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         groupbyColumns={[]}
         factBatches={unfilteredFactBatches}
         setControlValue={setControlValue}
+        setDataMask={setDataMask}
         width={600}
         height={300}
       />,
@@ -182,11 +185,21 @@ describe('PivotTableChart interaction filter seamless updates', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Apply row1 filter' }));
 
-    await waitFor(() =>
-      expect(setControlValue).toHaveBeenCalledWith('pivotSelectedFilters', {
-        row1: ['A'],
-      }),
-    );
+    await waitFor(() => {
+      const rowLabels = within(container.querySelector('tbody') as HTMLElement)
+        .getAllByRole('row')
+        .map(row => (row.querySelector('th')?.textContent || '').trim());
+      expect(rowLabels).toContain('A');
+      expect(rowLabels).not.toContain('B');
+    });
+    expect(
+      setDataMask.mock.calls.some(
+        call => call[0]?.ownState?.pivotSelectedFilters,
+      ),
+    ).toBe(false);
+    expect(
+      setControlValue.mock.calls.some(call => call[0] === 'pivotSelectedFilters'),
+    ).toBe(false);
 
     const filteredFormData = {
       ...formData,
@@ -204,6 +217,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         factBatches={unfilteredFactBatches}
         selectedFilters={{ row1: ['A'] }}
         setControlValue={setControlValue}
+        setDataMask={setDataMask}
         width={600}
         height={300}
       />,
@@ -213,9 +227,18 @@ describe('PivotTableChart interaction filter seamless updates', () => {
       screen.getByRole('button', { name: 'Clear chart filters' }),
     );
 
-    await waitFor(() =>
-      expect(setControlValue).toHaveBeenCalledWith('pivotSelectedFilters', {}),
-    );
+    await waitFor(() => {
+      const rowLabels = within(container.querySelector('tbody') as HTMLElement)
+        .getAllByRole('row')
+        .map(row => (row.querySelector('th')?.textContent || '').trim());
+      expect(rowLabels).toContain('A');
+      expect(rowLabels).toContain('B');
+    });
+    expect(
+      setDataMask.mock.calls.some(
+        call => call[0]?.ownState?.pivotSelectedFilters,
+      ),
+    ).toBe(false);
 
     const clearedFormData = { ...formData, pivotSelectedFilters: {} };
     rerender(
@@ -230,6 +253,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         factBatches={unfilteredFactBatches}
         selectedFilters={{}}
         setControlValue={setControlValue}
+        setDataMask={setDataMask}
         width={600}
         height={300}
       />,
@@ -256,6 +280,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         factBatches={unfilteredFactBatches}
         selectedFilters={{ row1: ['A'] }}
         setControlValue={setControlValue}
+        setDataMask={setDataMask}
         width={600}
         height={300}
       />,
@@ -270,7 +295,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
     });
   });
 
-  it('refetches when dashboard extra_form_data changes in user controlled mode', async () => {
+  test('refetches when dashboard extra_form_data changes in user controlled mode', async () => {
     const metrics = ['m1'];
     const rows = ['row1'];
     const allRecords = [
@@ -350,6 +375,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
+        appSection={AppSection.Dashboard}
         width={600}
         height={300}
       />,
@@ -373,6 +399,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
+        appSection={AppSection.Dashboard}
         width={600}
         height={300}
       />,
@@ -404,7 +431,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
     });
   });
 
-  it('restores persisted interaction-filter data and keeps it across width rerenders', async () => {
+  test('restores persisted interaction-filter data and keeps it across width rerenders', async () => {
     const metrics = ['m1'];
     const rows = ['row1'];
     const allRecords = [
@@ -470,6 +497,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         groupbyColumns={[]}
         factBatches={unfilteredFactBatches}
         selectedFilters={{}}
+        appSection={AppSection.Dashboard}
         width={600}
         height={300}
       />,
@@ -502,6 +530,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         groupbyColumns={[]}
         factBatches={unfilteredFactBatches}
         selectedFilters={{}}
+        appSection={AppSection.Dashboard}
         width={480}
         height={300}
       />,
@@ -516,7 +545,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
     });
   });
 
-  it('does not refetch persisted interaction-filter data when only tree signature changes', async () => {
+  test('does not refetch persisted interaction-filter data when only tree signature changes', async () => {
     const metrics = ['m1'];
     const rows = ['row1'];
     const allRecords = [
@@ -583,6 +612,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         factBatches={unfilteredFactBatches}
         selectedFilters={{}}
         treeDataSignature="signature-a"
+        appSection={AppSection.Dashboard}
         width={600}
         height={300}
       />,
@@ -617,6 +647,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         factBatches={unfilteredFactBatches}
         selectedFilters={{}}
         treeDataSignature="signature-b"
+        appSection={AppSection.Dashboard}
         width={480}
         height={300}
       />,
@@ -626,7 +657,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('does not run chart-owned recovery when dashboard remount tree misses bootstrap coverage', async () => {
+  test('does not run chart-owned recovery when dashboard remount tree misses bootstrap coverage', async () => {
     const metrics = ['m1'];
     const rows = ['row1'];
     const cols = ['col1'];
@@ -683,6 +714,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         groupbyRows={[]}
         groupbyColumns={[]}
         factBatches={[]}
+        appSection={AppSection.Dashboard}
         width={600}
         height={300}
       />,

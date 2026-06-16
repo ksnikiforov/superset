@@ -30,6 +30,7 @@ import {
 } from '../../types';
 import {
   buildResolvedMetricLabelMap,
+  getStableColumnKey,
   normalizeSubtotalLevels,
 } from '../../utils';
 import { getMetricKeys } from '../metrics';
@@ -65,6 +66,7 @@ export type PivotLayoutSpec = Pick<
   | 'colSubtotalPosition'
   | 'expandRowsLevel'
   | 'expandColumnsLevel'
+  | 'pivotExpansionState'
 > & {
   startCollapsed?: PivotTableQueryFormData['startCollapsed'];
   initialDepth?: PivotTableQueryFormData['initialDepth'];
@@ -97,6 +99,11 @@ const normalizeTotalPosition = (value: unknown): TotalPosition => {
   }
   return 'start';
 };
+
+const keysMatch = (left: string[], right?: string[]) =>
+  right !== undefined &&
+  left.length === right.length &&
+  left.every((value, index) => value === right[index]);
 
 export const buildLayoutContext = (
   layoutSpec: PivotLayoutSpec,
@@ -168,16 +175,31 @@ export const buildLayoutContext = (
   const colSubtotalLevelsForQuery = colSubtotalLevels.filter(
     level => level > 0,
   );
+  const rowKeys = rowDimensions.map(getStableColumnKey);
+  const colKeys = columnDimensions.map(getStableColumnKey);
   const startCollapsed = layoutSpec.startCollapsed ?? true;
   const initialDepth = layoutSpec.initialDepth ?? 1;
+  const hasExpansionState =
+    keysMatch(rowKeys, layoutSpec.pivotExpansionState?.rowKeys) &&
+    keysMatch(colKeys, layoutSpec.pivotExpansionState?.colKeys) &&
+    [
+      layoutSpec.pivotExpansionState?.rows,
+      layoutSpec.pivotExpansionState?.cols,
+      layoutSpec.pivotExpansionState?.collapsedRows,
+      layoutSpec.pivotExpansionState?.collapsedCols,
+    ].some(paths => paths && paths.length > 0);
   const rowExpandDepth = resolveInitialVisibleAxisDepth({
-    configuredDepth: layoutSpec.expandRowsLevel ?? undefined,
+    configuredDepth: hasExpansionState
+      ? 0
+      : layoutSpec.expandRowsLevel ?? undefined,
     dimensionCount: rowDimensions.length,
     startCollapsed,
     initialDepth,
   });
   const colExpandDepth = resolveInitialVisibleAxisDepth({
-    configuredDepth: layoutSpec.expandColumnsLevel ?? undefined,
+    configuredDepth: hasExpansionState
+      ? 0
+      : layoutSpec.expandColumnsLevel ?? undefined,
     dimensionCount: columnDimensions.length,
     startCollapsed,
     initialDepth,

@@ -151,7 +151,14 @@ export default function transformProps(
       verboseMap,
     }),
   );
-  const formDataWithMetricLabels = { ...baseFormData, metricLabelMap };
+  const formDataWithMetricLabels = {
+    ...baseFormData,
+    metricLabelMap,
+    pivotExpansionState:
+      (ownState?.pivotExpansionState as
+        | PivotTableQueryFormData['pivotExpansionState']
+        | undefined) ?? baseFormData.pivotExpansionState,
+  };
   const {
     formData: plannedFormData,
     layout,

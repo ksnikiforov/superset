@@ -74,6 +74,7 @@ export const usePivotRuntimeLayoutState = ({
     committedRuntimeLayoutProp ?? runtimeLayout;
   const lastPersistedRuntimeLayoutRef = useRef(runtimeLayout);
   const persistedRuntimeLayoutSyncRef = useRef(false);
+  const pendingRuntimeLayoutAckRef = useRef(false);
   const lastPersistedSelectionRef = useRef(selectedFiltersFromProps);
   const pendingPersistedSelectionSyncRef = useRef(false);
   const lastLocalSyncDashboardQueryContextRef = useRef<string | null>(null);
@@ -130,14 +131,18 @@ export const usePivotRuntimeLayoutState = ({
     (
       layout: PivotRuntimeLayout,
       filters: RuntimeSelection,
-      options: { commit?: boolean } = {},
+      options: {
+        commit?: boolean;
+        syncControlValues?: boolean;
+        syncOwnState?: boolean;
+      } = {},
     ) => {
-      if (
-        isDashboardRuntimeSync &&
-        !isSameRuntimeLayout(lastPersistedRuntimeLayoutRef.current, layout)
-      ) {
+      if (!isSameRuntimeLayout(lastPersistedRuntimeLayoutRef.current, layout)) {
         lastPersistedRuntimeLayoutRef.current = layout;
-        persistedRuntimeLayoutSyncRef.current = true;
+        pendingRuntimeLayoutAckRef.current = true;
+        if (isDashboardRuntimeSync) {
+          persistedRuntimeLayoutSyncRef.current = true;
+        }
       }
       if (isDashboardRuntimeSync) {
         lastLocalSyncDashboardQueryContextRef.current =
@@ -150,11 +155,11 @@ export const usePivotRuntimeLayoutState = ({
       if (options.commit !== false) {
         commitRuntimeLayout(layout);
       }
-      if (setControlValue) {
+      if (setControlValue && options.syncControlValues !== false) {
         setControlValue('pivotRuntimeLayout', layout);
         setControlValue('pivotSelectedFilters', filters);
       }
-      if (shouldPersistOwnState) {
+      if (shouldPersistOwnState && options.syncOwnState !== false) {
         const nextOwnState = mergeOwnState({
           pivotRuntimeLayout: layout,
           pivotSelectedFilters: filters,
@@ -178,9 +183,13 @@ export const usePivotRuntimeLayoutState = ({
       uiRuntimeLayoutRef.current,
       committedRuntimeLayoutRef.current,
     );
+    const parentAcknowledgedPendingLayout =
+      hasPendingRuntimeLayout &&
+      pendingRuntimeLayoutAckRef.current &&
+      isSameRuntimeLayout(runtimeLayout, lastPersistedRuntimeLayoutRef.current);
     const shouldSyncLayout =
       !(isDashboardRuntimeSync && persistedRuntimeLayoutSyncRef.current) &&
-      !hasPendingRuntimeLayout;
+      (!hasPendingRuntimeLayout || parentAcknowledgedPendingLayout);
     if (shouldSyncLayout) {
       commitRuntimeLayout(runtimeLayout);
     }
@@ -190,6 +199,9 @@ export const usePivotRuntimeLayoutState = ({
       isSameRuntimeLayout(runtimeLayout, lastPersistedRuntimeLayoutRef.current)
     ) {
       persistedRuntimeLayoutSyncRef.current = false;
+    }
+    if (parentAcknowledgedPendingLayout) {
+      pendingRuntimeLayoutAckRef.current = false;
     }
     if (shouldSyncLayout) {
       updateUiRuntimeLayout(runtimeLayout);

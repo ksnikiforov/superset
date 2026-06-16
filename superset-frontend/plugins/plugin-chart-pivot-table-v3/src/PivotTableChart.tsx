@@ -79,10 +79,8 @@ function PivotTableChart(props: PivotTableProps) {
     appSection,
   } = props;
 
-  const isDashboardContext =
-    appSection === AppSection.Dashboard || formData.dashboardId !== undefined;
   const isUserControlledMode = formData.interactionMode === 'user_controlled';
-  const isDashboardRuntimeSync = isDashboardContext;
+  const isDashboardRuntimeSync = appSection === AppSection.Dashboard;
   const shouldPersistOwnState = !isDashboardRuntimeSync;
   const fetchFormDataBase = queryFormData || formData;
   const dimensionList = useMemo(
@@ -105,9 +103,9 @@ function PivotTableChart(props: PivotTableProps) {
   );
   const shouldFetchDatasetVerboseMap = useMemo(
     () =>
-      isDashboardContext &&
+      isDashboardRuntimeSync &&
       dimensionKeys.some(dimensionKey => !resolvedVerboseMap[dimensionKey]),
-    [dimensionKeys, isDashboardContext, resolvedVerboseMap],
+    [dimensionKeys, isDashboardRuntimeSync, resolvedVerboseMap],
   );
   const { verboseMap: datasetVerboseMap, loading: isDatasetVerboseMapLoading } =
     useDatasetVerboseMap({
@@ -221,7 +219,7 @@ function PivotTableChart(props: PivotTableProps) {
     lastLocalSyncDashboardQueryContextRef,
     persistRuntimeState,
   } = usePivotRuntimeLayoutState({
-    isDashboardContext,
+    isDashboardContext: isDashboardRuntimeSync,
     runtimeLayout,
     dimensions: dimensionList,
     selectedFiltersFromFormData,
@@ -299,6 +297,7 @@ function PivotTableChart(props: PivotTableProps) {
     lastLocalSyncDashboardQueryContextRef,
     suppressStalePersistedFilterRestoreRef,
     commitUiRuntimeLayout: updateUiRuntimeLayout,
+    syncControlValuesOnInteraction: isDashboardRuntimeSync,
     persistRuntimeState,
   });
   const expansionFetchFormData = seamlessLoading

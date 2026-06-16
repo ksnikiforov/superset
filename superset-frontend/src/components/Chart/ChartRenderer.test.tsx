@@ -23,6 +23,7 @@ import {
   VizType,
   JsonObject,
   FeatureFlagMap,
+  AppSection,
 } from '@superset-ui/core';
 import ChartRenderer, {
   ChartRendererProps,
@@ -46,6 +47,7 @@ jest.mock('@superset-ui/core', () => ({
     <div
       data-test="mock-super-chart"
       data-is-refreshing={isRefreshing ? 'true' : 'false'}
+      data-app-section={String(props.appSection ?? '')}
     >
       {JSON.stringify(postTransformProps(props).formData)}
     </div>
@@ -117,6 +119,32 @@ test('should render SuperChart', () => {
     />,
   );
   expect(getByTestId('mock-super-chart')).toBeInTheDocument();
+});
+
+test('should pass dashboard app section to SuperChart', () => {
+  const { getByTestId } = render(
+    <ChartRenderer
+      {...(requiredProps as ChartRendererProps)}
+      source={ChartSource.Dashboard}
+    />,
+  );
+  expect(getByTestId('mock-super-chart')).toHaveAttribute(
+    'data-app-section',
+    AppSection.Dashboard,
+  );
+});
+
+test('should pass explore app section to SuperChart', () => {
+  const { getByTestId } = render(
+    <ChartRenderer
+      {...(requiredProps as ChartRendererProps)}
+      source={ChartSource.Explore}
+    />,
+  );
+  expect(getByTestId('mock-super-chart')).toHaveAttribute(
+    'data-app-section',
+    AppSection.Explore,
+  );
 });
 
 test('should use latestQueryFormData instead of formData when chartIsStale is true', () => {

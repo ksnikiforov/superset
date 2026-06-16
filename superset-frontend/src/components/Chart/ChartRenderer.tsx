@@ -34,6 +34,7 @@ import {
   AgGridChartState,
   ContextMenuFilters,
   DataRecordFilters,
+  AppSection,
 } from '@superset-ui/core';
 import { logging } from '@apache-superset/core/utils';
 import { t } from '@apache-superset/core/translation';
@@ -545,6 +546,11 @@ class ChartRenderer extends Component<ChartRendererProps, ChartRendererState> {
             height={height}
             annotationData={annotationData}
             datasource={datasource}
+            appSection={
+              this.props.source === ChartSource.Dashboard
+                ? AppSection.Dashboard
+                : AppSection.Explore
+            }
             initialValues={initialValues}
             formData={currentFormData}
             ownState={ownState}

@@ -189,6 +189,34 @@ describe('buildQuery (bootstrap)', () => {
     expect(names.some(name => name.includes('|scope:'))).toBe(false);
   });
 
+  test('uses ownState expansion state to keep bootstrap scoped to visible dimensions', () => {
+    const queryContext = buildQuery(
+      {
+        ...baseFormData,
+        startCollapsed: false,
+      },
+      {
+        ownState: {
+          pivotExpansionState: {
+            rowKeys: ['row1', 'row2'],
+            colKeys: ['col1', 'col2'],
+            rows: [],
+            cols: [],
+            collapsedRows: [['A']],
+            collapsedCols: [],
+          },
+        },
+      },
+    );
+
+    expect(
+      queryContext.queries.every(query => {
+        const columns = query.columns ?? [];
+        return !columns.includes('row2') && !columns.includes('col2');
+      }),
+    ).toBe(true);
+  });
+
   test('does not batch sibling persisted expansions during initial query planning', () => {
     const queryContext = buildQuery(
       buildFormData({

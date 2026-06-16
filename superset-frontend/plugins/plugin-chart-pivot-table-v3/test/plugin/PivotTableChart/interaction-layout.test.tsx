@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { type DataRecord } from '@superset-ui/core';
+import { AppSection, type DataRecord } from '@superset-ui/core';
 import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
@@ -136,7 +136,7 @@ describe('PivotTableChart interaction layout', () => {
     expect(screen.getByText('Dimensions')).toBeInTheDocument();
   });
 
-  test('persists runtime layout via setControlValue with query context in user controlled mode', async () => {
+  test('keeps Explore runtime layout changes local in user controlled mode', () => {
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,
       rows: ['row1'],
@@ -179,34 +179,23 @@ describe('PivotTableChart interaction layout', () => {
       />,
     );
 
-    const initialCalls = setControlValue.mock.calls.length;
-
     fireEvent.click(screen.getByText('Select measures'));
     fireEvent.click(screen.getByLabelText('Toggle measure m1'));
     fireEvent.click(screen.getByLabelText('Toggle measure m1'));
     fireEvent.click(screen.getByText('Select measures'));
-    await waitFor(() =>
-      expect(setControlValue.mock.calls.length).toBeGreaterThan(initialCalls),
-    );
     const runtimeLayoutCalls = setControlValue.mock.calls.filter(
       call => call[0] === 'pivotRuntimeLayout',
     );
-    const lastRuntimeLayoutCall = runtimeLayoutCalls.slice(-1)[0];
-    expect(lastRuntimeLayoutCall).toBeDefined();
-    expect((lastRuntimeLayoutCall[1] as PivotRuntimeLayout).metrics).toEqual([
-      'm2',
-      'm1',
-    ]);
-    expect(setDataMask).toHaveBeenCalled();
-    const setDataMaskCalls = setDataMask.mock.calls.map(call => call[0]);
-    const ownStatePayload = setDataMaskCalls.find(
-      payload => payload?.ownState?.pivotRuntimeLayout,
+    const selectedFiltersCalls = setControlValue.mock.calls.filter(
+      call => call[0] === 'pivotSelectedFilters',
     );
-    expect(ownStatePayload).toBeDefined();
-    expect(ownStatePayload.ownState.pivotRuntimeLayout.metrics).toEqual([
-      'm2',
-      'm1',
-    ]);
+    expect(runtimeLayoutCalls).toHaveLength(0);
+    expect(selectedFiltersCalls).toHaveLength(0);
+    expect(
+      setDataMask.mock.calls.some(
+        call => call[0]?.ownState?.pivotRuntimeLayout,
+      ),
+    ).toBe(false);
   });
 
   test('persists runtime layout and panel filters via setControlValue in dashboard mode', async () => {
@@ -250,6 +239,7 @@ describe('PivotTableChart interaction layout', () => {
         factBatches={initialRuntime.factBatches}
         setControlValue={setControlValue}
         setDataMask={setDataMask}
+        appSection={AppSection.Dashboard}
       />,
     );
 
@@ -297,6 +287,7 @@ describe('PivotTableChart interaction layout', () => {
         factBatches={initialRuntime.factBatches}
         setControlValue={setControlValue}
         setDataMask={setDataMask}
+        appSection={AppSection.Dashboard}
       />,
     );
 
@@ -1761,6 +1752,135 @@ describe('PivotTableChart interaction layout', () => {
     );
   });
 
+  test('keeps parent-synced Explore data when stale seamless layout update resolves empty', async () => {
+    const metrics = ['m1'];
+    const initialRows = ['row1'];
+    const parentRows = ['row1', 'row2'];
+    const initialRuntimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: initialRows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const parentSyncedRuntimeLayout: PivotRuntimeLayout = {
+      ...initialRuntimeLayout,
+      rows: parentRows,
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dashboardId: 1,
+      dimensions: parentRows,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: initialRuntimeLayout,
+      startCollapsed: false,
+      initialDepth: 1,
+    });
+    const initialRuntime = buildInitialBootstrapRuntime({
+      formData,
+      runtimeLayout: initialRuntimeLayout,
+      resultsByDepth: {
+        '0|0': [{ m1: 10 }],
+        '1|0': [{ row1: 'A', m1: 10 }],
+      },
+    });
+    const parentSyncedFormData = {
+      ...formData,
+      pivotRuntimeLayout: parentSyncedRuntimeLayout,
+    };
+    const refreshedRuntime = buildInitialBootstrapRuntime({
+      formData: parentSyncedFormData,
+      runtimeLayout: parentSyncedRuntimeLayout,
+      resultsByDepth: {
+        '0|0': [{ m1: 15 }],
+        '1|0': [{ row1: 'A', m1: 15 }],
+        '2|0': [{ row1: 'A', row2: 'B', m1: 15 }],
+      },
+    });
+    let resolveSeamless:
+      | ((results: Array<{ data: DataRecord[] }>) => void)
+      | undefined;
+    let seamlessSpecsLength = 0;
+    const fetchSpy = jest
+      .spyOn(supersetChartDataClient, 'fetch')
+      .mockImplementation(({ requestGroupId, specs }) => {
+        if (requestGroupId !== 'pivot-v3-seamless') {
+          return Promise.resolve(specs.map(() => ({ data: [] })));
+        }
+        seamlessSpecsLength = specs.length;
+        return new Promise(resolve => {
+          resolveSeamless = resolve;
+        });
+      });
+    const cancelSpy = jest
+      .spyOn(supersetChartDataClient, 'cancel')
+      .mockImplementation(() => undefined);
+    const setControlValue = jest.fn();
+    const setDataMask = jest.fn();
+
+    const { rerender } = render(
+      <PivotTableChart
+        data={initialRuntime.tree}
+        factBatches={initialRuntime.factBatches}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        setControlValue={setControlValue}
+        setDataMask={setDataMask}
+        width={600}
+        height={300}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByLabelText('Toggle row dimension')[1]);
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ requestGroupId: 'pivot-v3-seamless' }),
+      ),
+    );
+
+    rerender(
+      <PivotTableChart
+        data={refreshedRuntime.tree}
+        factBatches={[]}
+        formData={parentSyncedFormData}
+        rawFormData={parentSyncedFormData}
+        queryFormData={parentSyncedFormData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        setControlValue={setControlValue}
+        setDataMask={setDataMask}
+        width={600}
+        height={300}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('B')).toBeInTheDocument());
+    resolveSeamless?.(
+      Array.from({ length: seamlessSpecsLength || 1 }, () => ({ data: [] })),
+    );
+    await waitFor(() => expect(screen.getByText('B')).toBeInTheDocument());
+    expect(
+      setControlValue.mock.calls.some(call => call[0] === 'pivotRuntimeLayout'),
+    ).toBe(false);
+    expect(
+      setDataMask.mock.calls.some(
+        call => call[0]?.ownState?.pivotRuntimeLayout,
+      ),
+    ).toBe(false);
+
+    fetchSpy.mockRestore();
+    cancelSpy.mockRestore();
+  });
+
   test('keeps local column layout on stale dashboard rerender after seamless update', async () => {
     const metrics = ['m1'];
     const rows = ['row1'];
@@ -1817,6 +1937,7 @@ describe('PivotTableChart interaction layout', () => {
         groupbyRows={[]}
         groupbyColumns={[]}
         setControlValue={setControlValue}
+        appSection={AppSection.Dashboard}
         width={600}
         height={300}
       />,
@@ -1848,6 +1969,7 @@ describe('PivotTableChart interaction layout', () => {
         groupbyRows={[]}
         groupbyColumns={[]}
         setControlValue={setControlValue}
+        appSection={AppSection.Dashboard}
         width={480}
         height={300}
       />,
@@ -1919,6 +2041,7 @@ describe('PivotTableChart interaction layout', () => {
         groupbyRows={[]}
         groupbyColumns={[]}
         treeDataSignature="stable-signature"
+        appSection={AppSection.Dashboard}
         width={600}
         height={300}
       />,
@@ -1957,6 +2080,7 @@ describe('PivotTableChart interaction layout', () => {
         groupbyRows={[]}
         groupbyColumns={[]}
         treeDataSignature="stable-signature"
+        appSection={AppSection.Dashboard}
         width={480}
         height={300}
       />,
@@ -2159,6 +2283,7 @@ describe('PivotTableChart interaction layout', () => {
         groupbyRows={[]}
         groupbyColumns={[]}
         setControlValue={setControlValue}
+        appSection={AppSection.Dashboard}
         width={600}
         height={300}
       />,
@@ -2190,6 +2315,7 @@ describe('PivotTableChart interaction layout', () => {
         groupbyRows={[]}
         groupbyColumns={[]}
         setControlValue={setControlValue}
+        appSection={AppSection.Dashboard}
         width={480}
         height={300}
       />,
@@ -2256,6 +2382,7 @@ describe('PivotTableChart interaction layout', () => {
         groupbyRows={[]}
         groupbyColumns={[]}
         treeDataSignature="stable-signature"
+        appSection={AppSection.Dashboard}
         width={600}
         height={300}
       />,
@@ -2290,6 +2417,7 @@ describe('PivotTableChart interaction layout', () => {
         groupbyRows={[]}
         groupbyColumns={[]}
         treeDataSignature="stable-signature"
+        appSection={AppSection.Dashboard}
         width={480}
         height={300}
       />,
@@ -2359,6 +2487,7 @@ describe('PivotTableChart interaction layout', () => {
         groupbyRows={[]}
         groupbyColumns={[]}
         treeDataSignature="signature-a"
+        appSection={AppSection.Dashboard}
         width={600}
         height={300}
       />,
@@ -2393,6 +2522,7 @@ describe('PivotTableChart interaction layout', () => {
         groupbyRows={[]}
         groupbyColumns={[]}
         treeDataSignature="signature-b"
+        appSection={AppSection.Dashboard}
         width={480}
         height={300}
       />,

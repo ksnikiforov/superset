@@ -90,10 +90,15 @@ type UsePivotSeamlessRuntimeUpdateConfig = {
   lastLocalSyncDashboardQueryContextRef: MutableRefObject<string | null>;
   suppressStalePersistedFilterRestoreRef: MutableRefObject<boolean>;
   commitUiRuntimeLayout: (layout: PivotRuntimeLayout) => void;
+  syncControlValuesOnInteraction: boolean;
   persistRuntimeState: (
     layout: PivotRuntimeLayout,
     filters: RuntimeSelection,
-    options?: { commit?: boolean },
+    options?: {
+      commit?: boolean;
+      syncControlValues?: boolean;
+      syncOwnState?: boolean;
+    },
   ) => void;
 };
 
@@ -124,6 +129,7 @@ export const usePivotSeamlessRuntimeUpdate = (
     lastLocalSyncDashboardQueryContextRef,
     suppressStalePersistedFilterRestoreRef,
     commitUiRuntimeLayout,
+    syncControlValuesOnInteraction,
     persistRuntimeState,
   } = config;
   const [loading, setLoading] = useState(false);
@@ -136,6 +142,7 @@ export const usePivotSeamlessRuntimeUpdate = (
   const hasMetrics = metricKeys.length > 0;
   const lastUpstreamQueryContextRef = useRef<string | null>(null);
   const lastSyncedPropsRef = useRef({ data, factBatches });
+  const upstreamAdoptionEpochRef = useRef(0);
   const requestLifecycle = useMemo(
     () =>
       createLatestRequestLifecycle({
@@ -143,6 +150,12 @@ export const usePivotSeamlessRuntimeUpdate = (
           supersetChartDataClient.cancel(requestGroupId),
       }),
     [],
+  );
+  useEffect(
+    () => () => {
+      requestLifecycle.invalidate();
+    },
+    [requestLifecycle],
   );
   const materializeCommittedFacts = useCallback(
     (
@@ -171,7 +184,15 @@ export const usePivotSeamlessRuntimeUpdate = (
     async (
       nextLayout: PivotRuntimeLayout,
       nextFilters: RuntimeSelection,
-      { showLoading = true }: { showLoading?: boolean } = {},
+      {
+        showLoading = true,
+        syncControlValues = true,
+        syncOwnState = true,
+      }: {
+        showLoading?: boolean;
+        syncControlValues?: boolean;
+        syncOwnState?: boolean;
+      } = {},
     ) => {
       const normalized = normalizeRuntimeLayout(
         nextLayout,
@@ -180,6 +201,7 @@ export const usePivotSeamlessRuntimeUpdate = (
       );
       setLoading(showLoading);
       setError(undefined);
+      const upstreamAdoptionEpoch = upstreamAdoptionEpochRef.current;
       const updateResult = await fetchAndMaterializeSeamlessRuntimeUpdate({
         requestLifecycle,
         baseFormData,
@@ -189,7 +211,11 @@ export const usePivotSeamlessRuntimeUpdate = (
         selection: nextFilters,
         factBatches: committedFactBatchesRef.current,
       });
-      if (updateResult.status === 'stale') {
+      if (
+        updateResult.status === 'stale' ||
+        upstreamAdoptionEpoch !== upstreamAdoptionEpochRef.current
+      ) {
+        setLoading(false);
         return;
       }
       if (updateResult.status !== 'success') {
@@ -205,7 +231,10 @@ export const usePivotSeamlessRuntimeUpdate = (
         commitUiRuntimeLayout(normalized);
         commitFilters(nextFilters);
         setWarnings(updateResult.warnings);
-        persistRuntimeState(normalized, nextFilters);
+        persistRuntimeState(normalized, nextFilters, {
+          syncControlValues,
+          syncOwnState,
+        });
       });
       seamlessSyncRef.current = buildSeamlessRuntimeSyncSnapshot({
         runtimeLayout: normalized,
@@ -230,6 +259,14 @@ export const usePivotSeamlessRuntimeUpdate = (
   );
 
   useEffect(() => {
+    const incomingLayoutMatchesCommitted = isSameRuntimeLayout(
+      runtimeLayout,
+      committedRuntimeLayout,
+    );
+    const incomingLayoutMatchesUi = isSameRuntimeLayout(
+      runtimeLayout,
+      uiRuntimeLayoutRef.current,
+    );
     const hasLocalSyncForCurrentDashboardQueryContext =
       upstreamDashboardQueryContextSignature !== null &&
       lastLocalSyncDashboardQueryContextRef.current ===
@@ -238,7 +275,7 @@ export const usePivotSeamlessRuntimeUpdate = (
       loading ||
       hasLocalSyncForCurrentDashboardQueryContext ||
       hasSelectedFilters(persistedInteractionFilters) ||
-      !isSameRuntimeLayout(runtimeLayout, committedRuntimeLayout) ||
+      (!incomingLayoutMatchesCommitted && !incomingLayoutMatchesUi) ||
       !isEqual(selectedFiltersForTreeSync, committedFilters) ||
       (lastSyncedPropsRef.current.data === data &&
         lastSyncedPropsRef.current.factBatches === factBatches)
@@ -246,6 +283,7 @@ export const usePivotSeamlessRuntimeUpdate = (
       return;
     }
     lastSyncedPropsRef.current = { data, factBatches };
+    upstreamAdoptionEpochRef.current += 1;
     requestLifecycle.invalidate();
     committedFactBatchesRef.current = factBatches;
     setCommittedFactBatches(factBatches);
@@ -284,6 +322,7 @@ export const usePivotSeamlessRuntimeUpdate = (
     sourceMeasureLeavesByMetric,
     sourceMetrics,
     upstreamDashboardQueryContextSignature,
+    uiRuntimeLayoutRef,
   ]);
 
   const applyRuntimeLayoutChange = useCallback(
@@ -311,7 +350,10 @@ export const usePivotSeamlessRuntimeUpdate = (
           runtimeLayout.valuePlacement.index &&
         sameMetricSet(previousLayout.metrics, runtimeLayout.metrics)
       ) {
-        persistRuntimeState(runtimeLayout, uiSelectedFilters);
+        persistRuntimeState(runtimeLayout, uiSelectedFilters, {
+          syncControlValues: syncControlValuesOnInteraction,
+          syncOwnState: false,
+        });
         seamlessSyncRef.current = syncSnapshot;
         materializeCommittedFacts(
           runtimeLayout,
@@ -322,10 +364,14 @@ export const usePivotSeamlessRuntimeUpdate = (
       }
       persistRuntimeState(runtimeLayout, uiSelectedFilters, {
         commit: false,
+        syncControlValues: syncControlValuesOnInteraction,
+        syncOwnState: false,
       });
       seamlessSyncRef.current = syncSnapshot;
       applySeamlessUpdate(runtimeLayout, uiSelectedFilters, {
         showLoading: false,
+        syncControlValues: syncControlValuesOnInteraction,
+        syncOwnState: false,
       });
     },
     [
@@ -336,6 +382,7 @@ export const usePivotSeamlessRuntimeUpdate = (
       metricKeys,
       persistRuntimeState,
       seamlessSyncRef,
+      syncControlValuesOnInteraction,
       uiSelectedFilters,
       uiRuntimeLayoutRef,
       upstreamSignature,
@@ -354,11 +401,15 @@ export const usePivotSeamlessRuntimeUpdate = (
       suppressStalePersistedFilterRestoreRef.current =
         suppressStalePersistedFilterRestore;
       updateUiSelectedFilters(nextSelected);
-      applySeamlessUpdate(uiRuntimeLayout, nextSelected);
+      applySeamlessUpdate(uiRuntimeLayout, nextSelected, {
+        syncControlValues: syncControlValuesOnInteraction,
+        syncOwnState: false,
+      });
     },
     [
       applySeamlessUpdate,
       suppressStalePersistedFilterRestoreRef,
+      syncControlValuesOnInteraction,
       uiRuntimeLayout,
       uiSelectedFilters,
       updateUiSelectedFilters,
@@ -374,10 +425,14 @@ export const usePivotSeamlessRuntimeUpdate = (
       update.suppressStalePersistedFilterRestore;
     const nextSelected = update.selection;
     updateUiSelectedFilters(nextSelected);
-    applySeamlessUpdate(uiRuntimeLayout, nextSelected);
+    applySeamlessUpdate(uiRuntimeLayout, nextSelected, {
+      syncControlValues: syncControlValuesOnInteraction,
+      syncOwnState: false,
+    });
   }, [
     applySeamlessUpdate,
     suppressStalePersistedFilterRestoreRef,
+    syncControlValuesOnInteraction,
     uiRuntimeLayout,
     uiSelectedFilters,
     updateUiSelectedFilters,

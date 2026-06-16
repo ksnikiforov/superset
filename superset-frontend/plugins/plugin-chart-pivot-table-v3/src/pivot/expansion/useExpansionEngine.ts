@@ -106,6 +106,8 @@ const expansionIntentToStateKeys = (
   ),
 });
 
+const hasCells = (tree: PivotTreeData) => Object.keys(tree.cells).length > 0;
+
 type ExpansionPersistenceDeps = {
   shouldPersist: boolean;
   setControlValue?: HandlerFunction;
@@ -388,6 +390,13 @@ export const useExpansionEngine = ({
         visibleLoadingKeys,
       });
       if (!result.tree) {
+        return;
+      }
+      if (
+        skipWhenComplete &&
+        hasCells(treeRef.current) &&
+        !hasCells(result.tree)
+      ) {
         return;
       }
       addWarnings('warnings' in result ? result.warnings : undefined);
