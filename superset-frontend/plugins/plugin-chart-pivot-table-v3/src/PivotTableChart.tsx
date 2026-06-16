@@ -25,6 +25,7 @@ import {
   getColumnLabel,
   type JsonObject,
 } from '@superset-ui/core';
+import { Loading } from '@superset-ui/core/components';
 import { supersetTheme } from '@apache-superset/core/theme';
 import { type PivotTableProps, PivotRuntimeLayout } from './types';
 import { useExpansionEngine } from './pivot/expansion/useExpansionEngine';
@@ -52,6 +53,7 @@ import {
 import { usePivotSeamlessRuntimeUpdate } from './pivot/chart/usePivotSeamlessRuntimeUpdate';
 import { PivotTableView } from './pivot/render/PivotTableView';
 import { usePivotTableViewSurface } from './pivot/chart/usePivotTableViewSurface';
+import { useDatasetVerboseMap } from './pivot/chart/useDatasetVerboseMap';
 
 const EMPTY_SELECTED_FILTERS: Record<string, DataRecordValue[]> = {};
 
@@ -95,10 +97,35 @@ function PivotTableChart(props: PivotTableProps) {
     () =>
       Object.fromEntries(
         Object.entries(formData.verboseMap ?? {}).filter(
-          (entry): entry is [string, string] => typeof entry[1] === 'string',
+          (entry): entry is [string, string] =>
+            typeof entry[1] === 'string' && entry[1].length > 0,
         ),
       ),
     [formData.verboseMap],
+  );
+  const shouldFetchDatasetVerboseMap = useMemo(
+    () =>
+      isDashboardContext &&
+      dimensionKeys.some(dimensionKey => !resolvedVerboseMap[dimensionKey]),
+    [dimensionKeys, isDashboardContext, resolvedVerboseMap],
+  );
+  const { verboseMap: datasetVerboseMap, loading: isDatasetVerboseMapLoading } =
+    useDatasetVerboseMap({
+      datasourceKey: formData.datasource,
+      enabled: shouldFetchDatasetVerboseMap,
+    });
+  const effectiveVerboseMap = useMemo(
+    () => ({
+      ...datasetVerboseMap,
+      ...resolvedVerboseMap,
+    }),
+    [datasetVerboseMap, resolvedVerboseMap],
+  );
+  const isWaitingForDatasetVerboseMap = useMemo(
+    () =>
+      isDatasetVerboseMapLoading &&
+      dimensionKeys.some(dimensionKey => !effectiveVerboseMap[dimensionKey]),
+    [dimensionKeys, effectiveVerboseMap, isDatasetVerboseMapLoading],
   );
   const resolvedDateFormatters = useMemo(
     () => formData.dateFormatters ?? {},
@@ -108,9 +135,9 @@ function PivotTableChart(props: PivotTableProps) {
     () => ({
       ...fetchFormDataBase,
       dateFormatters: resolvedDateFormatters,
-      verboseMap: resolvedVerboseMap,
+      verboseMap: effectiveVerboseMap,
     }),
-    [fetchFormDataBase, resolvedDateFormatters, resolvedVerboseMap],
+    [effectiveVerboseMap, fetchFormDataBase, resolvedDateFormatters],
   );
 
   const appliedFormData = fetchFormDataBaseWithFormatters;
@@ -285,12 +312,12 @@ function PivotTableChart(props: PivotTableProps) {
       const baseLabel = getColumnLabel(dimension);
       const label =
         typeof dimension === 'string'
-          ? (resolvedVerboseMap[key] ?? baseLabel)
+          ? (effectiveVerboseMap[key] ?? baseLabel)
           : baseLabel;
       map.set(key, label);
     });
     return map;
-  }, [dimensionList, resolvedVerboseMap]);
+  }, [dimensionList, effectiveVerboseMap]);
 
   const layoutResult = usePivotLayout({
     formData: appliedLayoutFormData,
@@ -303,13 +330,13 @@ function PivotTableChart(props: PivotTableProps) {
         const baseLabel = getColumnLabel(dimension);
         const stableKey = getStableColumnKey(dimension);
         return (
-          resolvedVerboseMap[stableKey] ??
+          effectiveVerboseMap[stableKey] ??
           (typeof dimension === 'string'
-            ? (resolvedVerboseMap[dimension] ?? baseLabel)
+            ? (effectiveVerboseMap[dimension] ?? baseLabel)
             : baseLabel)
         );
       }),
-    [layoutRowDimensions, resolvedVerboseMap],
+    [effectiveVerboseMap, layoutRowDimensions],
   );
   const {
     tree,
@@ -420,6 +447,14 @@ function PivotTableChart(props: PivotTableProps) {
       }),
     [dimensionLabelMap, hasMetrics, uiRuntimeLayout],
   );
+  if (isWaitingForDatasetVerboseMap) {
+    return (
+      <div style={{ width, height, display: 'grid', placeItems: 'center' }}>
+        <Loading muted position="inline-centered" size="s" />
+      </div>
+    );
+  }
+
   if (!isUserControlledMode) {
     return (
       <PivotTableView
@@ -446,7 +481,7 @@ function PivotTableChart(props: PivotTableProps) {
           metrics={metricsForUi}
           measureLeavesByMetric={sourceMeasureLeavesByMetric}
           metricLabelMap={formData.metricLabelMap}
-          dimensionLabelMap={resolvedVerboseMap}
+          dimensionLabelMap={effectiveVerboseMap}
           dateFormatters={resolvedDateFormatters}
           dimensionFilterValues={dimensionFilterValues}
           dimensionFilterLoading={dimensionFilterLoading}

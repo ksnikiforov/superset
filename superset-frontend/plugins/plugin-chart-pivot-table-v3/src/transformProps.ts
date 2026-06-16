@@ -179,6 +179,7 @@ export default function transformProps(
     ...plannedFormData,
     metricsLayout,
     metricLabelMap,
+    verboseMap,
     columnFormats,
     currencyFormats,
   };
@@ -372,6 +373,7 @@ export default function transformProps(
       slice_id: plannedFormData.slice_id ?? chartId,
       metricsLayout,
       metricLabelMap,
+      verboseMap,
       extra_form_data: queryFormDataWithTypes.extra_form_data,
       dateFormatters,
       colTypeMap: colTypeMapWithAliases,

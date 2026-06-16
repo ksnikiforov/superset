@@ -235,6 +235,70 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     });
   });
 
+  test('keeps dataset verbose names before first render for dimensions outside query results', () => {
+    const chartProps = new ChartProps({
+      formData: {
+        ...baseFormData,
+        interactionMode: 'user_controlled',
+        dimensions: ['row1', 'semantic_only'],
+        pivotRuntimeLayout: {
+          version: 1,
+          rows: ['row1'],
+          cols: [],
+          metrics: ['metric1'],
+          leafSelection: {},
+          valuePlacement: { axis: 'col', index: 0 },
+        },
+      },
+      width: 400,
+      height: 300,
+      queriesData: [
+        {
+          data: [{ metric1: 30 }],
+          colnames: ['metric1'],
+          coltypes: [0],
+        },
+        {
+          data: [{ row1: 'A', metric1: 10 }],
+          colnames: ['row1', 'metric1'],
+          coltypes: [1, 0],
+        },
+      ],
+      hooks: { setDataMask: jest.fn() },
+      filterState: { selectedFilters: {} },
+      datasource: {
+        verboseMap: {},
+        columnFormats: {},
+        currencyFormats: {},
+        columns: [
+          {
+            column_name: 'row1',
+            verbose_name: 'Row One',
+            type_generic: GenericDataType.String,
+          },
+          {
+            column_name: 'semantic_only',
+            verbose_name: 'Semantic Only',
+            type_generic: GenericDataType.String,
+          },
+        ],
+      },
+      theme: supersetTheme,
+    });
+
+    const result = transformProps(
+      chartProps as ChartProps<PivotTableQueryFormData>,
+    );
+
+    expect(result.formData.verboseMap).toMatchObject({
+      row1: 'Row One',
+      semantic_only: 'Semantic Only',
+    });
+    expect(result.queryFormData?.verboseMap).toMatchObject({
+      semantic_only: 'Semantic Only',
+    });
+  });
+
   it('maps query results by query_name rather than array order (Contract 2)', () => {
     const formData = baseFormData as PivotTableQueryFormData;
     const specs = buildInitialQuerySpecs(formData);
