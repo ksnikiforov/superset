@@ -44,7 +44,9 @@ import {
   type SeamlessRuntimeSyncSnapshot,
 } from '../runtime/seamlessRuntimeUpdate';
 import { type PivotFactStoreBatch } from '../runtime/ingestQueryResults';
-import { createPivotFactStoreFromBatches } from '../runtime/factStore';
+import {
+  createPivotFactStoreFromBatches,
+} from '../runtime/factStore';
 import { materializeLoadedPivotTreeFromFactStore } from '../runtime/materializePivotTree';
 import { buildInitialPivotUpdatePlan } from '../query/specs';
 import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';

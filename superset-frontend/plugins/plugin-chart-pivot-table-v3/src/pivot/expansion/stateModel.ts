@@ -75,6 +75,30 @@ export const coerceExpansionState = (
   };
 };
 
+const keysMatch = (actual: string[], candidate: unknown) =>
+  Array.isArray(candidate) &&
+  actual.length === candidate.length &&
+  actual.every((key, index) => candidate[index] === key);
+
+export const coerceExpansionStateForLayout = ({
+  value,
+  rowKeys,
+  colKeys,
+}: {
+  value: unknown;
+  rowKeys: string[];
+  colKeys: string[];
+}): PivotExpansionStateKeys | undefined => {
+  if (
+    !isRecord(value) ||
+    !keysMatch(rowKeys, value.rowKeys) ||
+    !keysMatch(colKeys, value.colKeys)
+  ) {
+    return undefined;
+  }
+  return coerceExpansionState(value);
+};
+
 const pathStartsWith = (path: PivotPath, prefix: PivotPath) =>
   prefix.every((value, index) => path[index] === value);
 

@@ -25,6 +25,7 @@ import {
 import {
   buildDesiredExpandedKeys,
   coerceExpansionState,
+  coerceExpansionStateForLayout,
   pruneExpandedToStablePrefix,
 } from '../../../src/pivot/expansion/stateModel';
 import { buildExpandedKeysForCoverageNeeds } from '../../../src/pivot/expansion/planner';
@@ -59,7 +60,7 @@ const makeNode = ({
 });
 
 describe('expansionStateModel', () => {
-  it('coerces persisted expansion state and drops subtotal tokens', () => {
+  test('coerces persisted expansion state and drops subtotal tokens', () => {
     const expansionState = coerceExpansionState({
       rowKeys: ['r1'],
       colKeys: ['c1'],
@@ -77,7 +78,7 @@ describe('expansionStateModel', () => {
     });
   });
 
-  it('returns undefined when expansion state is malformed', () => {
+  test('returns undefined when expansion state is malformed', () => {
     expect(coerceExpansionState(null)).toBeUndefined();
     expect(
       coerceExpansionState({
@@ -95,7 +96,49 @@ describe('expansionStateModel', () => {
     });
   });
 
-  it('builds default expanded keys from coverage manifest needs', () => {
+  test('rejects persisted expansion state without matching layout keys', () => {
+    expect(
+      coerceExpansionStateForLayout({
+        value: { rows: [['A']], cols: [] },
+        rowKeys: ['r1', 'r2'],
+        colKeys: [],
+      }),
+    ).toBeUndefined();
+    expect(
+      coerceExpansionStateForLayout({
+        value: {
+          rowKeys: ['r1'],
+          colKeys: [],
+          rows: [['A']],
+          cols: [],
+        },
+        rowKeys: ['r1', 'r2'],
+        colKeys: [],
+      }),
+    ).toBeUndefined();
+  });
+
+  test('accepts persisted expansion state with matching layout keys', () => {
+    expect(
+      coerceExpansionStateForLayout({
+        value: {
+          rowKeys: ['r1', 'r2'],
+          colKeys: [],
+          rows: [['A']],
+          cols: [],
+        },
+        rowKeys: ['r1', 'r2'],
+        colKeys: [],
+      }),
+    ).toEqual({
+      rows: [serializePath(['A'])],
+      cols: [],
+      collapsedRows: [],
+      collapsedCols: [],
+    });
+  });
+
+  test('builds default expanded keys from coverage manifest needs', () => {
     const metricToken = encodeMetricKey('m1');
     const nodes: Record<string, PivotTreeNode> = {
       [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
@@ -136,7 +179,7 @@ describe('expansionStateModel', () => {
     expect(expanded.has(metricToken)).toBe(true);
   });
 
-  it('prunes expansions to the stable prefix depth', () => {
+  test('prunes expansions to the stable prefix depth', () => {
     const nodes: Record<string, PivotTreeNode> = {
       [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
       A: makeNode({ axis: 'row', path: ['A'], hasChildren: true }),
@@ -159,7 +202,7 @@ describe('expansionStateModel', () => {
     expect(pruned).toEqual(new Set([rootKey, serializePath(['A'])]));
   });
 
-  it('keeps collapsed branches closed when full-level coverage wants descendants', () => {
+  test('keeps collapsed branches closed when full-level coverage wants descendants', () => {
     const tree: PivotTreeData = {
       rows: {
         [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),

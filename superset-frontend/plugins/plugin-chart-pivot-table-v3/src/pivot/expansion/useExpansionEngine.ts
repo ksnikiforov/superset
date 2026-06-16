@@ -33,7 +33,7 @@ import {
 } from '../../types';
 import {
   type PivotExpansionStateKeys,
-  coerceExpansionState,
+  coerceExpansionStateForLayout,
 } from './stateModel';
 import { parsePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
@@ -41,6 +41,7 @@ import { stableStringify } from '../shared/stableStringify';
 import { type LayoutContext } from '../layout/LayoutContext';
 import type { PivotProgram } from '../runtime/types';
 import {
+  assignMissingPivotFactQueryContextKey,
   buildPivotFactQueryContextKey,
   createPivotFactStoreFromBatches,
   type PivotFactStore,
@@ -115,11 +116,19 @@ type ExpansionPersistenceDeps = {
   mergeOwnState?: (partial: JsonObject) => JsonObject;
 };
 
+type ExpansionLayoutKeys = {
+  rowKeys: string[];
+  colKeys: string[];
+};
+
 const toPersistedPayload = (
   state: PivotExpansionStateKeys,
+  layoutKeys: ExpansionLayoutKeys,
 ): PivotExpansionState => {
   const toPathArray = (keys: string[]) => keys.map(key => parsePath(key));
   return {
+    rowKeys: layoutKeys.rowKeys,
+    colKeys: layoutKeys.colKeys,
     rows: toPathArray(state.rows),
     cols: toPathArray(state.cols),
     collapsedRows: toPathArray(state.collapsedRows ?? []),
@@ -130,11 +139,12 @@ const toPersistedPayload = (
 const persistExpansionStateKeys = (
   state: PivotExpansionStateKeys,
   deps: ExpansionPersistenceDeps,
+  layoutKeys: ExpansionLayoutKeys,
 ) => {
   if (!deps.shouldPersist) {
     return;
   }
-  const payload = toPersistedPayload(state);
+  const payload = toPersistedPayload(state, layoutKeys);
   if (deps.setControlValue) {
     deps.setControlValue('pivotExpansionState', payload);
     return;
@@ -189,9 +199,20 @@ export const useExpansionEngine = ({
 }: ExpansionEngineConfig): ExpansionEngineResult => {
   const [tree, setTree] = useState<PivotTreeData>(data);
   const treeRef = useRef(tree);
+  const queryContextKey = useMemo(
+    () => buildPivotFactQueryContextKey(fetchFormData),
+    [fetchFormData],
+  );
+  const currentFactBatches = useMemo(
+    () =>
+      factBatches.map(batch =>
+        assignMissingPivotFactQueryContextKey(batch, queryContextKey),
+      ),
+    [factBatches, queryContextKey],
+  );
   const factStoreRef = useRef<PivotFactStore>();
   if (!factStoreRef.current) {
-    factStoreRef.current = createPivotFactStoreFromBatches(factBatches);
+    factStoreRef.current = createPivotFactStoreFromBatches(currentFactBatches);
   }
   const [expandedByAxis, setExpandedByAxis] = useState<AxisSetMap>(() => ({
     row: new Set(),
@@ -200,9 +221,20 @@ export const useExpansionEngine = ({
   const { row: expandedRows, col: expandedCols } = expandedByAxis;
   const expandedRef = useRef(expandedByAxis);
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(() => new Set());
+  const groupbyRowKeys = useMemo(
+    () => pivotProgram.rowDimensions.map(getStableColumnKey),
+    [pivotProgram.rowDimensions],
+  );
+  const groupbyColumnKeys = useMemo(
+    () => pivotProgram.columnDimensions.map(getStableColumnKey),
+    [pivotProgram.columnDimensions],
+  );
   const initialExpansionState =
-    coerceExpansionState(persistedExpansionState) ??
-    createEmptyExpansionState();
+    coerceExpansionStateForLayout({
+      value: persistedExpansionState,
+      rowKeys: groupbyRowKeys,
+      colKeys: groupbyColumnKeys,
+    }) ?? createEmptyExpansionState();
   const expansionIntentRef = useRef<ExpansionIntentSets>(
     expansionStateKeysToIntent(initialExpansionState),
   );
@@ -218,10 +250,6 @@ export const useExpansionEngine = ({
       }),
     [],
   );
-  const queryContextKey = useMemo(
-    () => buildPivotFactQueryContextKey(fetchFormData),
-    [fetchFormData],
-  );
 
   const expansionPersistenceDepsRef = useRef<ExpansionPersistenceDeps>({
     shouldPersist: shouldPersistExpansionState,
@@ -236,14 +264,6 @@ export const useExpansionEngine = ({
     mergeOwnState,
   };
   const previousDataRef = useRef<PivotTreeData | null>(null);
-  const groupbyRowKeys = useMemo(
-    () => pivotProgram.rowDimensions.map(getStableColumnKey),
-    [pivotProgram.rowDimensions],
-  );
-  const groupbyColumnKeys = useMemo(
-    () => pivotProgram.columnDimensions.map(getStableColumnKey),
-    [pivotProgram.columnDimensions],
-  );
   const previousLayoutRef = useRef({
     rows: groupbyRowKeys,
     cols: groupbyColumnKeys,
@@ -255,6 +275,12 @@ export const useExpansionEngine = ({
     },
     [expansionRequestLifecycle],
   );
+
+  useEffect(() => {
+    currentFactBatches.forEach(batch => {
+      factStoreRef.current?.upsertBatch(batch);
+    });
+  }, [currentFactBatches]);
 
   useSyncRef(treeRef, tree);
   useSyncRef(expandedRef, expandedByAxis);
@@ -321,8 +347,9 @@ export const useExpansionEngine = ({
     persistExpansionStateKeys(
       expansionIntentToStateKeys(expansionIntentRef.current),
       expansionPersistenceDepsRef.current,
+      { rowKeys: groupbyRowKeys, colKeys: groupbyColumnKeys },
     );
-  }, []);
+  }, [groupbyColumnKeys, groupbyRowKeys]);
 
   const collapseNode = useCallback(
     (axis: PivotAxis, node: PivotTreeNode) => {
@@ -374,6 +401,9 @@ export const useExpansionEngine = ({
       visibleLoadingKeys?: Set<string>;
     } = {}) => {
       const factStore = factStoreRef.current as PivotFactStore;
+      currentFactBatches.forEach(batch => {
+        factStore.upsertBatch(batch);
+      });
       const result = await executeExpansionHydrationForIntent({
         axisCoverageNeeds,
         completeBehavior: skipWhenComplete ? 'skip' : 'returnTree',
@@ -400,7 +430,7 @@ export const useExpansionEngine = ({
         return;
       }
       addWarnings('warnings' in result ? result.warnings : undefined);
-      onFactBatchesChange?.(factStore.getFactBatches());
+      onFactBatchesChange?.(factStore.getFactBatches(queryContextKey));
       commitExpansionState({
         tree: result.tree,
         expanded: resolveExpandedByAxisForTree({
@@ -425,6 +455,7 @@ export const useExpansionEngine = ({
       fetchFormData,
       fetchLayout,
       addWarnings,
+      currentFactBatches,
       onFactBatchesChange,
       persistExpansionState,
       pivotProgram,
@@ -490,7 +521,7 @@ export const useExpansionEngine = ({
     previousDataRef.current = data;
 
     expansionRequestLifecycle.invalidate();
-    factStoreRef.current = createPivotFactStoreFromBatches(factBatches);
+    factStoreRef.current = createPivotFactStoreFromBatches(currentFactBatches);
     setWarnings([]);
     setErrorMessage(undefined);
     setLoadingKeys(new Set());
@@ -501,6 +532,7 @@ export const useExpansionEngine = ({
       persistExpansionStateKeys(
         reinitializationPlan.persistedState,
         expansionPersistenceDepsRef.current,
+        { rowKeys: currentLayout.rows, colKeys: currentLayout.cols },
       );
     }
 
@@ -514,7 +546,7 @@ export const useExpansionEngine = ({
     commitExpansionState,
     data,
     expansionSemanticSignature,
-    factBatches,
+    currentFactBatches,
     axisCoverageNeeds,
     groupbyColumnKeys,
     groupbyRowKeys,

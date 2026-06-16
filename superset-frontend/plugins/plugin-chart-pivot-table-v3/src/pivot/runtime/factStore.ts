@@ -97,18 +97,51 @@ const buildPivotFactRequestKey = ({
     normalizeFactValueKeys(valueKeys),
   ]);
 
+type PivotQueryContextFilter = NonNullable<
+  PivotTableQueryFormData['adhoc_filters']
+>[number];
+
+const isEmptyObject = (value: unknown) =>
+  value !== null &&
+  typeof value === 'object' &&
+  !Array.isArray(value) &&
+  Object.keys(value).length === 0;
+
+const normalizeEmptyObject = <T>(value: T | null | undefined) =>
+  value === undefined || value === null || isEmptyObject(value) ? null : value;
+
+const isNoopTemporalRangeFilter = (filter: PivotQueryContextFilter) => {
+  const candidate = filter as {
+    comparator?: unknown;
+    operator?: unknown;
+  };
+  return (
+    candidate.operator === 'TEMPORAL_RANGE' &&
+    candidate.comparator === 'No filter'
+  );
+};
+
 export const buildPivotFactQueryContextKey = (
   formData: PivotTableQueryFormData,
 ) =>
   stableStringify({
-    adhoc_filters: formData.adhoc_filters ?? [],
-    extra_form_data: formData.extra_form_data ?? null,
-    extras: formData.extras ?? null,
+    adhoc_filters: (formData.adhoc_filters ?? []).filter(
+      filter => !isNoopTemporalRangeFilter(filter),
+    ),
+    extra_form_data: normalizeEmptyObject(formData.extra_form_data),
+    extras: normalizeEmptyObject(formData.extras),
     granularity_sqla: formData.granularity_sqla ?? null,
     time_grain_sqla: formData.time_grain_sqla ?? null,
     time_offsets: formData.time_offsets ?? [],
-    time_range: formData.time_range ?? null,
+    time_range:
+      formData.time_range === 'No filter' ? null : (formData.time_range ?? null),
   });
+
+export const assignMissingPivotFactQueryContextKey = (
+  batch: PivotFactStoreBatch,
+  queryContextKey: string,
+): PivotFactStoreBatch =>
+  batch.queryContextKey === undefined ? { ...batch, queryContextKey } : batch;
 
 export const buildFactValueKeys = ({
   metricKeys,

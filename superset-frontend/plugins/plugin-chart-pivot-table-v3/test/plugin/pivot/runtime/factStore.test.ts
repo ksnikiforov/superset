@@ -87,6 +87,49 @@ test('upserts duplicate exact facts by request/path/value key', () => {
   expect(store.getFactBatches()[0].facts.map(fact => fact.value)).toEqual([12]);
 });
 
+test('uses the same query-context key for semantically empty filters', () => {
+  const emptyKey = buildQueryContextKey({
+    adhoc_filters: [],
+  });
+
+  const noFilterKey = buildQueryContextKey({
+    adhoc_filters: [
+      {
+        clause: 'WHERE',
+        comparator: 'No filter',
+        expressionType: 'SIMPLE',
+        operator: 'TEMPORAL_RANGE',
+        subject: 'transaction_timestamp',
+      },
+    ],
+    extra_form_data: {},
+    extras: {},
+    time_range: 'No filter',
+  });
+
+  expect(noFilterKey).toBe(emptyKey);
+});
+
+test('keeps effective temporal filters in the query-context key', () => {
+  const emptyKey = buildQueryContextKey({
+    adhoc_filters: [],
+  });
+  const filteredKey = buildQueryContextKey({
+    adhoc_filters: [
+      {
+        clause: 'WHERE',
+        comparator: '2026-01-01 : 2026-02-01',
+        expressionType: 'SIMPLE',
+        operator: 'TEMPORAL_RANGE',
+        subject: 'transaction_timestamp',
+      },
+    ],
+    extra_form_data: {},
+  });
+
+  expect(filteredKey).not.toBe(emptyKey);
+});
+
 test('keeps different request scopes as separate exact fact batches', () => {
   const store = createPivotFactStore();
   const firstScope: PivotFactStoreBatchScope = { kind: 'root' };

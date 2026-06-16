@@ -33,6 +33,7 @@ import {
   fetchPlannedQuerySpecs,
 } from './ingestQueryResults';
 import {
+  assignMissingPivotFactQueryContextKey,
   buildPivotFactQueryContextKey,
   createPivotFactStore,
   createPivotFactStoreFromBatches,
@@ -113,19 +114,27 @@ const buildSeamlessRuntimeCoveragePlan = ({
   runtimeLayout,
   selection,
   factBatches = [],
-}: Omit<SeamlessRuntimeUpdateConfig, 'requestLifecycle'>) => ({
-  ...buildInitialPivotUpdatePlan({
+}: Omit<SeamlessRuntimeUpdateConfig, 'requestLifecycle'>) => {
+  const plan = buildInitialPivotUpdatePlan({
     formData: baseFormData,
     runtimeLayout,
     selection,
     metricsOverride: sourceMetrics,
     measureLeavesByMetricOverride: sourceMeasureLeavesByMetric,
-  }),
-  factStore:
-    factBatches.length > 0
-      ? createPivotFactStoreFromBatches(factBatches)
-      : createPivotFactStore(),
-});
+  });
+  const queryContextKey = buildPivotFactQueryContextKey(plan.formData);
+  return {
+    ...plan,
+    factStore:
+      factBatches.length > 0
+        ? createPivotFactStoreFromBatches(
+            factBatches.map(batch =>
+              assignMissingPivotFactQueryContextKey(batch, queryContextKey),
+            ),
+          )
+        : createPivotFactStore(),
+  };
+};
 
 export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
   requestLifecycle,
@@ -181,7 +190,9 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
     return {
       status: 'success' as const,
       tree,
-      factBatches: factStore.getFactBatches(),
+      factBatches: factStore.getFactBatches(
+        buildPivotFactQueryContextKey(formData),
+      ),
       warnings: collectPlannedQueryWarnings(results),
     };
   } catch (error) {
