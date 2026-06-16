@@ -251,23 +251,38 @@ export const usePivotSeamlessRuntimeUpdate = (
     setCommittedFactBatches(factBatches);
     setWarnings([]);
     setError(undefined);
-    materializeCommittedFacts(
+    const { formData, layout } = buildInitialPivotUpdatePlan({
+      formData: baseFormData,
       runtimeLayout,
-      selectedFiltersForTreeSync,
-      factBatches,
+      selection: selectedFiltersForTreeSync,
+      metricsOverride: sourceMetrics,
+      measureLeavesByMetricOverride: sourceMeasureLeavesByMetric,
+    });
+    const nextTree = materializeLoadedPivotTreeFromFactStore({
+      store: createPivotFactStoreFromBatches(factBatches),
+      layout,
+      formData,
+    });
+    setCommittedTree(
+      Object.keys(data.cells).length > 0 &&
+        Object.keys(nextTree.cells).length === 0
+        ? data
+        : nextTree,
     );
   }, [
+    baseFormData,
     data,
     factBatches,
     committedFilters,
     committedRuntimeLayout,
     lastLocalSyncDashboardQueryContextRef,
     loading,
-    materializeCommittedFacts,
     persistedInteractionFilters,
     requestLifecycle,
     runtimeLayout,
     selectedFiltersForTreeSync,
+    sourceMeasureLeavesByMetric,
+    sourceMetrics,
     upstreamDashboardQueryContextSignature,
   ]);
 

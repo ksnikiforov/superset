@@ -73,7 +73,7 @@ const buildInitialBootstrapRuntime = ({
 };
 
 describe('PivotTableChart interaction layout', () => {
-  it('shows the side panel only in user controlled mode', () => {
+  test('shows the side panel only in user controlled mode', () => {
     const metrics = ['m1'];
     const rows = ['row1'];
     const tree = applyMetricAxis(
@@ -136,7 +136,7 @@ describe('PivotTableChart interaction layout', () => {
     expect(screen.getByText('Dimensions')).toBeInTheDocument();
   });
 
-  it('persists runtime layout via setControlValue with query context in user controlled mode', async () => {
+  test('persists runtime layout via setControlValue with query context in user controlled mode', async () => {
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,
       rows: ['row1'],
@@ -209,7 +209,7 @@ describe('PivotTableChart interaction layout', () => {
     ]);
   });
 
-  it('persists runtime layout and panel filters via setControlValue in dashboard mode', async () => {
+  test('persists runtime layout and panel filters via setControlValue in dashboard mode', async () => {
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,
       rows: ['row1'],
@@ -303,7 +303,7 @@ describe('PivotTableChart interaction layout', () => {
     expect(screen.getByLabelText('Clear filters')).toBeEnabled();
   });
 
-  it('applies metric order changes locally when query form data has not updated yet', () => {
+  test('applies metric order changes locally when query form data has not updated yet', () => {
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,
       rows: [],
@@ -367,7 +367,7 @@ describe('PivotTableChart interaction layout', () => {
     expect(labelsAfter.indexOf('m2')).toBeLessThan(labelsAfter.indexOf('m1'));
   });
 
-  it('renders the applied layout when query form data is provided', () => {
+  test('renders the applied layout when query form data is provided', () => {
     const appliedRuntimeLayout: PivotRuntimeLayout = {
       version: 1,
       rows: [],
@@ -421,7 +421,7 @@ describe('PivotTableChart interaction layout', () => {
     expect(headerLabels.indexOf('A')).toBeLessThan(headerLabels.indexOf('m1'));
   });
 
-  it('suppresses the grand total column when columns only contain Values in user-controlled mode', () => {
+  test('suppresses the grand total column when columns only contain Values in user-controlled mode', () => {
     const metrics = ['m1'];
     const rowGroupby = ['row1'];
     const baseTree = buildTreeFromRecords(
@@ -479,7 +479,7 @@ describe('PivotTableChart interaction layout', () => {
     expect(headerLabels).not.toContain('Grand total');
   });
 
-  it('does not render expand toggles for Value leaf when metrics are last on columns in user-controlled mode', () => {
+  test('does not render expand toggles for Value leaf when metrics are last on columns in user-controlled mode', () => {
     const metricKey = 'grossRevenue';
     const secondaryMetric = 'netRevenue';
     const valueLeaf = buildValueLeaf();
@@ -579,7 +579,7 @@ describe('PivotTableChart interaction layout', () => {
     });
   });
 
-  it('keeps top-level column headers limited to column dimensions in user-controlled mode', () => {
+  test('keeps top-level column headers limited to column dimensions in user-controlled mode', () => {
     const metrics = ['m1', 'm2'];
     const valueLeaf = buildValueLeaf();
     const ixLeaf = buildBuiltInLeaf('ix', {
@@ -686,7 +686,7 @@ describe('PivotTableChart interaction layout', () => {
     );
   });
 
-  it('keeps metric labels when datetime columns are formatted with Values at column end', () => {
+  test('keeps metric labels when datetime columns are formatted with Values at column end', () => {
     const metrics = ['m1', 'm2'];
     const rowGroupby = ['row2'];
     const colGroupby = ['orderDate'];
@@ -772,7 +772,7 @@ describe('PivotTableChart interaction layout', () => {
     expect(metricLabels).toEqual(['m1', 'm2', 'm1', 'm2']);
   });
 
-  it('prefers ownState runtime layout over formData runtime layout in user-controlled mode', () => {
+  test('prefers ownState runtime layout over formData runtime layout in user-controlled mode', () => {
     const metricKey = 'm1';
     const dimensionKey = 'row1';
     const metrics = [metricKey];
@@ -835,7 +835,7 @@ describe('PivotTableChart interaction layout', () => {
     expect(rowLabel?.textContent).toBe('A');
   });
 
-  it('does not duplicate metric headers when leaf tier is visible with row totals', () => {
+  test('does not duplicate metric headers when leaf tier is visible with row totals', () => {
     const metrics = ['m1', 'm2', 'm3'];
     const valueLeaf = buildValueLeaf();
     const ixLeaf = buildBuiltInLeaf('ix', {
@@ -940,7 +940,7 @@ describe('PivotTableChart interaction layout', () => {
     });
   });
 
-  it('keeps metric columns visible in interaction mode with value-first layout and row totals', () => {
+  test('keeps metric columns visible in interaction mode with value-first layout and row totals', () => {
     const metrics = ['m1', 'm2'];
     const rowGroupby = ['name'];
     const detail = buildTreeFromRecords(
@@ -1018,7 +1018,7 @@ describe('PivotTableChart interaction layout', () => {
     expect(rowHeaders).not.toContain('Grand total');
   });
 
-  it('renders column grand total row in interaction mode with multiple metrics', () => {
+  test('renders column grand total row in interaction mode with multiple metrics', () => {
     const metrics = ['m1', 'm2'];
     const rowGroupby = ['name'];
     const detail = buildTreeFromRecords(
@@ -1098,7 +1098,7 @@ describe('PivotTableChart interaction layout', () => {
     expect(values).toEqual(['22', '44']);
   });
 
-  it('keeps value-first interaction stable when totals are disabled', () => {
+  test('keeps value-first interaction stable when totals are disabled', () => {
     const metrics = ['m1', 'm2'];
     const rowGroupby = ['name'];
     const tree = applyMetricAxis(
@@ -1162,7 +1162,7 @@ describe('PivotTableChart interaction layout', () => {
     expect(headerLabels).not.toContain('Grand total');
   });
 
-  it('does not interleave metric totals with column dimensions when row totals are present', () => {
+  test('does not interleave metric totals with column dimensions when row totals are present', () => {
     const metrics = ['m1', 'm2', 'm3'];
     const valueLeaf = buildValueLeaf();
     const ixLeaf = buildBuiltInLeaf('ix', {
@@ -1369,7 +1369,7 @@ describe('PivotTableChart interaction layout', () => {
     expect(within(container).getByText('Total m1')).toBeInTheDocument();
   });
 
-  it('renders measure leaf labels instead of raw leaf tokens in headers', () => {
+  test('renders measure leaf labels instead of raw leaf tokens in headers', () => {
     const metrics = ['m1'];
     const valueLeaf = buildValueLeaf();
     const ixLeaf = buildBuiltInLeaf('ix', {
@@ -1445,7 +1445,7 @@ describe('PivotTableChart interaction layout', () => {
     expect(labels).toEqual(expect.arrayContaining(['Value', 'IX 1YA']));
   });
 
-  it('renders materialized derived measure leaf values from upstream refreshes in user-controlled mode', async () => {
+  test('renders materialized derived measure leaf values from upstream refreshes in user-controlled mode', async () => {
     const metricKey = 'm1';
     const rowGroupby = ['row1'];
     const valueLeaf = buildValueLeaf();
@@ -1565,7 +1565,7 @@ describe('PivotTableChart interaction layout', () => {
     );
   });
 
-  it('treats upstream refresh data as the materialized source of truth for custom leaves', async () => {
+  test('treats upstream refresh data as the materialized source of truth for custom leaves', async () => {
     const metricKey = 'm1';
     const customMetricKey = 'm1_custom';
     const rowGroupby = ['row1'];
@@ -1678,7 +1678,90 @@ describe('PivotTableChart interaction layout', () => {
     );
   });
 
-  it('keeps local column layout on stale dashboard rerender after seamless update', async () => {
+  test('keeps non-empty upstream refresh data when fact batches cannot rematerialize it', async () => {
+    const metrics = ['m1'];
+    const rows = ['row1'];
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dashboardId: 1,
+      dimensions: rows,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: false,
+      initialDepth: 1,
+      verboseMap: { row1: 'row1' },
+    });
+    const initialRuntime = buildInitialBootstrapRuntime({
+      formData,
+      runtimeLayout,
+      resultsByDepth: {
+        '0|0': [{ m1: 10 }],
+        '1|0': [{ row1: 'A', m1: 10 }],
+      },
+    });
+    const refreshedTree = applyMetricAxis(
+      buildTreeFromRecords([{ row1: 'A', m1: 15 }], metrics, rows, [], 1, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rows,
+      [],
+      0,
+    );
+
+    const { container, rerender } = render(
+      <PivotTableChart
+        data={initialRuntime.tree}
+        factBatches={initialRuntime.factBatches}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    const rowMetricValues = () =>
+      Array.from(container.querySelectorAll('tbody td.value-cell')).map(cell =>
+        Number(cell.textContent?.trim()),
+      );
+
+    expect(rowMetricValues()).toEqual(expect.arrayContaining([10]));
+
+    rerender(
+      <PivotTableChart
+        data={refreshedTree}
+        factBatches={[]}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        width={300}
+        height={300}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(rowMetricValues()).toEqual(expect.arrayContaining([15])),
+    );
+  });
+
+  test('keeps local column layout on stale dashboard rerender after seamless update', async () => {
     const metrics = ['m1'];
     const rows = ['row1'];
     const cols = ['col1'];
@@ -1776,7 +1859,7 @@ describe('PivotTableChart interaction layout', () => {
     cancelSpy.mockRestore();
   });
 
-  it('keeps seamless multi-metric values-only cells after stale dashboard rerender', async () => {
+  test('keeps seamless multi-metric values-only cells after stale dashboard rerender', async () => {
     const metrics = ['m1', 'm2'];
     const rows = ['row1'];
     const cols = ['col1'];
@@ -1887,7 +1970,7 @@ describe('PivotTableChart interaction layout', () => {
     cancelSpy.mockRestore();
   });
 
-  it('keeps multi-metric Values cells visible after adding and removing a column dimension', async () => {
+  test('keeps multi-metric Values cells visible after adding and removing a column dimension', async () => {
     const metrics = ['m1', 'm2'];
     const rows = ['row1'];
     const cols = ['col1'];
@@ -2020,7 +2103,7 @@ describe('PivotTableChart interaction layout', () => {
     cancelSpy.mockRestore();
   });
 
-  it('keeps column dimension headers after stale dashboard rerender when startCollapsed is enabled', async () => {
+  test('keeps column dimension headers after stale dashboard rerender when startCollapsed is enabled', async () => {
     const metrics = ['m1'];
     const rows = ['row1'];
     const cols = ['col1'];
@@ -2118,7 +2201,7 @@ describe('PivotTableChart interaction layout', () => {
     cancelSpy.mockRestore();
   });
 
-  it('keeps seamless data after stale dashboard rerender with unchanged query context', async () => {
+  test('keeps seamless data after stale dashboard rerender with unchanged query context', async () => {
     const metrics = ['m1'];
     const rows = ['row1'];
     const cols = ['col1'];
@@ -2221,7 +2304,7 @@ describe('PivotTableChart interaction layout', () => {
     cancelSpy.mockRestore();
   });
 
-  it('keeps seamless data after stale dashboard rerender when only treeDataSignature changes', async () => {
+  test('keeps seamless data after stale dashboard rerender when only treeDataSignature changes', async () => {
     const metrics = ['m1'];
     const rows = ['row1'];
     const cols = ['col1'];
