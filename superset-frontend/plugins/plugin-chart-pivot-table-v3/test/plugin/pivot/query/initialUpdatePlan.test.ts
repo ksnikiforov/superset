@@ -25,6 +25,10 @@ import {
   formatQueryName,
 } from '../../../../src/pivot/query/specs';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../../src/types';
+import {
+  buildBuiltInLeaf,
+  buildValueLeaf,
+} from '../../../../src/pivot/measureLeaves';
 import { METRICS_PLACEHOLDER } from '../../../../src/pivot/core/tokens';
 import { buildFormData } from '../../fixtures/pivotFormData';
 
@@ -195,5 +199,111 @@ describe('buildInitialPivotUpdatePlan', () => {
     }));
 
     expect(queryShape).toEqual(planShape);
+  });
+
+  test('uses saved empty measure leaves as comparison defaults', () => {
+    const formData = buildFormData({
+      metrics: ['grossRevenue'],
+      measureLeavesByMetric: {},
+    });
+
+    const plan = buildInitialPivotUpdatePlan({ formData });
+
+    expect(plan.formData.measureLeavesByMetric?.grossRevenue).toEqual([
+      buildValueLeaf(),
+      buildBuiltInLeaf('offset_value', {
+        n: 1,
+        unit: 'month',
+        direction: 'past',
+      }),
+      buildBuiltInLeaf('offset_value', {
+        n: 1,
+        unit: 'year',
+        direction: 'past',
+      }),
+      buildBuiltInLeaf('ix', {
+        n: 1,
+        unit: 'month',
+        direction: 'past',
+      }),
+    ]);
+    expect(plan.formData.time_offsets).toEqual(['1 month ago', '1 year ago']);
+  });
+
+  test('does not build comparison queries from string time labels', () => {
+    const query = buildQuery(
+      buildFormData({
+        groupbyRows: ['month', 'age'],
+        groupbyColumns: [METRICS_PLACEHOLDER],
+        metrics: ['N Baskets'],
+        measureLeavesByMetric: {},
+        temporal_columns_lookup: {
+          transaction_timestamp: true,
+        },
+        adhoc_filters: [
+          {
+            clause: 'WHERE',
+            comparator: 'No filter',
+            expressionType: 'SIMPLE',
+            operator: 'TEMPORAL_RANGE',
+            subject: 'transaction_timestamp',
+          },
+        ],
+      }),
+    ).queries[0];
+
+    expect(query.time_offsets).toEqual([]);
+    expect(query.columns).toEqual(['month']);
+  });
+
+  test('keeps offsets for categorical dimensions with an enclosed time range', () => {
+    const query = buildQuery(
+      buildFormData({
+        groupbyRows: ['age'],
+        groupbyColumns: [METRICS_PLACEHOLDER],
+        metrics: ['N Baskets'],
+        measureLeavesByMetric: {},
+        temporal_columns_lookup: {
+          transaction_timestamp: true,
+        },
+        adhoc_filters: [
+          {
+            clause: 'WHERE',
+            comparator: '2017-06-17T00:00:00 : 2017-07-01T00:00:00',
+            expressionType: 'SIMPLE',
+            operator: 'TEMPORAL_RANGE',
+            subject: 'transaction_timestamp',
+          },
+        ],
+      }),
+    ).queries[0];
+
+    expect(query.columns).toEqual(['age']);
+    expect(query.time_offsets).toEqual(['1 month ago', '1 year ago']);
+  });
+
+  test('builds pivot-v3 comparison queries from a real temporal column', () => {
+    const query = buildQuery(
+      buildFormData({
+        groupbyRows: ['transaction_timestamp', 'age'],
+        groupbyColumns: [METRICS_PLACEHOLDER],
+        metrics: ['N Baskets'],
+        measureLeavesByMetric: {},
+        temporal_columns_lookup: {
+          transaction_timestamp: true,
+        },
+        time_grain_sqla: 'P1M',
+      }),
+    ).queries[0];
+
+    expect(query.time_offsets).toEqual(['1 month ago', '1 year ago']);
+    expect(query.columns?.[0]).toEqual({
+      timeGrain: 'P1M',
+      columnType: 'BASE_AXIS',
+      sqlExpression: 'transaction_timestamp',
+      label: 'transaction_timestamp',
+      expressionType: 'SQL',
+    });
+    expect(query.columns).toHaveLength(1);
   });
 });

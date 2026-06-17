@@ -69,6 +69,11 @@ import {
   targetAxisScope,
   type ExpansionCoverageTarget,
 } from '../expansion/planner';
+import {
+  buildTemporalBaseAxisColumn,
+  resolvePivotTimeComparison,
+  type PivotTimeComparisonSpec,
+} from './timeComparison';
 import { coerceValueForColumn, normalizeTemporalValue } from './pathFilters';
 import {
   buildFactCoverage,
@@ -101,16 +106,31 @@ export type QuerySpec = {
   columns: QueryFormColumn[];
   metrics: QueryFormMetric[];
   filters: QueryObjectFilterClause[];
+  meta?: QuerySpecMeta;
 };
 
 export type QuerySpecMeta = {
   requiredTimeOffsets: string[];
   factSelector: PivotFactSelector;
+  timeComparison?: PivotTimeComparisonSpec;
 };
 
 export type PlannedQuerySpec = QuerySpec & {
   meta: QuerySpecMeta;
 };
+
+const hasEnclosedTemporalRangeFilter = (
+  filters: QueryObjectFilterClause[],
+): boolean =>
+  filters.some(filter => {
+    const candidate = filter as { op?: unknown; val?: unknown };
+    return (
+      candidate.op === 'TEMPORAL_RANGE' &&
+      typeof candidate.val === 'string' &&
+      candidate.val !== 'No filter' &&
+      candidate.val.includes(':')
+    );
+  });
 
 export const toChartDataQueries = ({
   specs,
@@ -119,19 +139,37 @@ export const toChartDataQueries = ({
   specs: QuerySpec[];
   baseQueryObject: QueryObject;
 }): QueryObject[] =>
-  specs.map(spec => ({
-    ...baseQueryObject,
-    columns: spec.columns,
-    metrics:
-      spec.metrics.length > 0
-        ? spec.metrics
-        : ((baseQueryObject.metrics ?? []) as QueryFormMetric[]),
-    filters: [
+  specs.map(spec => {
+    const comparison = spec.meta?.timeComparison;
+    const filters = [
       ...((baseQueryObject.filters ?? []) as QueryObjectFilterClause[]),
       ...spec.filters,
-    ],
-    query_name: spec.queryName,
-  }));
+    ];
+    const requiredTimeOffsets = spec.meta?.requiredTimeOffsets ?? [];
+    const timeOffsets =
+      comparison || hasEnclosedTemporalRangeFilter(filters)
+        ? requiredTimeOffsets
+        : [];
+    return {
+      ...baseQueryObject,
+      columns: comparison
+        ? [
+            buildTemporalBaseAxisColumn(comparison),
+            ...spec.columns.filter(
+              column =>
+                getColumnLabel(column) !== comparison.temporalColumnLabel,
+            ),
+          ]
+        : spec.columns,
+      metrics:
+        spec.metrics.length > 0
+          ? spec.metrics
+          : ((baseQueryObject.metrics ?? []) as QueryFormMetric[]),
+      filters,
+      query_name: spec.queryName,
+      ...(requiredTimeOffsets.length > 0 ? { time_offsets: timeOffsets } : {}),
+    };
+  });
 
 type QueryShape = {
   rowGroupby: QueryFormColumn[];
@@ -249,6 +287,7 @@ const buildQueryShape = ({
 };
 
 type PlannedQuerySpecParams = {
+  formData: PivotTableQueryFormData;
   coverage: PivotFactCoverage;
   metrics: QueryFormMetric[];
   measureHierarchy?: MeasureHierarchy;
@@ -602,6 +641,7 @@ const resolveFetchContext = ({
 };
 
 const buildPlannedQuerySpec = ({
+  formData,
   coverage,
   metrics,
   measureHierarchy,
@@ -613,6 +653,12 @@ const buildPlannedQuerySpec = ({
 }: PlannedQuerySpecParams): PlannedQuerySpec => {
   const metricKeys = metrics.map(getMetricKey).filter(Boolean) as string[];
   const metricKeySet = new Set(metricKeys);
+  const columns = [...coverage.rowDimensions, ...coverage.columnDimensions];
+  const timeComparison = resolvePivotTimeComparison({
+    columns,
+    formData,
+    requiredTimeOffsets,
+  });
   const valueKeys =
     measureHierarchy && measureHierarchy.groups.length > 0
       ? normalizeFactValueKeys([
@@ -651,11 +697,12 @@ const buildPlannedQuerySpec = ({
     queryName: `${formatQueryName(coverage.rowDepth, coverage.columnDepth)}${
       scope.kind === 'root' ? '' : `|scope:${stableStringify(scope)}`
     }`,
-    columns: [...coverage.rowDimensions, ...coverage.columnDimensions],
+    columns,
     metrics,
     filters,
     meta: {
       requiredTimeOffsets,
+      ...(timeComparison ? { timeComparison } : {}),
       factSelector: {
         coverage,
         materialization,
@@ -698,6 +745,7 @@ const buildAxisExpansionSpecs = ({
 
   return ctx.coverages.map(coverage =>
     buildPlannedQuerySpec({
+      formData,
       coverage,
       metrics: ctx.metricsForQuery,
       measureHierarchy: ctx.measureHierarchy,
@@ -1019,6 +1067,7 @@ export const buildInitialQuerySpecs = (
       measureHierarchy: layout.measureHierarchy,
     });
     return buildPlannedQuerySpec({
+      formData,
       coverage,
       metrics: queryShape.metrics,
       measureHierarchy: layout.measureHierarchy,

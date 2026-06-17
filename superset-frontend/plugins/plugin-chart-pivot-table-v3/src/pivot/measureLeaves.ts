@@ -123,6 +123,25 @@ export const buildBuiltInLeaf = (
   label: buildMeasureLeafLabel(operator, offset),
 });
 
+const oneMonthAgo: MeasureLeafOffset = {
+  n: 1,
+  unit: 'month',
+  direction: 'past',
+};
+
+const oneYearAgo: MeasureLeafOffset = {
+  n: 1,
+  unit: 'year',
+  direction: 'past',
+};
+
+export const buildDefaultMeasureLeaves = (): MeasureLeafSpec[] => [
+  buildValueLeaf(),
+  buildBuiltInLeaf('offset_value', oneMonthAgo),
+  buildBuiltInLeaf('offset_value', oneYearAgo),
+  buildBuiltInLeaf('ix', oneMonthAgo),
+];
+
 export const buildCustomLeaf = ({
   label,
   metric,
@@ -206,10 +225,14 @@ export const coerceMeasureLeavesByMetric = (
   existing?: MeasureLeavesByMetricKey,
 ): MeasureLeavesByMetricKey => {
   const next: MeasureLeavesByMetricKey = {};
+  const defaultLeaves =
+    existing && Object.keys(existing).length === 0
+      ? buildDefaultMeasureLeaves()
+      : [buildValueLeaf()];
   metrics.forEach(metricKey => {
     const existingLeaves = existing?.[metricKey] ?? [];
     const resolvedLeaves =
-      existingLeaves.length > 0 ? existingLeaves : [buildValueLeaf()];
+      existingLeaves.length > 0 ? existingLeaves : defaultLeaves;
     next[metricKey] = resolvedLeaves;
   });
   return next;
