@@ -197,9 +197,9 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         call => call[0]?.ownState?.pivotSelectedFilters,
       ),
     ).toBe(false);
-    expect(
-      setControlValue.mock.calls.some(call => call[0] === 'pivotSelectedFilters'),
-    ).toBe(false);
+    expect(setControlValue).toHaveBeenCalledWith('pivotSelectedFilters', {
+      row1: ['A'],
+    });
 
     const filteredFormData = {
       ...formData,
@@ -239,6 +239,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         call => call[0]?.ownState?.pivotSelectedFilters,
       ),
     ).toBe(false);
+    expect(setControlValue).toHaveBeenCalledWith('pivotSelectedFilters', {});
 
     const clearedFormData = { ...formData, pivotSelectedFilters: {} };
     rerender(

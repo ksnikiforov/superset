@@ -75,6 +75,17 @@ describe('pivot table v3 control panel', () => {
     expect(expandColumnsLevelControl.config.mapStateToProps).toBeUndefined();
   });
 
+  it('keeps user-controlled runtime layout writes from marking Explore stale', () => {
+    const runtimeLayoutControl = getControl('pivotRuntimeLayout');
+    const selectedFiltersControl = getControl('pivotSelectedFilters');
+    const expansionStateControl = getControl('pivotExpansionState');
+
+    expect(runtimeLayoutControl.config.dontRefreshOnChange).toBe(true);
+    expect(runtimeLayoutControl.config.renderTrigger).toBe(false);
+    expect(selectedFiltersControl.config.dontRefreshOnChange).toBe(true);
+    expect(expansionStateControl.config.dontRefreshOnChange).toBe(true);
+  });
+
   it('builds column subtotal options based on column depth and clamps selections', () => {
     const colSubtotalControl = getControl('colSubtotalLevels');
     const { mapStateToProps } = colSubtotalControl.config;

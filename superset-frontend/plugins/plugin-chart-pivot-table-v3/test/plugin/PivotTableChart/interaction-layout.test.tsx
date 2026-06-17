@@ -136,7 +136,7 @@ describe('PivotTableChart interaction layout', () => {
     expect(screen.getByText('Dimensions')).toBeInTheDocument();
   });
 
-  test('keeps Explore runtime layout changes local in user controlled mode', () => {
+  test('persists Explore runtime layout changes via setControlValue', () => {
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,
       rows: ['row1'],
@@ -189,8 +189,10 @@ describe('PivotTableChart interaction layout', () => {
     const selectedFiltersCalls = setControlValue.mock.calls.filter(
       call => call[0] === 'pivotSelectedFilters',
     );
-    expect(runtimeLayoutCalls).toHaveLength(0);
-    expect(selectedFiltersCalls).toHaveLength(0);
+    expect(runtimeLayoutCalls).toHaveLength(1);
+    expect(runtimeLayoutCalls[0][1].metrics).toEqual(['m2', 'm1']);
+    expect(selectedFiltersCalls).toHaveLength(1);
+    expect(selectedFiltersCalls[0][1]).toEqual({});
     expect(
       setDataMask.mock.calls.some(
         call => call[0]?.ownState?.pivotRuntimeLayout,
@@ -294,7 +296,7 @@ describe('PivotTableChart interaction layout', () => {
     expect(screen.getByLabelText('Clear filters')).toBeEnabled();
   });
 
-  test('applies metric order changes locally when query form data has not updated yet', () => {
+  test('records metric order changes when query form data has not updated yet', () => {
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,
       rows: [],
@@ -313,31 +315,28 @@ describe('PivotTableChart interaction layout', () => {
       startCollapsed: false,
       pivotRuntimeLayout: runtimeLayout,
     });
-    const baseTree = buildTreeFromRecords(
-      [{ col1: 'A', m1: 10, m2: 20 }],
-      ['m1', 'm2'],
-      [],
-      ['col1'],
-      0,
-      1,
-    );
-    const tree = applyMetricAxis(
-      baseTree,
-      ['m1', 'm2'],
-      MetricsLayoutEnum.COLUMNS,
-      [],
-      ['col1'],
-      1,
-    );
+    const initialRuntime = buildInitialBootstrapRuntime({
+      formData,
+      runtimeLayout,
+      resultsByDepth: {
+        '0|0': [{ m1: 10, m2: 20 }],
+        '0|1': [{ col1: 'A', m1: 10, m2: 20 }],
+      },
+    });
+    const setControlValue = jest.fn();
+    const setDataMask = jest.fn();
     const { container } = render(
       <PivotTableChart
-        data={tree}
+        data={initialRuntime.tree}
+        factBatches={initialRuntime.factBatches}
         formData={formData}
         rawFormData={formData}
         queryFormData={formData}
         metrics={['m1', 'm2']}
         groupbyRows={[]}
         groupbyColumns={[]}
+        setControlValue={setControlValue}
+        setDataMask={setDataMask}
       />,
     );
 
@@ -354,8 +353,16 @@ describe('PivotTableChart interaction layout', () => {
     fireEvent.click(screen.getByLabelText('Toggle measure m1'));
     fireEvent.click(screen.getByText('Select measures'));
 
-    const labelsAfter = headerLabels();
-    expect(labelsAfter.indexOf('m2')).toBeLessThan(labelsAfter.indexOf('m1'));
+    const runtimeLayoutCalls = setControlValue.mock.calls.filter(
+      call => call[0] === 'pivotRuntimeLayout',
+    );
+    expect(runtimeLayoutCalls).not.toHaveLength(0);
+    expect(runtimeLayoutCalls.at(-1)?.[1].metrics).toEqual(['m2', 'm1']);
+    expect(
+      setDataMask.mock.calls.some(
+        call => call[0]?.ownState?.pivotRuntimeLayout,
+      ),
+    ).toBe(false);
   });
 
   test('renders the applied layout when query form data is provided', () => {
@@ -763,7 +770,7 @@ describe('PivotTableChart interaction layout', () => {
     expect(metricLabels).toEqual(['m1', 'm2', 'm1', 'm2']);
   });
 
-  test('prefers ownState runtime layout over formData runtime layout in user-controlled mode', () => {
+  test('prefers formData runtime layout over ownState in user-controlled mode', () => {
     const metricKey = 'm1';
     const dimensionKey = 'row1';
     const metrics = [metricKey];
@@ -784,16 +791,16 @@ describe('PivotTableChart interaction layout', () => {
     );
     const ownRuntimeLayout: PivotRuntimeLayout = {
       version: 1,
-      rows: [dimensionKey],
-      cols: [],
+      rows: [],
+      cols: [dimensionKey],
       metrics,
       leafSelection: {},
       valuePlacement: { axis: 'col', index: 0 },
     };
     const formRuntimeLayout: PivotRuntimeLayout = {
       ...ownRuntimeLayout,
-      rows: [],
-      cols: [dimensionKey],
+      rows: [dimensionKey],
+      cols: [],
     };
     const formData = buildFormData({
       interactionMode: 'user_controlled',
@@ -1868,9 +1875,10 @@ describe('PivotTableChart interaction layout', () => {
       Array.from({ length: seamlessSpecsLength || 1 }, () => ({ data: [] })),
     );
     await waitFor(() => expect(screen.getByText('B')).toBeInTheDocument());
-    expect(
-      setControlValue.mock.calls.some(call => call[0] === 'pivotRuntimeLayout'),
-    ).toBe(false);
+    expect(setControlValue).toHaveBeenCalledWith(
+      'pivotRuntimeLayout',
+      parentSyncedRuntimeLayout,
+    );
     expect(
       setDataMask.mock.calls.some(
         call => call[0]?.ownState?.pivotRuntimeLayout,
@@ -2211,7 +2219,7 @@ describe('PivotTableChart interaction layout', () => {
             `${spec.meta.factSelector.coverage.rowDepth}|${spec.meta.factSelector.coverage.columnDepth}`,
         ),
       ),
-    ).toEqual(new Set(['1|1', '0|1']));
+    ).toEqual(new Set(['1|1', '1|0', '0|1']));
     await waitFor(() => expect(screen.getByText('X')).toBeInTheDocument());
 
     fireEvent.click(screen.getAllByLabelText('Remove dimension')[0]);

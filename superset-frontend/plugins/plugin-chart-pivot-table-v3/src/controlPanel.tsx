@@ -487,6 +487,8 @@ const config: ControlPanelConfig = {
             config: {
               type: 'HiddenControl',
               default: null,
+              dontRefreshOnChange: true,
+              renderTrigger: false,
             },
           },
         ],

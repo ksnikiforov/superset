@@ -158,9 +158,10 @@ export default function transformProps(
     ...baseFormData,
     metricLabelMap,
     pivotExpansionState:
+      baseFormData.pivotExpansionState ??
       (ownState?.pivotExpansionState as
         | PivotTableQueryFormData['pivotExpansionState']
-        | undefined) ?? baseFormData.pivotExpansionState,
+        | undefined),
   };
   const {
     formData: plannedFormData,

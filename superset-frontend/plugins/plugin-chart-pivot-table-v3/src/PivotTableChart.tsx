@@ -164,10 +164,11 @@ function PivotTableChart(props: PivotTableProps) {
   const metricsForUi = sourceMetrics;
   const metricKeys = useMemo(() => getMetricKeys(metricsForUi), [metricsForUi]);
   const hasMetrics = metricKeys.length > 0;
+  const shouldSyncControlValuesOnInteraction = Boolean(setControlValue);
   const runtimeLayout = useMemo(() => {
     const persisted = isUserControlledMode
-      ? ((ownState?.pivotRuntimeLayout as PivotRuntimeLayout | undefined) ??
-        formData.pivotRuntimeLayout)
+      ? (formData.pivotRuntimeLayout ??
+        (ownState?.pivotRuntimeLayout as PivotRuntimeLayout | undefined))
       : undefined;
     return normalizeRuntimeLayout(
       persisted ?? buildRuntimeLayoutFromFormData(formData),
@@ -323,7 +324,7 @@ function PivotTableChart(props: PivotTableProps) {
     lastLocalSyncDashboardQueryContextRef,
     suppressStalePersistedFilterRestoreRef,
     commitUiRuntimeLayout: updateUiRuntimeLayout,
-    syncControlValuesOnInteraction: isDashboardRuntimeSync,
+    syncControlValuesOnInteraction: shouldSyncControlValuesOnInteraction,
     persistRuntimeState,
   });
   const expansionFetchFormData = seamlessLoading

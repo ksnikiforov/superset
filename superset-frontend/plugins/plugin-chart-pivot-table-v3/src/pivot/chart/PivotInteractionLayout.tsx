@@ -147,7 +147,7 @@ const VerticalValueChip = styled(ValueChip)`
 
 const VerticalChipLabel = styled(ChipLabel)`
   writing-mode: vertical-rl;
-  text-orientation: mixed;
+  text-orientation: sideways;
   transform: rotate(180deg);
   transform-origin: center;
 `;

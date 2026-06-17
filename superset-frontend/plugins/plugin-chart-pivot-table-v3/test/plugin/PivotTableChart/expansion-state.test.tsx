@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import { QueryFormColumn } from '@superset-ui/core';
+import { AppSection, QueryFormColumn } from '@superset-ui/core';
 import { fireEvent, render, screen, waitFor } from '../../testUtils';
 import PivotTableChart, {
   buildPreloadedTreeFactBatches,
@@ -240,6 +240,7 @@ describe('PivotTableChart expansion state persistence', () => {
     omitPersistExpansionState = false,
     metricsOverride,
     factBatches,
+    appSection,
   }: {
     data: PivotTreeData;
     ownState?: Record<string, unknown>;
@@ -254,6 +255,7 @@ describe('PivotTableChart expansion state persistence', () => {
     omitPersistExpansionState?: boolean;
     metricsOverride?: PivotTableQueryFormData['metrics'];
     factBatches?: PivotFactStoreBatch[];
+    appSection?: AppSection;
   }) => {
     const metricsValue = metricsOverride ?? metrics;
     const groupbyRowsValue = groupbyRowsOverride ?? rowGroupby;
@@ -301,6 +303,7 @@ describe('PivotTableChart expansion state persistence', () => {
         setDataMask={setDataMask || jest.fn()}
         setControlValue={setControlValue}
         emitCrossFilters={emitCrossFilters}
+        appSection={appSection}
         factBatches={
           factBatches ??
           buildPreloadedTreeFactBatches(data, {
@@ -655,6 +658,7 @@ describe('PivotTableChart expansion state persistence', () => {
           metricsLayout: MetricsLayoutEnum.COLUMNS,
           pivotRuntimeLayout: runtimeLayout,
         },
+        appSection: AppSection.Dashboard,
       }),
     );
 

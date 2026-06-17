@@ -217,6 +217,42 @@ describe('buildQuery (bootstrap)', () => {
     ).toBe(true);
   });
 
+  test('prefers formData expansion state over stale ownState expansion state', () => {
+    const queryContext = buildQuery(
+      {
+        ...baseFormData,
+        startCollapsed: false,
+        pivotExpansionState: {
+          rowKeys: ['row1', 'row2'],
+          colKeys: ['col1', 'col2'],
+          rows: [],
+          cols: [],
+          collapsedRows: [],
+          collapsedCols: [],
+        },
+      },
+      {
+        ownState: {
+          pivotExpansionState: {
+            rowKeys: ['row1', 'row2'],
+            colKeys: ['col1', 'col2'],
+            rows: [],
+            cols: [],
+            collapsedRows: [['A']],
+            collapsedCols: [],
+          },
+        },
+      },
+    );
+
+    expect(
+      queryContext.queries.some(query => {
+        const columns = query.columns ?? [];
+        return columns.includes('row2') || columns.includes('col2');
+      }),
+    ).toBe(true);
+  });
+
   test('does not batch sibling persisted expansions during initial query planning', () => {
     const queryContext = buildQuery(
       buildFormData({

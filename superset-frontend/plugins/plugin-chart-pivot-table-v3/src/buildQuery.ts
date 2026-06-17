@@ -32,9 +32,10 @@ export default function buildQuery(
   options?: Parameters<BuildQuery<PivotTableQueryFormData>>[1],
 ) {
   const pivotExpansionState =
+    formData.pivotExpansionState ??
     (options?.ownState?.pivotExpansionState as
       | PivotTableQueryFormData['pivotExpansionState']
-      | undefined) ?? formData.pivotExpansionState;
+      | undefined);
   const {
     formData: resolvedFormData,
     layout,
