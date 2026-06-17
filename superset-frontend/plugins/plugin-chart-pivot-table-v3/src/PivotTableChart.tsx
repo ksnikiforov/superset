@@ -327,9 +327,7 @@ function PivotTableChart(props: PivotTableProps) {
     syncControlValuesOnInteraction: shouldSyncControlValuesOnInteraction,
     persistRuntimeState,
   });
-  const expansionFetchFormData = seamlessLoading
-    ? appliedLayoutFormData
-    : fetchFormData;
+  const expansionFetchFormData = fetchFormData;
 
   const dimensionLabelMap = useMemo(() => {
     const map = new Map<string, string>();

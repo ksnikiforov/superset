@@ -280,6 +280,8 @@ export const useExpansionEngine = ({
       resolveExpansionReinitializationPlan({
         previousSemanticSignature: null,
         nextSemanticSignature: expansionSemanticSignature,
+        previousQueryContextKey: queryContextKey,
+        nextQueryContextKey: queryContextKey,
         previousData: null,
         data,
         currentTree: data,
@@ -299,6 +301,7 @@ export const useExpansionEngine = ({
       initialExpansionState,
       initialLayout,
       pivotProgram,
+      queryContextKey,
     ],
   );
   const initialFactStore = useMemo(
@@ -634,6 +637,8 @@ export const useExpansionEngine = ({
     const reinitializationPlan = resolveExpansionReinitializationPlan({
       previousSemanticSignature,
       nextSemanticSignature: expansionSemanticSignature,
+      previousQueryContextKey,
+      nextQueryContextKey: queryContextKey,
       previousData: previousDataRef.current,
       data,
       currentTree: treeRef.current,
@@ -680,7 +685,6 @@ export const useExpansionEngine = ({
     const shouldPreserveVisibleTreeDuringHydration =
       !isInitialMount &&
       previousSemanticSignature === expansionSemanticSignature &&
-      previousQueryContextKey === queryContextKey &&
       shouldHydrateExpansion;
     if (!shouldPreserveVisibleTreeDuringHydration) {
       commitExpansionState({
@@ -716,6 +720,7 @@ export const useExpansionEngine = ({
     fetchLayout.measureHierarchy.leafTierVisibility,
     hydrateAtomic,
     expansionRequestLifecycle,
+    queryContextKey,
     reportAsyncError,
     clearLoadingKeys,
   ]);

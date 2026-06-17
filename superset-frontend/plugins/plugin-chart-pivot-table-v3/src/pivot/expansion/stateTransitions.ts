@@ -397,6 +397,8 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
 export const resolveExpansionReinitializationPlan = (params: {
   previousSemanticSignature: string | null;
   nextSemanticSignature: string;
+  previousQueryContextKey: string;
+  nextQueryContextKey: string;
   previousData: PivotTreeData | null;
   data: PivotTreeData;
   currentTree: PivotTreeData;
@@ -417,9 +419,12 @@ export const resolveExpansionReinitializationPlan = (params: {
   const isInitialMount = params.previousSemanticSignature === null;
   const semanticSignatureChanged =
     params.previousSemanticSignature !== params.nextSemanticSignature;
+  const queryContextChanged =
+    params.previousQueryContextKey !== params.nextQueryContextKey;
   if (
     !isInitialMount &&
     !semanticSignatureChanged &&
+    !queryContextChanged &&
     !layoutChanged &&
     !hasNewData
   ) {

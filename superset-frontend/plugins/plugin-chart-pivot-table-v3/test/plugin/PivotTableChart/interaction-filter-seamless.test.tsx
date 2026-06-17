@@ -48,6 +48,9 @@ jest.mock('../../../src/pivot/chart/PivotInteractionPanel', () => ({
       <button type="button" onClick={() => onFilterChange?.('row1', ['A'])}>
         Apply row1 filter
       </button>
+      <button type="button" onClick={() => onFilterChange?.('segment', ['S'])}>
+        Apply segment filter
+      </button>
       <button type="button" onClick={() => onClearFilters?.()}>
         Clear chart filters
       </button>
@@ -306,6 +309,97 @@ describe('PivotTableChart interaction filter seamless updates', () => {
       expect(rowLabels).toContain('A');
       expect(rowLabels).toContain('B');
     });
+  });
+
+  test('keeps expanded rows visible while a filtered context hydrates', async () => {
+    const metrics = ['m1'];
+    const rows = ['row1', 'row2'];
+    const records = [{ row1: 'A', row2: 'B', segment: 'all', m1: 10 }];
+    const filteredRecords = [{ row1: 'A', row2: 'B', segment: 'S', m1: 20 }];
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: [...rows, 'segment'],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      pivotExpansionState: {
+        rowKeys: rows,
+        colKeys: [],
+        rows: [['A']],
+        cols: [],
+        collapsedRows: [],
+        collapsedCols: [],
+      },
+      startCollapsed: true,
+      initialDepth: 1,
+    });
+    const tree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, rows, [], 2, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rows,
+      [],
+      0,
+    );
+    const factBatches = buildPreloadedTreeFactBatches(tree, {
+      groupbyRows: rows,
+      groupbyColumns: [],
+    });
+
+    type FetchArgs = {
+      requestGroupId?: string;
+      specs: Array<{ columns?: string[] }>;
+    };
+    fetchMock.mockImplementation(({ requestGroupId, specs }: FetchArgs) => {
+      if (requestGroupId !== 'pivot-v3-seamless') {
+        return Promise.resolve(specs.map(() => ({ data: records })));
+      }
+      return Promise.resolve(
+        specs.map(spec => {
+          if (spec.columns?.includes('row1')) {
+            return {
+              data: filteredRecords.map(({ row1, m1 }) => ({ row1, m1 })),
+            };
+          }
+          return { data: [{ m1: 20 }] };
+        }),
+      );
+    });
+    fetchPivotBranchMock.mockImplementation(() => new Promise(() => undefined));
+
+    render(
+      <PivotTableChart
+        data={tree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        factBatches={factBatches}
+        width={600}
+        height={300}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('B')).toBeInTheDocument());
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Apply segment filter' }),
+    );
+
+    await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalled());
+    expect(screen.getByText('B')).toBeInTheDocument();
   });
 
   test('refetches when dashboard extra_form_data changes in user controlled mode', async () => {
