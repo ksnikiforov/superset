@@ -134,7 +134,9 @@ export const buildPivotFactQueryContextKey = (
     time_grain_sqla: formData.time_grain_sqla ?? null,
     time_offsets: formData.time_offsets ?? [],
     time_range:
-      formData.time_range === 'No filter' ? null : (formData.time_range ?? null),
+      formData.time_range === 'No filter'
+        ? null
+        : (formData.time_range ?? null),
   });
 
 export const assignMissingPivotFactQueryContextKey = (
@@ -142,6 +144,14 @@ export const assignMissingPivotFactQueryContextKey = (
   queryContextKey: string,
 ): PivotFactStoreBatch =>
   batch.queryContextKey === undefined ? { ...batch, queryContextKey } : batch;
+
+export const bindPivotFactBatchToQueryContext = (
+  batch: PivotFactStoreBatch,
+  queryContextKey: string,
+): PivotFactStoreBatch => ({
+  ...batch,
+  queryContextKey,
+});
 
 export const buildFactValueKeys = ({
   metricKeys,

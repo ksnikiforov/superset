@@ -41,7 +41,10 @@ import type {
   FetchPivotExpansionRequest,
   FetchPivotExpansionResult,
 } from '../../../src/pivot/expansion/fetchPivotExpansion';
-import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
+import {
+  buildPivotFactQueryContextKey,
+  type PivotFactStoreBatch,
+} from '../../../src/pivot/runtime/factStore';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
   buildMockBranchFetchResult,
@@ -55,6 +58,7 @@ import {
   injectRowSubtotalLeaves,
   applyMetricAxis,
 } from '../fixtures/metricAxis';
+import { buildValueLeaf } from '../../../src/pivot/measureLeaves';
 
 jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
@@ -2425,6 +2429,48 @@ describe('PivotTableChart expansion state persistence', () => {
       JSON.stringify(getMockExpansionRequestPath(call[0])),
     );
     expect(fetchedPaths).not.toContain(JSON.stringify(['A', 'X']));
+  });
+
+  test('keeps baseline totals when expansion hydrates with a newer query context', async () => {
+    const staleQueryContextKey = buildPivotFactQueryContextKey(
+      buildFormData({}),
+    );
+    const rootTree = applyMetricAxis(
+      buildTreeFromRecords([{ m1: 37 }], metrics, rowGroupby, [], 0, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      [],
+    );
+    const baseTree = mergeTrees(rootTree, buildTree(1));
+    const pivotExpansionState = makePivotExpansionState({
+      rows: [['A']],
+    });
+    const staleFactBatches = buildPreloadedTreeFactBatches(baseTree, {
+      groupbyRows: rowGroupby,
+      groupbyColumns: [],
+      queryContextKey: staleQueryContextKey,
+    });
+    branchExpansionMock.mockImplementation(
+      resolveMockBranchFetchResult({ data: buildTree(2) }),
+    );
+
+    render(
+      buildChartProps({
+        data: baseTree,
+        factBatches: staleFactBatches,
+        formDataOverrides: {
+          colTotals: true,
+          measureLeavesByMetric: { m1: [buildValueLeaf()] },
+          pivotExpansionState,
+          time_offsets: ['1 month ago'],
+        },
+      }),
+    );
+
+    await waitFor(() => expect(screen.getByText('X')).toBeInTheDocument());
+    expect(screen.getByText('Grand total')).toBeInTheDocument();
+    expect(screen.getByText('37')).toBeInTheDocument();
   });
 
   test('does not fetch persisted subtotal expansions', async () => {

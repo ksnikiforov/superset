@@ -30,6 +30,7 @@ import { buildLayoutContext } from '../../../../src/pivot/layout/LayoutContext';
 import { type DataRecordValue } from '@superset-ui/core';
 import { MetricsLayoutEnum } from '../../../../src/types';
 import {
+  encodeMeasureLeafKey,
   encodeMetricKey,
   METRICS_PLACEHOLDER,
   SUBTOTAL_TOKEN,
@@ -40,6 +41,7 @@ import {
 } from '../../../../src/pivot/core/path';
 import { buildFormData } from '../../fixtures/pivotFormData';
 import { buildPivotFactQueryContextKey } from '../../../../src/pivot/runtime/factStore';
+import { buildMeasureLeafOutputKey } from '../../../../src/pivot/measureLeaves';
 
 const queryContextKey = buildPivotFactQueryContextKey(buildFormData({}));
 
@@ -371,6 +373,149 @@ test('materializes column subtotal leaves from planned coverage specs', () => {
     values: expect.objectContaining({ sales: 12 }),
     isSubtotal: true,
   });
+});
+
+test('preserves root measure leaf cells when merging fixed dashboard root and expanded row batches', () => {
+  const store = createPivotFactStore();
+  const rootSpec = buildSpec({
+    queryName: 'pivot_v3|row0|col0',
+    rowDepth: 0,
+    colDepth: 0,
+    metrics: ['sales', 'couponSales'],
+    rowGroupby: ['age', 'is_promoted'],
+    colGroupby: [],
+  });
+  const ageSpec = buildSpec({
+    queryName: 'pivot_v3|row1|col0',
+    rowDepth: 1,
+    colDepth: 0,
+    metrics: ['sales', 'couponSales'],
+    rowGroupby: ['age', 'is_promoted'],
+    colGroupby: [],
+  });
+  const promotedSpec = buildSpec({
+    queryName: 'pivot_v3|row2|col0|scope:19-24',
+    rowDepth: 2,
+    colDepth: 0,
+    metrics: ['sales', 'couponSales'],
+    rowGroupby: ['age', 'is_promoted'],
+    colGroupby: [],
+    scope: {
+      kind: 'scopedFull',
+      axis: 'row',
+      ancestorPaths: [['19-24']],
+    },
+  });
+
+  ingestQueryResults({
+    specs: [rootSpec, ageSpec, promotedSpec],
+    results: [
+      {
+        query_name: rootSpec.queryName,
+        data: [
+          {
+            sales: 6002,
+            couponSales: 3435.84,
+            'sales__1 month ago': 6582,
+            'couponSales__1 month ago': 5037.04,
+          },
+        ],
+      },
+      {
+        query_name: ageSpec.queryName,
+        data: [
+          {
+            age: '19-24',
+            sales: 188,
+            couponSales: 50.01,
+            'sales__1 month ago': 168,
+            'couponSales__1 month ago': 53.99,
+          },
+        ],
+      },
+      {
+        query_name: promotedSpec.queryName,
+        data: [
+          {
+            age: '19-24',
+            is_promoted: false,
+            sales: 181,
+            couponSales: 20.57,
+            'sales__1 month ago': 165,
+            'couponSales__1 month ago': 28.95,
+          },
+          {
+            age: '19-24',
+            is_promoted: true,
+            sales: 100,
+            couponSales: 29.44,
+            'sales__1 month ago': 91,
+            'couponSales__1 month ago': 25.04,
+          },
+        ],
+      },
+    ],
+  }).forEach(ingested =>
+    store.upsertBatch({
+      ...ingested.spec.meta.factSelector,
+      facts: ingested.facts,
+    }),
+  );
+
+  const formData = buildFormData({
+    groupbyRows: ['age', 'is_promoted'],
+    groupbyColumns: [METRICS_PLACEHOLDER],
+    metrics: ['sales', 'couponSales'],
+    metricsLayout: MetricsLayoutEnum.COLUMNS,
+    measureLeavesByMetric: {},
+    colTotals: true,
+    rowTotals: false,
+    rowSubTotals: true,
+  });
+  const tree = materializeLoadedPivotTreeFromFactStore({
+    store,
+    layout: buildLayoutContext(formData),
+    formData,
+  });
+  const layout = buildLayoutContext(formData);
+  const valueLeaf = layout.measureHierarchy.groups[0].leaves[0];
+  const offsetLeaf = layout.measureHierarchy.groups[0].leaves[1];
+  const rootSalesValueCell =
+    tree.cells[
+      serializeCellKey(
+        '',
+        serializePath([
+          encodeMetricKey('sales'),
+          encodeMeasureLeafKey(valueLeaf.id),
+        ]),
+      )
+    ];
+  const rootSalesOffsetCell =
+    tree.cells[
+      serializeCellKey(
+        '',
+        serializePath([
+          encodeMetricKey('sales'),
+          encodeMeasureLeafKey(offsetLeaf.id),
+        ]),
+      )
+    ];
+  const rootCouponValueCell =
+    tree.cells[
+      serializeCellKey(
+        '',
+        serializePath([
+          encodeMetricKey('couponSales'),
+          encodeMeasureLeafKey(valueLeaf.id),
+        ]),
+      )
+    ];
+
+  expect(rootSalesValueCell?.values).toMatchObject({ sales: 6002 });
+  expect(rootSalesOffsetCell?.values).toMatchObject({
+    [buildMeasureLeafOutputKey('sales', offsetLeaf)]: 6582,
+  });
+  expect(rootCouponValueCell?.values).toMatchObject({ couponSales: 3435.84 });
 });
 
 test('materializes full branches after skipped pre-Values metric branches', () => {

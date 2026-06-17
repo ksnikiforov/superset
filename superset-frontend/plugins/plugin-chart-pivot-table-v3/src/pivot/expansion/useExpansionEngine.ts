@@ -41,7 +41,7 @@ import { stableStringify } from '../shared/stableStringify';
 import { type LayoutContext } from '../layout/LayoutContext';
 import type { PivotProgram } from '../runtime/types';
 import {
-  assignMissingPivotFactQueryContextKey,
+  bindPivotFactBatchToQueryContext,
   buildPivotFactQueryContextKey,
   createPivotFactStoreFromBatches,
   type PivotFactStore,
@@ -206,7 +206,7 @@ export const useExpansionEngine = ({
   const currentFactBatches = useMemo(
     () =>
       factBatches.map(batch =>
-        assignMissingPivotFactQueryContextKey(batch, queryContextKey),
+        bindPivotFactBatchToQueryContext(batch, queryContextKey),
       ),
     [factBatches, queryContextKey],
   );
