@@ -45,6 +45,7 @@ type UsePivotTableViewSurfaceInput = {
   expandedRows: Set<string>;
   expandedCols: Set<string>;
   loadingKeys: Set<string>;
+  isInitialExpansionHydrating: boolean;
   errorMessage?: string;
   warnings: ChartDataWarning[];
   seamlessLoading: boolean;
@@ -77,6 +78,7 @@ export const usePivotTableViewSurface = ({
   expandedRows,
   expandedCols,
   loadingKeys,
+  isInitialExpansionHydrating,
   errorMessage,
   warnings,
   seamlessLoading,
@@ -161,7 +163,7 @@ export const usePivotTableViewSurface = ({
     errorMessage: activeErrorMessage,
     onRetry,
     warnings: combinedWarnings,
-    showGlobalLoader: false,
+    showGlobalLoader: isInitialExpansionHydrating,
     showCornerLoader: seamlessCornerLoading,
     stickyHeaders,
     headerOffset,

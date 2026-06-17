@@ -2130,7 +2130,7 @@ describe('PivotTableChart expansion state persistence', () => {
     expect(branchExpansionMock).not.toHaveBeenCalled();
   });
 
-  test('does not show a global loader for persisted expansion prefetch', async () => {
+  test('hides intermediate table while persisted expansion hydrates', async () => {
     const deferred = createDeferredBranchFetch();
     branchExpansionMock.mockImplementation(deferred.implementation);
 
@@ -2146,17 +2146,53 @@ describe('PivotTableChart expansion state persistence', () => {
     );
 
     await waitFor(() => expect(branchExpansionMock).toHaveBeenCalled());
-    expect(
-      screen.queryByRole('status', { name: /loading/i }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText('Rows')).not.toBeInTheDocument();
 
     deferred.resolveAll({ data: buildTree(2) });
     await Promise.all(deferred.promises);
 
+    await waitFor(() => expect(screen.getByText('Rows')).toBeInTheDocument());
+    expect(screen.getAllByText('X').length).toBeGreaterThan(0);
+  });
+
+  test('keeps current expanded table while same-query data rehydrates expansions', async () => {
+    const pivotExpansionState = makePivotExpansionState({ rows: [['A']] });
+    const expandedTree = buildTree(2);
+
+    const { rerender } = render(
+      buildChartProps({
+        data: expandedTree,
+        formDataOverrides: { pivotExpansionState },
+        factBatches: buildPreloadedTreeFactBatches(expandedTree, {
+          groupbyRows: rowGroupby,
+          groupbyColumns: [],
+        }),
+      }),
+    );
+
     await waitFor(() =>
-      expect(
-        screen.queryByRole('status', { name: /loading/i }),
-      ).not.toBeInTheDocument(),
+      expect(screen.getAllByText('X').length).toBeGreaterThan(0),
+    );
+
+    const deferred = createDeferredBranchFetch();
+    branchExpansionMock.mockClear();
+    branchExpansionMock.mockImplementation(deferred.implementation);
+
+    rerender(
+      buildChartProps({
+        data: buildTree(1),
+        formDataOverrides: { pivotExpansionState },
+      }),
+    );
+
+    await waitFor(() => expect(branchExpansionMock).toHaveBeenCalled());
+    expect(screen.getAllByText('X').length).toBeGreaterThan(0);
+
+    deferred.resolveAll({ data: expandedTree });
+    await Promise.all(deferred.promises);
+
+    await waitFor(() =>
+      expect(screen.getAllByText('X').length).toBeGreaterThan(0),
     );
   });
 

@@ -62,6 +62,7 @@ import { StaleChunkedWorkError } from '../runtime/chunkedWork';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { getStableColumnKey } from '../../utils';
 import { executeExpansionHydrationForIntent } from './hydrationExecutor';
+import { planHydrationIteration } from './planner';
 import { rootKey } from '../viewModel';
 
 type AxisSetMap = Record<PivotAxis, Set<string>>;
@@ -108,6 +109,12 @@ const expansionIntentToStateKeys = (
 });
 
 const hasCells = (tree: PivotTreeData) => Object.keys(tree.cells).length > 0;
+const hasExpandedIntent = (state: PivotExpansionStateKeys) =>
+  state.rows.length > 0 || state.cols.length > 0;
+const emptyExpandedByAxis = (): AxisSetMap => ({
+  row: new Set(),
+  col: new Set(),
+});
 
 type ExpansionPersistenceDeps = {
   shouldPersist: boolean;
@@ -155,11 +162,43 @@ const persistExpansionStateKeys = (
   }
 };
 
+const needsExpansionHydration = ({
+  state,
+  axisCoverageNeeds,
+  factStore,
+  program,
+  queryContextKey,
+}: {
+  state: PivotExpansionStateKeys;
+  axisCoverageNeeds: PivotAxisCoverageNeed[];
+  factStore: PivotFactStore;
+  program: PivotProgram;
+  queryContextKey: string;
+}) => {
+  if (!hasExpandedIntent(state)) {
+    return false;
+  }
+  const intent = expansionStateKeysToIntent(state);
+  return (
+    planHydrationIteration({
+      desired: {
+        row: new Set([rootKey, ...intent.expanded.row]),
+        col: new Set([rootKey, ...intent.expanded.col]),
+      },
+      axisCoverageNeeds,
+      factSelectors: factStore.getCoverageSelectors(queryContextKey),
+      program,
+      queryContextKey,
+    }).kind === 'fetch'
+  );
+};
+
 export type ExpansionEngineResult = {
   tree: PivotTreeData;
   expandedRows: Set<string>;
   expandedCols: Set<string>;
   loadingKeys: Set<string>;
+  isInitialExpansionHydrating: boolean;
   errorMessage?: string;
   warnings: ChartDataWarning[];
   handleToggle: (axis: PivotAxis, node: PivotTreeNode) => void;
@@ -197,8 +236,6 @@ export const useExpansionEngine = ({
   persistedExpansionState,
   shouldPersistExpansionState,
 }: ExpansionEngineConfig): ExpansionEngineResult => {
-  const [tree, setTree] = useState<PivotTreeData>(data);
-  const treeRef = useRef(tree);
   const queryContextKey = useMemo(
     () => buildPivotFactQueryContextKey(fetchFormData),
     [fetchFormData],
@@ -210,18 +247,6 @@ export const useExpansionEngine = ({
       ),
     [factBatches, queryContextKey],
   );
-  const factStoreRef = useRef<PivotFactStore>();
-  if (!factStoreRef.current) {
-    factStoreRef.current = createPivotFactStoreFromBatches(currentFactBatches);
-  }
-  const [expandedByAxis, setExpandedByAxis] = useState<AxisSetMap>(() => ({
-    row: new Set(),
-    col: new Set(),
-  }));
-  const { row: expandedRows, col: expandedCols } = expandedByAxis;
-  const expandedRef = useRef(expandedByAxis);
-  const [loadingKeys, setLoadingKeys] = useState<Set<string>>(() => new Set());
-  const loadingScopesRef = useRef<Map<number, Set<string>>>(new Map());
   const groupbyRowKeys = useMemo(
     () => pivotProgram.rowDimensions.map(getStableColumnKey),
     [pivotProgram.rowDimensions],
@@ -230,14 +255,83 @@ export const useExpansionEngine = ({
     () => pivotProgram.columnDimensions.map(getStableColumnKey),
     [pivotProgram.columnDimensions],
   );
-  const initialExpansionState =
-    coerceExpansionStateForLayout({
-      value: persistedExpansionState,
-      rowKeys: groupbyRowKeys,
-      colKeys: groupbyColumnKeys,
-    }) ?? createEmptyExpansionState();
+  const initialExpansionState = useMemo(
+    () =>
+      coerceExpansionStateForLayout({
+        value: persistedExpansionState,
+        rowKeys: groupbyRowKeys,
+        colKeys: groupbyColumnKeys,
+      }) ?? createEmptyExpansionState(),
+    [groupbyColumnKeys, groupbyRowKeys, persistedExpansionState],
+  );
+  const initialLayout = useMemo(
+    () => ({
+      rows: groupbyRowKeys,
+      cols: groupbyColumnKeys,
+    }),
+    [groupbyColumnKeys, groupbyRowKeys],
+  );
+  const initialReinitializationPlan = useMemo(
+    () =>
+      resolveExpansionReinitializationPlan({
+        previousSemanticSignature: null,
+        nextSemanticSignature: expansionSemanticSignature,
+        previousData: null,
+        data,
+        currentTree: data,
+        previousLayout: initialLayout,
+        currentLayout: initialLayout,
+        sessionState: initialExpansionState,
+        axisCoverageNeeds,
+        program: pivotProgram,
+        isLeafTierVisible:
+          fetchLayout.measureHierarchy.leafTierVisibility === 'visible',
+      }),
+    [
+      axisCoverageNeeds,
+      data,
+      expansionSemanticSignature,
+      fetchLayout.measureHierarchy.leafTierVisibility,
+      initialExpansionState,
+      initialLayout,
+      pivotProgram,
+    ],
+  );
+  const initialFactStore = useMemo(
+    () => createPivotFactStoreFromBatches(currentFactBatches),
+    [currentFactBatches],
+  );
+  const [tree, setTree] = useState<PivotTreeData>(
+    () => initialReinitializationPlan?.tree ?? data,
+  );
+  const treeRef = useRef(tree);
+  const factStoreRef = useRef<PivotFactStore>();
+  if (!factStoreRef.current) {
+    factStoreRef.current = initialFactStore;
+  }
+  const initialExpanded =
+    initialReinitializationPlan?.expanded ?? emptyExpandedByAxis();
+  const [expandedByAxis, setExpandedByAxis] = useState<AxisSetMap>(
+    () => initialExpanded,
+  );
+  const { row: expandedRows, col: expandedCols } = expandedByAxis;
+  const expandedRef = useRef(expandedByAxis);
+  const initialPersistedState =
+    initialReinitializationPlan?.persistedState ?? initialExpansionState;
+  const [isInitialExpansionHydrating, setIsInitialExpansionHydrating] =
+    useState(() =>
+      needsExpansionHydration({
+        state: initialPersistedState,
+        axisCoverageNeeds,
+        factStore: initialFactStore,
+        program: pivotProgram,
+        queryContextKey,
+      }),
+    );
+  const [loadingKeys, setLoadingKeys] = useState<Set<string>>(() => new Set());
+  const loadingScopesRef = useRef<Map<number, Set<string>>>(new Map());
   const expansionIntentRef = useRef<ExpansionIntentSets>(
-    expansionStateKeysToIntent(initialExpansionState),
+    expansionStateKeysToIntent(initialPersistedState),
   );
   const [errorMessage, setErrorMessage] = useState<string>();
   const [warnings, setWarnings] = useState<ChartDataWarning[]>([]);
@@ -269,6 +363,7 @@ export const useExpansionEngine = ({
     rows: groupbyRowKeys,
     cols: groupbyColumnKeys,
   });
+  const previousQueryContextKeyRef = useRef(queryContextKey);
 
   useEffect(
     () => () => {
@@ -526,6 +621,7 @@ export const useExpansionEngine = ({
 
   useEffect(() => {
     const previousSemanticSignature = expansionSemanticSignatureRef.current;
+    const previousQueryContextKey = previousQueryContextKeyRef.current;
     expansionSemanticSignatureRef.current = expansionSemanticSignature;
     const currentLayout = {
       rows: groupbyRowKeys,
@@ -550,9 +646,11 @@ export const useExpansionEngine = ({
     }
     previousLayoutRef.current = currentLayout;
     previousDataRef.current = data;
+    previousQueryContextKeyRef.current = queryContextKey;
 
     expansionRequestLifecycle.invalidate();
-    factStoreRef.current = createPivotFactStoreFromBatches(currentFactBatches);
+    const nextFactStore = createPivotFactStoreFromBatches(currentFactBatches);
+    factStoreRef.current = nextFactStore;
     setWarnings([]);
     setErrorMessage(undefined);
     clearLoadingKeys();
@@ -567,16 +665,38 @@ export const useExpansionEngine = ({
       );
     }
 
-    commitExpansionState({
-      tree: reinitializationPlan.tree,
-      expanded: reinitializationPlan.expanded,
+    const shouldHydrateExpansion = needsExpansionHydration({
+      state: reinitializationPlan.persistedState,
+      axisCoverageNeeds,
+      factStore: nextFactStore,
+      program: pivotProgram,
+      queryContextKey,
     });
+    const isInitialMount = previousSemanticSignature === null;
+    const shouldPreserveVisibleTreeDuringHydration =
+      !isInitialMount &&
+      previousSemanticSignature === expansionSemanticSignature &&
+      previousQueryContextKey === queryContextKey &&
+      shouldHydrateExpansion;
+    if (!shouldPreserveVisibleTreeDuringHydration) {
+      commitExpansionState({
+        tree: reinitializationPlan.tree,
+        expanded: reinitializationPlan.expanded,
+      });
+    }
 
-    hydrateAtomic({
+    const shouldBlockInitialRender = isInitialMount && shouldHydrateExpansion;
+    setIsInitialExpansionHydrating(shouldBlockInitialRender);
+    const hydration = hydrateAtomic({
       skipWhenComplete: true,
       visibleLoadingKeys:
         previousSemanticSignature === null ? undefined : new Set(),
-    }).catch(reportAsyncError);
+    });
+    hydration.catch(reportAsyncError).finally(() => {
+      if (shouldBlockInitialRender) {
+        setIsInitialExpansionHydrating(false);
+      }
+    });
   }, [
     commitExpansionState,
     data,
@@ -605,6 +725,7 @@ export const useExpansionEngine = ({
     expandedRows,
     expandedCols,
     loadingKeys,
+    isInitialExpansionHydrating,
     errorMessage,
     warnings,
     handleToggle,
