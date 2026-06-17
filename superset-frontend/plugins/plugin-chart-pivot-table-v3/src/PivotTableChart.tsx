@@ -165,27 +165,36 @@ function PivotTableChart(props: PivotTableProps) {
   const metricKeys = useMemo(() => getMetricKeys(metricsForUi), [metricsForUi]);
   const hasMetrics = metricKeys.length > 0;
   const runtimeLayout = useMemo(() => {
-    const persisted =
-      (ownState?.pivotRuntimeLayout as PivotRuntimeLayout | undefined) ??
-      formData.pivotRuntimeLayout ??
-      buildRuntimeLayoutFromFormData(formData);
-    return normalizeRuntimeLayout(persisted, dimensionKeys, metricKeys);
-  }, [dimensionKeys, formData, metricKeys, ownState]);
+    const persisted = isUserControlledMode
+      ? ((ownState?.pivotRuntimeLayout as PivotRuntimeLayout | undefined) ??
+        formData.pivotRuntimeLayout)
+      : undefined;
+    return normalizeRuntimeLayout(
+      persisted ?? buildRuntimeLayoutFromFormData(formData),
+      dimensionKeys,
+      metricKeys,
+    );
+  }, [dimensionKeys, formData, isUserControlledMode, metricKeys, ownState]);
   const appliedRuntimeLayoutFromQuery = useMemo(
     () =>
       normalizeRuntimeLayout(
-        appliedFormData.pivotRuntimeLayout ?? runtimeLayout,
+        isUserControlledMode
+          ? (appliedFormData.pivotRuntimeLayout ?? runtimeLayout)
+          : buildRuntimeLayoutFromFormData(appliedFormData),
         appliedDimensionKeys,
         metricKeys,
       ),
     [
       appliedDimensionKeys,
       appliedFormData.pivotRuntimeLayout,
+      appliedFormData,
+      isUserControlledMode,
       metricKeys,
       runtimeLayout,
     ],
   );
   const appliedRuntimeLayout =
+    !isUserControlledMode ||
     ownState?.pivotRuntimeLayout ||
     isSameRuntimeLayout(appliedRuntimeLayoutFromQuery, runtimeLayout)
       ? runtimeLayout
@@ -233,12 +242,28 @@ function PivotTableChart(props: PivotTableProps) {
     committedRuntimeLayout: appliedRuntimeLayout,
   });
 
+  const fixedAppliedRuntimeLayout = useMemo(
+    () =>
+      buildRuntimeLayoutFromFormData({
+        ...appliedFormData,
+        metrics: sourceMetrics,
+        measureLeavesByMetric: sourceMeasureLeavesByMetric,
+      }),
+    [appliedFormData, sourceMeasureLeavesByMetric, sourceMetrics],
+  );
+  const committedLayoutForApplied = isUserControlledMode
+    ? committedRuntimeLayoutRef.current
+    : fixedAppliedRuntimeLayout;
+  const draftLayoutForApplied = isUserControlledMode
+    ? uiRuntimeLayout
+    : fixedAppliedRuntimeLayout;
+
   const { appliedLayoutFormData, appliedPivotProgram } =
     resolveAppliedInteractionLayout({
       appliedFormData,
       sourceMetrics,
       sourceMeasureLeavesByMetric,
-      committedRuntimeLayout: committedRuntimeLayoutRef.current,
+      committedRuntimeLayout: committedLayoutForApplied,
       appliedDimensionKeys,
     });
   const { appliedLayoutFormData: draftLayoutFormData } =
@@ -246,7 +271,7 @@ function PivotTableChart(props: PivotTableProps) {
       appliedFormData,
       sourceMetrics,
       sourceMeasureLeavesByMetric,
-      committedRuntimeLayout: uiRuntimeLayout,
+      committedRuntimeLayout: draftLayoutForApplied,
       appliedDimensionKeys,
     });
   const fetchFormData = useMemo(

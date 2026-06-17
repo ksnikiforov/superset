@@ -29,7 +29,7 @@ import { METRICS_PLACEHOLDER } from '../../../../src/pivot/core/tokens';
 import { buildFormData } from '../../fixtures/pivotFormData';
 
 describe('buildInitialPivotUpdatePlan', () => {
-  it('builds selection filters from stable-key selections', () => {
+  test('builds selection filters from stable-key selections', () => {
     const formData = buildFormData({
       interactionMode: 'user_controlled',
       dimensions: ['country', 'state'],
@@ -49,7 +49,7 @@ describe('buildInitialPivotUpdatePlan', () => {
     ]);
   });
 
-  it('ignores selection filters outside canonical dimension keys', () => {
+  test('ignores selection filters outside canonical dimension keys', () => {
     const formData = buildFormData({
       interactionMode: 'user_controlled',
       dimensions: ['country'],
@@ -67,7 +67,7 @@ describe('buildInitialPivotUpdatePlan', () => {
     expect(filters).toEqual([{ col: 'country', op: 'IN', val: ['CA'] }]);
   });
 
-  it('builds normalized form data with selection filters', () => {
+  test('builds normalized form data with selection filters', () => {
     const formData = buildFormData({
       interactionMode: 'user_controlled',
       dimensions: ['country', 'state'],
@@ -89,7 +89,7 @@ describe('buildInitialPivotUpdatePlan', () => {
     ]);
   });
 
-  it('applies runtime layout + selection override before building specs', () => {
+  test('applies runtime layout + selection override before building specs', () => {
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,
       rows: ['r2'],
@@ -130,7 +130,37 @@ describe('buildInitialPivotUpdatePlan', () => {
     expect(bootstrapSpec?.columns).toEqual(['r2', 'c1']);
   });
 
-  it('stays query-shape compatible with buildQuery', () => {
+  test('ignores stale runtime layout when planning fixed-mode queries', () => {
+    const formData = buildFormData({
+      interactionMode: 'fixed',
+      dimensions: ['age', 'month'],
+      groupbyRows: ['age', 'month'],
+      groupbyColumns: [],
+      metrics: ['countCustomers'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: {
+        version: 1,
+        rows: ['month'],
+        cols: [],
+        metrics: ['countCustomers'],
+        leafSelection: {},
+        valuePlacement: { axis: 'col', index: 0 },
+      },
+    });
+
+    const plan = buildInitialPivotUpdatePlan({ formData });
+    const queryContext = buildQuery(formData);
+
+    expect(plan.formData.groupbyRows).toEqual(['age', 'month']);
+    expect(plan.formData.groupbyColumns).toEqual([METRICS_PLACEHOLDER]);
+    expect(plan.specs.map(spec => spec.columns)).toContainEqual(['age']);
+    expect(plan.specs.map(spec => spec.columns)).not.toContainEqual(['month']);
+    expect(queryContext.queries.map(query => query.columns)).toEqual(
+      plan.specs.map(spec => spec.columns),
+    );
+  });
+
+  test('stays query-shape compatible with buildQuery', () => {
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,
       rows: ['shipMode'],

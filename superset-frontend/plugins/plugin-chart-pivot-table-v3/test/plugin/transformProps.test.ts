@@ -46,7 +46,7 @@ const baseFormData: Partial<PivotTableQueryFormData> = {
 describe('Pivot Table v3 transformProps (bootstrap)', () => {
   const rootKey = serializePath([]);
 
-  it('builds a bootstrap tree from totals + top-level grid/row/col queries', () => {
+  test('builds a bootstrap tree from totals + top-level grid/row/col queries', () => {
     const rowKey = serializePath(['A']);
     const colKey = serializePath(['B']);
     const chartProps = new ChartProps({
@@ -108,7 +108,7 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     ).toBe(20);
   });
 
-  it('uses metric display labels when building metric header nodes', () => {
+  test('uses metric display labels when building metric header nodes', () => {
     const metricKey = 'metric1';
     const metricLabel = 'Revenue';
     const rowKey = serializePath(['A']);
@@ -168,7 +168,7 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     expect(metricNode.label).toBe(metricLabel);
   });
 
-  it('keeps metric labels for base metrics in user-controlled mode', () => {
+  test('keeps metric labels for base metrics in user-controlled mode', () => {
     const chartProps = new ChartProps({
       formData: {
         ...baseFormData,
@@ -235,6 +235,65 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     });
   });
 
+  test('ignores stale runtime layout in fixed mode', () => {
+    const fixedFormData = {
+      ...baseFormData,
+      interactionMode: 'fixed',
+      dimensions: ['age', 'month'],
+      groupbyRows: ['age', 'month'],
+      groupbyColumns: [],
+      pivotRuntimeLayout: {
+        version: 1,
+        rows: ['month'],
+        cols: [],
+        metrics: ['metric1'],
+        leafSelection: {},
+        valuePlacement: { axis: 'col', index: 0 },
+      },
+    } as PivotTableQueryFormData;
+    const specs = buildInitialQuerySpecs(fixedFormData);
+    const chartProps = new ChartProps({
+      formData: fixedFormData,
+      width: 400,
+      height: 300,
+      queriesData: specs.map(spec => {
+        const { rowDepth, columnDepth } = spec.meta.factSelector.coverage;
+        if (rowDepth === 0 && columnDepth === 0) {
+          return {
+            query: { query_name: spec.queryName },
+            data: [{ metric1: 10 }],
+            colnames: ['metric1'],
+            coltypes: [0],
+          };
+        }
+        return {
+          query: { query_name: spec.queryName },
+          data: [{ age: '19-24', month: 'M06', metric1: 10 }],
+          colnames: ['age', 'month', 'metric1'],
+          coltypes: [1, 1, 0],
+        };
+      }),
+      hooks: { setDataMask: jest.fn() },
+      filterState: { selectedFilters: {} },
+      datasource: {
+        verboseMap: {},
+        columnFormats: {},
+        currencyFormats: {},
+        columns: [
+          { column_name: 'age', type_generic: GenericDataType.String },
+          { column_name: 'month', type_generic: GenericDataType.String },
+        ],
+      },
+      theme: supersetTheme,
+    });
+
+    const result = transformProps(chartProps);
+
+    expect(result.data.rows).toHaveProperty(serializePath(['19-24']));
+    expect(result.data.rows).not.toHaveProperty(serializePath(['M06']));
+    expect(result.formData.groupbyRows).toEqual(['age', 'month']);
+  });
+
   test('keeps dataset verbose names before first render for dimensions outside query results', () => {
     const chartProps = new ChartProps({
       formData: {
@@ -299,7 +358,7 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     });
   });
 
-  it('maps query results by query_name rather than array order (Contract 2)', () => {
+  test('maps query results by query_name rather than array order (Contract 2)', () => {
     const formData = baseFormData as PivotTableQueryFormData;
     const specs = buildInitialQuerySpecs(formData);
     const queryResults = specs.map(spec => {
@@ -387,7 +446,7 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     ).toBe(20);
   });
 
-  it('adds metric headers when metrics are placed first in columns', () => {
+  test('adds metric headers when metrics are placed first in columns', () => {
     const metricKey = serializePath([encodeMetricKey('metric1')]);
     const chartProps = new ChartProps({
       formData: {
@@ -438,7 +497,7 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     expect(result.data.cols).toHaveProperty(metricKey);
   });
 
-  it('retains root-only columns when the column payload is empty', () => {
+  test('retains root-only columns when the column payload is empty', () => {
     const rowKey = serializePath(['A']);
     const chartProps = new ChartProps({
       formData: baseFormData,
@@ -499,7 +558,7 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     ).toBe(12);
   });
 
-  it('uses the first query payload for the grand total cell', () => {
+  test('uses the first query payload for the grand total cell', () => {
     const chartProps = new ChartProps({
       formData: {
         ...baseFormData,
@@ -547,7 +606,7 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     ).toBe(5);
   });
 
-  it('uses datasource column types when present', () => {
+  test('uses datasource column types when present', () => {
     const chartProps = new ChartProps({
       formData: baseFormData,
       width: 400,
@@ -586,7 +645,7 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     );
   });
 
-  it('normalizes row and column subtotal selections', () => {
+  test('normalizes row and column subtotal selections', () => {
     const chartProps = new ChartProps({
       formData: {
         ...baseFormData,
@@ -622,7 +681,7 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     expect(treeDataSignature.colSubtotalLevels).toEqual([]);
   });
 
-  it('does not merge persisted expansion branches into the initial tree', () => {
+  test('does not merge persisted expansion branches into the initial tree', () => {
     const expandedRowKey = serializePath(['A', 'B']);
     const formData: Partial<PivotTableQueryFormData> = {
       ...baseFormData,
@@ -723,7 +782,7 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     expect(result.data.rows).not.toHaveProperty(expandedRowKey);
   });
 
-  it('uses the render chart id as export id when form data has no slice id', () => {
+  test('uses the render chart id as export id when form data has no slice id', () => {
     const chartProps = new ChartProps({
       formData: baseFormData,
       width: 400,

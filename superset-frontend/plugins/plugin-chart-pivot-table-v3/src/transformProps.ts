@@ -80,12 +80,15 @@ export default function transformProps(
   const { setDataMask = () => {}, onContextMenu, setControlValue } = hooks;
   const baseFormData = rawFormDataCamel as PivotTableQueryFormData;
   const rawFormData = rawFormDataBase as PivotTableQueryFormData;
-  const runtimeLayout =
-    baseFormData.pivotRuntimeLayout ??
-    (ownState?.pivotRuntimeLayout as
-      | PivotTableQueryFormData['pivotRuntimeLayout']
-      | undefined) ??
-    buildRuntimeLayoutFromFormData(baseFormData);
+  const isUserControlledMode =
+    baseFormData.interactionMode === 'user_controlled';
+  const runtimeLayout = isUserControlledMode
+    ? (baseFormData.pivotRuntimeLayout ??
+      (ownState?.pivotRuntimeLayout as
+        | PivotTableQueryFormData['pivotRuntimeLayout']
+        | undefined) ??
+      buildRuntimeLayoutFromFormData(baseFormData))
+    : buildRuntimeLayoutFromFormData(baseFormData);
   const metricsForLabels = ensureIsArray(
     rawFormData.metrics ?? baseFormData.metrics ?? runtimeLayout.metrics,
   );

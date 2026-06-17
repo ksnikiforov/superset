@@ -1245,9 +1245,13 @@ export const buildInitialPivotUpdatePlan = ({
             ? { measureLeavesByMetric: measureLeavesByMetricOverride }
             : {}),
         };
+  const layoutOverride =
+    formDataWithOverrides.interactionMode === 'user_controlled'
+      ? (runtimeLayout ?? normalizedFormData.pivotRuntimeLayout)
+      : undefined;
   const resolvedFormData = resolveInteractionFormData({
     formData: formDataWithOverrides,
-    runtimeLayout: runtimeLayout ?? normalizedFormData.pivotRuntimeLayout,
+    runtimeLayout: layoutOverride,
   });
   const layout = buildLayoutContext(resolvedFormData);
   const timeOffsets = Array.from(
