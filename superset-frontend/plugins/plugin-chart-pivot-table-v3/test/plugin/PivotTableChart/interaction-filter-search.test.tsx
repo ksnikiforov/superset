@@ -17,7 +17,13 @@
  * under the License.
  */
 import { GenericDataType } from '@apache-superset/core/common';
-import { fireEvent, render, screen, waitFor } from '../../testUtils';
+import {
+  fireEvent,
+  mockDatasetVerboseMap,
+  render,
+  screen,
+  waitFor,
+} from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
@@ -79,6 +85,7 @@ describe('PivotTableChart interaction filter search', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
 
   beforeEach(() => {
+    mockDatasetVerboseMap();
     fetchMock.mockReset();
     fetchPivotBranchMock.mockReset();
     fetchPivotBranchMock.mockResolvedValue({
@@ -87,7 +94,11 @@ describe('PivotTableChart interaction filter search', () => {
     });
   });
 
-  it('uses a dynamic search query for dimension filter values', async () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test('uses a dynamic search query for dimension filter values', async () => {
     const metrics = ['m1'];
     const rows = ['row1'];
     const records = [

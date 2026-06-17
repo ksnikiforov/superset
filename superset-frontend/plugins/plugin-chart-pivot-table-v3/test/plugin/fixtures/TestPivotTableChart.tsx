@@ -475,7 +475,6 @@ const baseProps: PivotTableProps & LegacyTestPivotProps = {
   formData: baseFormData,
   rawFormData: baseFormData,
   sourceMetrics: emptyMetrics,
-  sourceMeasureLeavesByMetric: {},
   groupbyRows: emptyGroupbyRows,
   groupbyColumns: emptyGroupbyColumns,
   aggregateFunction: 'Sum',
@@ -544,8 +543,7 @@ export default function TestPivotTableChart(props: TestPivotTableChartProps) {
       baseProps.sourceMetrics,
     sourceMeasureLeavesByMetric:
       props.sourceMeasureLeavesByMetric ??
-      props.formData?.measureLeavesByMetric ??
-      baseProps.sourceMeasureLeavesByMetric,
+      props.formData?.measureLeavesByMetric,
   };
   mergedProps.formData = {
     ...mergedProps.formData,

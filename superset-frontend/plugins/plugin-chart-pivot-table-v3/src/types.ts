@@ -329,7 +329,7 @@ export interface PivotTableProps {
   queryFormData?: PivotTableQueryFormData;
   persistExpansionState?: boolean;
   sourceMetrics: QueryFormMetric[];
-  sourceMeasureLeavesByMetric: MeasureLeavesByMetricKey;
+  sourceMeasureLeavesByMetric?: MeasureLeavesByMetricKey;
   emitCrossFilters?: boolean;
   setControlValue?: HandlerFunction;
   setDataMask: SetDataMaskHook;

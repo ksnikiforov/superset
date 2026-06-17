@@ -17,7 +17,9 @@
  * under the License.
  */
 /* eslint-disable import/no-extraneous-dependencies */
+import { SupersetClient } from '@superset-ui/core';
 import { render as baseRender } from 'spec/helpers/testing-library';
+import { clearDatasetVerboseMapCache } from '../src/pivot/chart/useDatasetVerboseMap';
 
 type BaseRender = typeof baseRender;
 type RenderOptions = Parameters<BaseRender>[1];
@@ -26,3 +28,18 @@ export * from 'spec/helpers/testing-library';
 
 export const render: BaseRender = (ui, options?: RenderOptions) =>
   baseRender(ui, { ...options, useDnd: options?.useDnd ?? true });
+
+export const mockDatasetVerboseMap = (
+  verboseMap: Record<string, string> = {},
+) => {
+  clearDatasetVerboseMapCache();
+  const response = {
+    json: {
+      result: {
+        columns: [],
+        verbose_map: verboseMap,
+      },
+    },
+  } as unknown as Awaited<ReturnType<typeof SupersetClient.get>>;
+  return jest.spyOn(SupersetClient, 'get').mockResolvedValue(response);
+};

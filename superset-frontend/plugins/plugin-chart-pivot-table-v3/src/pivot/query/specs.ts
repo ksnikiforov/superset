@@ -147,7 +147,9 @@ export const toChartDataQueries = ({
     ];
     const requiredTimeOffsets = spec.meta?.requiredTimeOffsets ?? [];
     const timeOffsets =
-      comparison || hasEnclosedTemporalRangeFilter(filters)
+      comparison ||
+      hasEnclosedTemporalRangeFilter(filters) ||
+      spec.meta?.factSelector.scope.kind !== 'root'
         ? requiredTimeOffsets
         : [];
     return {

@@ -18,7 +18,13 @@
  */
 
 import { AppSection, QueryFormColumn } from '@superset-ui/core';
-import { fireEvent, render, screen, waitFor } from '../../testUtils';
+import {
+  fireEvent,
+  mockDatasetVerboseMap,
+  render,
+  screen,
+  waitFor,
+} from '../../testUtils';
 import PivotTableChart, {
   buildPreloadedTreeFactBatches,
 } from '../fixtures/TestPivotTableChart';
@@ -85,6 +91,14 @@ describe('PivotTableChart expansion state persistence', () => {
   const branchExpansionMock = jest.fn();
   const batchExpansionMock = jest.fn();
   const intersectionExpansionMock = jest.fn();
+
+  beforeEach(() => {
+    mockDatasetVerboseMap();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   const resolveBatchWithSingles = async ({
     targets,

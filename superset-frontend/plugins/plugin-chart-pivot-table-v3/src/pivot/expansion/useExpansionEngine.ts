@@ -109,6 +109,10 @@ const expansionIntentToStateKeys = (
 });
 
 const hasCells = (tree: PivotTreeData) => Object.keys(tree.cells).length > 0;
+const hasDisplayableTree = (tree: PivotTreeData) =>
+  hasCells(tree) ||
+  Object.keys(tree.rows).some(key => key !== rootKey) ||
+  Object.keys(tree.cols).some(key => key !== rootKey);
 const hasExpandedIntent = (state: PivotExpansionStateKeys) =>
   state.rows.length > 0 || state.cols.length > 0;
 const emptyExpandedByAxis = (): AxisSetMap => ({
@@ -685,7 +689,10 @@ export const useExpansionEngine = ({
       });
     }
 
-    const shouldBlockInitialRender = isInitialMount && shouldHydrateExpansion;
+    const shouldBlockInitialRender =
+      isInitialMount &&
+      shouldHydrateExpansion &&
+      !hasDisplayableTree(reinitializationPlan.tree);
     setIsInitialExpansionHydrating(shouldBlockInitialRender);
     const hydration = hydrateAtomic({
       skipWhenComplete: true,

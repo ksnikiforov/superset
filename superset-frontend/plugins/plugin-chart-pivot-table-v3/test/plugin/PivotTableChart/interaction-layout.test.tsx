@@ -17,7 +17,14 @@
  * under the License.
  */
 import { AppSection, type DataRecord } from '@superset-ui/core';
-import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
+import {
+  fireEvent,
+  mockDatasetVerboseMap,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
@@ -73,6 +80,14 @@ const buildInitialBootstrapRuntime = ({
 };
 
 describe('PivotTableChart interaction layout', () => {
+  beforeEach(() => {
+    mockDatasetVerboseMap();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   test('shows the side panel only in user controlled mode', () => {
     const metrics = ['m1'];
     const rows = ['row1'];
@@ -2219,7 +2234,7 @@ describe('PivotTableChart interaction layout', () => {
             `${spec.meta.factSelector.coverage.rowDepth}|${spec.meta.factSelector.coverage.columnDepth}`,
         ),
       ),
-    ).toEqual(new Set(['1|1', '1|0', '0|1']));
+    ).toEqual(new Set(['1|1', '0|1']));
     await waitFor(() => expect(screen.getByText('X')).toBeInTheDocument());
 
     fireEvent.click(screen.getAllByLabelText('Remove dimension')[0]);

@@ -16,7 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
+import {
+  fireEvent,
+  mockDatasetVerboseMap,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '../../testUtils';
 import { AppSection } from '@superset-ui/core';
 import PivotTableChart, {
   buildPreloadedTreeFactBatches,
@@ -78,12 +85,17 @@ describe('PivotTableChart interaction filter seamless updates', () => {
   const fetchPivotBranchMock = fetchPivotExpansion as jest.Mock;
 
   beforeEach(() => {
+    mockDatasetVerboseMap();
     fetchMock.mockReset();
     fetchPivotBranchMock.mockReset();
     fetchPivotBranchMock.mockResolvedValue({
       data: undefined,
       factBatches: [],
     });
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   test('does not restore stale persisted filter after clear-all acknowledgement', async () => {
