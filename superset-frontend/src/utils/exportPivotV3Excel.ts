@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import { utils, writeFile, type CellObject } from 'xlsx';
+import { utils, writeFile, type CellObject, type Range } from 'xlsx';
 import {
   getPivotV3ExportSheetDataForChart,
   type PivotV3ExportSheetCell,
@@ -42,6 +42,27 @@ export function exportPivotV3ExcelFromSheetData(
   const worksheet = utils.aoa_to_sheet(
     sheetData.map(row => row.map(toSheetCell)),
   );
+  const merges = sheetData.flatMap((row, rowIndex) =>
+    row.flatMap((cell, columnIndex): Range[] => {
+      const colSpan = cell.colSpan ?? 1;
+      const rowSpan = cell.rowSpan ?? 1;
+      if (colSpan <= 1 && rowSpan <= 1) {
+        return [];
+      }
+      return [
+        {
+          s: { r: rowIndex, c: columnIndex },
+          e: {
+            r: rowIndex + rowSpan - 1,
+            c: columnIndex + colSpan - 1,
+          },
+        },
+      ];
+    }),
+  );
+  if (merges.length > 0) {
+    worksheet['!merges'] = merges;
+  }
   const workbook = utils.book_new(worksheet, 'Sheet1');
   writeFile(workbook, `${fileName}.xlsx`);
 }

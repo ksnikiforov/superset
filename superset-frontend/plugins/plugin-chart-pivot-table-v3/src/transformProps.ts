@@ -381,7 +381,7 @@ export default function transformProps(
     treeDataSignature,
     formData: {
       ...plannedFormData,
-      slice_id: plannedFormData.slice_id ?? chartId,
+      slice_id: plannedFormData.slice_id ?? rawFormData.slice_id ?? chartId,
       metricsLayout,
       metricLabelMap,
       verboseMap,

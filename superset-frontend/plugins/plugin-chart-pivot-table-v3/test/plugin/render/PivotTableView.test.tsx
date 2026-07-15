@@ -133,6 +133,43 @@ describe('PivotTableView', () => {
     ]);
   });
 
+  it('registers export data from the containing chart id as a fallback', () => {
+    render(
+      <div id="chart-id-372">
+        <PivotTableView
+          height={300}
+          width={400}
+          renderModel={baseRenderModel}
+          pivotProgram={basePivotProgram}
+          tree={baseTree}
+          expandedRows={new Set()}
+          expandedCols={new Set()}
+          showGlobalLoader={false}
+          onRetry={jest.fn()}
+          stickyHeaders={false}
+          headerOffset={0}
+          headerRowOffsets={[]}
+          headerRef={createRef()}
+          colTotalPosition="start"
+          formatting={baseFormatting}
+          onToggleNode={jest.fn()}
+          shouldShowToggle={() => false}
+          showSpinner={() => false}
+          isRowAggregateBold={() => false}
+          isColAggregateBold={() => false}
+          getNodeDimDepth={() => 0}
+          handleCellClick={jest.fn()}
+          handleCellKeyDown={jest.fn()}
+          handleCellContextMenu={jest.fn()}
+        />
+      </div>,
+    );
+
+    expect(getPivotV3ExportSheetDataForChart(372)).toEqual([
+      [{ value: 'Rows', type: 'string', isHeader: true }],
+    ]);
+  });
+
   it('renders the rows header when not loading', () => {
     renderView(false);
     expect(screen.getByText('Rows')).toBeInTheDocument();

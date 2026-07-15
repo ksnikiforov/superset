@@ -94,4 +94,43 @@ describe('exportPivotV3Excel', () => {
       'registered-export.xlsx',
     );
   });
+
+  test('writes worksheet merges from pivot header spans', () => {
+    exportPivotV3ExcelFromSheetData(
+      [
+        [
+          {
+            value: 'Rows',
+            type: 'string',
+            isHeader: true,
+            rowSpan: 2,
+          },
+          {
+            value: '2025',
+            type: 'string',
+            isHeader: true,
+            colSpan: 2,
+          },
+          { value: '', type: 'string', isHeader: true },
+        ],
+        [
+          { value: '', type: 'string', isHeader: true },
+          { value: 'Sales', type: 'string', isHeader: true },
+          { value: 'Profit', type: 'string', isHeader: true },
+        ],
+      ],
+      'merged-export',
+    );
+
+    expect(utils.book_new).toHaveBeenCalledWith(
+      {
+        worksheet: true,
+        '!merges': [
+          { s: { r: 0, c: 0 }, e: { r: 1, c: 0 } },
+          { s: { r: 0, c: 1 }, e: { r: 0, c: 2 } },
+        ],
+      },
+      'Sheet1',
+    );
+  });
 });

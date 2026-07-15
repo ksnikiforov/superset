@@ -20,6 +20,9 @@
 import {
   buildPivotV3ExportSheetModel,
   buildPivotV3RowExportModel,
+  getPivotV3ExportSheetDataForChart,
+  registerPivotV3ExportSheetDataForChart,
+  unregisterPivotV3ExportSheetDataForChart,
 } from '../../../src/export/buildPivotV3ExportTable';
 import { type PivotResultCell, type PivotTreeNode } from '../../../src/types';
 import { type VisibleCellEntry } from '../../../src/pivot/cellUtils';
@@ -245,5 +248,87 @@ describe('pivot v3 export worksheet model', () => {
     ]);
     expect(sheet[1][2]).toMatchObject({ isHeader: true, type: 'number' });
     expect(sheet[2][2]).toMatchObject({ isHeader: false, type: 'number' });
+  });
+
+  test('preserves mixed header spans and row alignment without row axes', () => {
+    const grandTotal = rowNode([], { key: 'grand-total' });
+    const sales = colNode(['2025', 'Sales']);
+    const profit = colNode(['2025', 'Profit']);
+    const total = colNode(['Grand Total']);
+    const visibleRows = [grandTotal];
+    const visibleCols = [sales, profit, total];
+    const cells = Object.fromEntries([
+      cell(grandTotal, sales, 'Sales', 10),
+      cell(grandTotal, profit, 'Profit', 2),
+      cell(grandTotal, total, 'Grand Total', 12),
+    ]);
+
+    const sheet = buildPivotV3ExportSheetModel({
+      rowAxisLabels: [],
+      rowCornerLabel: 'Rows',
+      rowExportDepthCount: 0,
+      rowExportRows: new Map(),
+      renderModel: {
+        columnHeaderRows: [
+          [
+            { node: colNode(['2025']), colSpan: 2, rowSpan: 1 },
+            { node: total, colSpan: 1, rowSpan: 2 },
+          ],
+          [
+            { node: sales, colSpan: 1, rowSpan: 1 },
+            { node: profit, colSpan: 1, rowSpan: 1 },
+          ],
+        ],
+        visibleRows,
+        visibleCols,
+        visibleCellEntries: visibleCellEntries(cells, visibleRows, visibleCols),
+      },
+      formatLabel: node => node.formattedLabel,
+      deriveMetricKey: (_row, col) => String(col.label),
+      formatBodyCell: (_row, _col, resultCell, metricKey) =>
+        resultCell?.values[metricKey] as string | number | null | undefined,
+      isGrandTotalLikeRow: row => row === grandTotal,
+    });
+
+    expect(sheet.map(row => row.map(entry => entry.value))).toEqual([
+      ['Rows', '2025', '', 'Grand Total'],
+      ['', 'Sales', 'Profit', ''],
+      ['Grand total', 10, 2, 12],
+    ]);
+    expect(sheet[0][0]).toMatchObject({ rowSpan: 2 });
+    expect(sheet[0][1]).toMatchObject({ colSpan: 2 });
+    expect(sheet[0][3]).toMatchObject({ rowSpan: 2 });
+  });
+
+  test('shares registered export data across numeric and string chart ids', () => {
+    const sheet = [
+      [{ value: 'Rows', type: 'string', isHeader: true }],
+    ] as const;
+
+    registerPivotV3ExportSheetDataForChart(
+      601,
+      sheet.map(row => [...row]),
+    );
+
+    expect(getPivotV3ExportSheetDataForChart('601')).toEqual(sheet);
+    unregisterPivotV3ExportSheetDataForChart('601');
+  });
+
+  test('does not unregister export data owned by a newer chart render', () => {
+    const staleSheet = [
+      [{ value: 'Stale', type: 'string', isHeader: true }],
+    ] as const;
+    const currentSheet = [
+      [{ value: 'Current', type: 'string', isHeader: true }],
+    ] as const;
+    const staleRows = staleSheet.map(row => [...row]);
+    const currentRows = currentSheet.map(row => [...row]);
+
+    registerPivotV3ExportSheetDataForChart(602, staleRows);
+    registerPivotV3ExportSheetDataForChart(602, currentRows);
+    unregisterPivotV3ExportSheetDataForChart(602, staleRows);
+
+    expect(getPivotV3ExportSheetDataForChart(602)).toBe(currentRows);
+    unregisterPivotV3ExportSheetDataForChart(602, currentRows);
   });
 });

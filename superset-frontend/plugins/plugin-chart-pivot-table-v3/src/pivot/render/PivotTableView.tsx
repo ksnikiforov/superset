@@ -378,6 +378,7 @@ export const PivotTableView = ({
     renderCellContent,
     renderDatabarContent,
   } = formatting;
+  const exportContainerRef = useRef<HTMLDivElement>(null);
   const stickyRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const [stickyTotalRowOffsets, setStickyTotalRowOffsets] = useState<
     Record<string, number>
@@ -543,12 +544,22 @@ export const PivotTableView = ({
     ],
   );
   useLayoutEffect(() => {
-    if (exportChartId === undefined) {
+    const containingChart =
+      exportContainerRef.current?.closest<HTMLElement>('[id^="chart-id-"]');
+    const containingChartId = containingChart?.id.slice('chart-id-'.length);
+    const resolvedExportChartId = exportChartId ?? containingChartId;
+    if (resolvedExportChartId === undefined || resolvedExportChartId === '') {
       return undefined;
     }
-    registerPivotV3ExportSheetDataForChart(exportChartId, exportSheetData);
+    registerPivotV3ExportSheetDataForChart(
+      resolvedExportChartId,
+      exportSheetData,
+    );
     return () => {
-      unregisterPivotV3ExportSheetDataForChart(exportChartId);
+      unregisterPivotV3ExportSheetDataForChart(
+        resolvedExportChartId,
+        exportSheetData,
+      );
     };
   }, [exportChartId, exportSheetData]);
   const renderCornerHeader = (rowSpan?: number) => (
@@ -562,7 +573,12 @@ export const PivotTableView = ({
   );
 
   return (
-    <Container height={height} width={width} style={containerStyle}>
+    <Container
+      ref={exportContainerRef}
+      height={height}
+      width={width}
+      style={containerStyle}
+    >
       {errorMessage ? (
         <ErrorWrapper>
           <ErrorContent>

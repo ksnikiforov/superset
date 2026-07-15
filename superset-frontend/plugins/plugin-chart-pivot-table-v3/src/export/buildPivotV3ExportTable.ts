@@ -179,20 +179,26 @@ export type PivotV3ExportSheetCell =
       value: string;
       type: 'string';
       isHeader: boolean;
+      colSpan?: number;
+      rowSpan?: number;
     }
   | {
       value: number;
       type: 'number';
       isHeader: boolean;
+      colSpan?: number;
+      rowSpan?: number;
     };
 
 const textCell = (
   value: string,
   isHeader: boolean,
+  spans: Pick<PivotV3ExportSheetCell, 'colSpan' | 'rowSpan'> = {},
 ): PivotV3ExportSheetCell => ({
   value,
   type: 'string',
   isHeader,
+  ...spans,
 });
 
 const toExportSheetCell = (
@@ -206,18 +212,6 @@ const toExportSheetCell = (
     getText(value === undefined || value === null ? '' : String(value)),
     isHeader,
   );
-};
-
-const appendExpandedLabelCell = (
-  target: PivotV3ExportSheetCell[],
-  label: string,
-  span: number,
-  isHeader: boolean,
-) => {
-  target.push(textCell(label, isHeader));
-  for (let index = 1; index < Math.max(span, 1); index += 1) {
-    target.push(textCell('', isHeader));
-  }
 };
 
 type BuildPivotV3ExportSheetModelParams = {
@@ -262,25 +256,72 @@ const buildModelHeaderRows = ({
     ];
   }
 
-  return columnHeaderRows.map((rowCells, rowIndex) => {
-    const cells: PivotV3ExportSheetCell[] =
-      rowExportDepthCount > 0
-        ? Array.from({ length: rowExportDepthCount }, (_, index) =>
-            textCell(rowIndex === 0 ? (rowAxisLabels[index] ?? '') : '', true),
-          )
-        : rowIndex === 0
-          ? [textCell(rowCornerLabel, true)]
-          : [];
-    rowCells.forEach(cell => {
-      appendExpandedLabelCell(
-        cells,
-        formatLabel(cell.node, 'col'),
-        cell.colSpan,
-        true,
-      );
+  const headerRowCount = columnHeaderRows.length;
+  const rowHeaderCount = rowExportDepthCount > 0 ? rowExportDepthCount : 1;
+  const rows = Array.from({ length: headerRowCount }, () =>
+    Array.from({ length: rowHeaderCount }, () => textCell('', true)),
+  );
+  if (rowExportDepthCount > 0) {
+    rowAxisLabels.slice(0, rowExportDepthCount).forEach((label, index) => {
+      rows[0][index] = textCell(label, true, {
+        rowSpan: headerRowCount > 1 ? headerRowCount : undefined,
+      });
     });
-    return cells;
+  } else {
+    rows[0][0] = textCell(rowCornerLabel, true, {
+      rowSpan: headerRowCount > 1 ? headerRowCount : undefined,
+    });
+  }
+
+  const occupied = Array.from({ length: headerRowCount }, () =>
+    Array<boolean>(rowHeaderCount).fill(true),
+  );
+  columnHeaderRows.forEach((headerCells, rowIndex) => {
+    let columnIndex = rowHeaderCount;
+    headerCells.forEach(headerCell => {
+      while (occupied[rowIndex][columnIndex]) {
+        columnIndex += 1;
+      }
+      const colSpan = Math.max(headerCell.colSpan, 1);
+      const rowSpan = Math.max(headerCell.rowSpan, 1);
+      while (rows[rowIndex].length < columnIndex) {
+        rows[rowIndex].push(textCell('', true));
+      }
+      rows[rowIndex][columnIndex] = textCell(
+        formatLabel(headerCell.node, 'col'),
+        true,
+        {
+          colSpan: colSpan > 1 ? colSpan : undefined,
+          rowSpan: rowSpan > 1 ? rowSpan : undefined,
+        },
+      );
+      for (
+        let occupiedRow = rowIndex;
+        occupiedRow < Math.min(rowIndex + rowSpan, headerRowCount);
+        occupiedRow += 1
+      ) {
+        for (
+          let occupiedColumn = columnIndex;
+          occupiedColumn < columnIndex + colSpan;
+          occupiedColumn += 1
+        ) {
+          occupied[occupiedRow][occupiedColumn] = true;
+          if (occupiedRow === rowIndex && occupiedColumn > columnIndex) {
+            rows[occupiedRow][occupiedColumn] = textCell('', true);
+          }
+        }
+      }
+      columnIndex += colSpan;
+    });
   });
+
+  const columnCount = rows.reduce((max, row) => Math.max(max, row.length), 0);
+  rows.forEach(row => {
+    while (row.length < columnCount) {
+      row.push(textCell('', true));
+    }
+  });
+  return rows;
 };
 
 const buildVisibleCellLookup = (visibleCellEntries: VisibleCellEntry[]) => {
@@ -320,9 +361,12 @@ export const buildPivotV3ExportSheetModel = ({
   const bodyRows = visibleRows.map(row => {
     const rowExport = rowExportRows.get(row.key);
     const isHeader = isGrandTotalLikeRow(row) || rowExport?.isSubtotal === true;
-    const rowCells = (rowExport?.values ?? []).map(value =>
-      textCell(value, true),
-    );
+    const rowHeaderValues =
+      rowExport?.values ??
+      (rowExportDepthCount > 0
+        ? Array.from({ length: rowExportDepthCount }, () => '')
+        : [formatLabel(row, 'row')]);
+    const rowCells = rowHeaderValues.map(value => textCell(value, true));
     visibleCols.forEach(col => {
       const cell = visibleCellLookup.get(row.key)?.get(col.key);
       const metricKey = deriveMetricKey(row, col);
@@ -335,25 +379,45 @@ export const buildPivotV3ExportSheetModel = ({
   return [...headerRows, ...bodyRows];
 };
 
-const pivotV3ExportSheetDataByChartId = new Map<
-  string | number,
-  PivotV3ExportSheetCell[][]
->();
+const pivotV3ExportRegistryHost = globalThis as typeof globalThis & {
+  __supersetPivotV3ExportSheetDataByChartId?: Map<
+    string,
+    PivotV3ExportSheetCell[][]
+  >;
+};
+const pivotV3ExportSheetDataByChartId =
+  pivotV3ExportRegistryHost.__supersetPivotV3ExportSheetDataByChartId ??
+  new Map<string, PivotV3ExportSheetCell[][]>();
+pivotV3ExportRegistryHost.__supersetPivotV3ExportSheetDataByChartId =
+  pivotV3ExportSheetDataByChartId;
+
+const normalizeExportChartId = (chartId: string | number) => String(chartId);
 
 export const registerPivotV3ExportSheetDataForChart = (
   chartId: string | number,
   sheetData: PivotV3ExportSheetCell[][],
 ) => {
-  pivotV3ExportSheetDataByChartId.set(chartId, sheetData);
+  pivotV3ExportSheetDataByChartId.set(
+    normalizeExportChartId(chartId),
+    sheetData,
+  );
 };
 
 export const unregisterPivotV3ExportSheetDataForChart = (
   chartId: string | number,
+  sheetData?: PivotV3ExportSheetCell[][],
 ) => {
-  pivotV3ExportSheetDataByChartId.delete(chartId);
+  const normalizedChartId = normalizeExportChartId(chartId);
+  if (
+    sheetData !== undefined &&
+    pivotV3ExportSheetDataByChartId.get(normalizedChartId) !== sheetData
+  ) {
+    return;
+  }
+  pivotV3ExportSheetDataByChartId.delete(normalizedChartId);
 };
 
 export const getPivotV3ExportSheetDataForChart = (
   chartId: string | number,
 ): PivotV3ExportSheetCell[][] | undefined =>
-  pivotV3ExportSheetDataByChartId.get(chartId);
+  pivotV3ExportSheetDataByChartId.get(normalizeExportChartId(chartId));
