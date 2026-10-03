@@ -16,7 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useAcknowledgedValue } from '../useAcknowledgedValue';
+import { useControlMap } from '../useControlMap';
+import { normalizeEditorMetric, disallowsAdhocMetrics } from '../metricInput';
 import { t, tn } from '@apache-superset/core/translation';
 import {
   type ComponentProps,
@@ -58,8 +59,8 @@ import {
   DndItemType,
   isDatasourcePanelDndItem,
   type savedMetricType,
+  DndSelectLabel as PivotDndSelectLabel,
 } from '../../exploreImports';
-import { DndSelectLabel as PivotDndSelectLabel } from '../../exploreImports';
 import PivotMetricDefinitionValue, {
   MetricFormatSelector,
 } from './PivotMetricDefinitionValue';
@@ -139,9 +140,6 @@ const toAdhocMetricColumn = (column: ColumnMeta): AdhocMetricColumn => ({
 const toAdhocMetricInput = (
   metric: Exclude<QueryFormMetric, string>,
 ): AdhocMetricInput => metric as AdhocMetricInput;
-
-const normalizeAdhocExpressionType = (metric: AdhocMetric): 'SIMPLE' | 'SQL' =>
-  metric.expressionType === 'SQL' ? 'SQL' : 'SIMPLE';
 
 const isDictionaryForAdhocMetric = (
   value: QueryFormMetric,
@@ -238,43 +236,6 @@ const resolveMetricReferenceKey = (metric?: QueryFormMetric) => {
   return metricKey || undefined;
 };
 
-const normalizeMetricReferenceValue = (metric: ValueType): QueryFormMetric => {
-  if (typeof metric === 'string') {
-    return metric;
-  }
-  if ('metric_name' in metric) {
-    const metricName = metric.metric_name;
-    if (typeof metricName === 'string') {
-      return metricName;
-    }
-  }
-  if (metric instanceof AdhocMetric) {
-    return {
-      expressionType: normalizeAdhocExpressionType(metric),
-      column: metric.column,
-      aggregate: metric.aggregate,
-      sqlExpression: metric.sqlExpression,
-      label: metric.label,
-      hasCustomLabel: metric.hasCustomLabel,
-      optionName: metric.optionName,
-    } as QueryFormMetric;
-  }
-  if ('expressionType' in metric) {
-    const adhocMetric = new AdhocMetric(toAdhocMetricInput(metric));
-    return {
-      expressionType: normalizeAdhocExpressionType(adhocMetric),
-      column: adhocMetric.column,
-      aggregate: adhocMetric.aggregate,
-      sqlExpression: adhocMetric.sqlExpression,
-      label: metric.label || adhocMetric.label,
-      hasCustomLabel: metric.hasCustomLabel ?? adhocMetric.hasCustomLabel,
-      optionName:
-        typeof metric.optionName === 'string' ? metric.optionName : undefined,
-    } as QueryFormMetric;
-  }
-  return metric as unknown as QueryFormMetric;
-};
-
 export const updateMetricConfigForRename = ({
   metricFormatting,
   metricDatabars,
@@ -291,7 +252,7 @@ export const updateMetricConfigForRename = ({
   if (!oldKey || !nextKey) {
     return { metricFormatting, metricDatabars };
   }
-  const replacementMetric = normalizeMetricReferenceValue(newMetric);
+  const replacementMetric = normalizeEditorMetric(newMetric);
 
   const replaceMetricReference = (
     metric?: QueryFormMetric,
@@ -401,6 +362,33 @@ export type PivotDndMetricSelectProps = DndControlProps<QueryFormMetric> & {
   datasourceType?: string;
 };
 
+type MeasureEditor = {
+  open: boolean;
+  metricKey: string | null;
+  metricLabel: string;
+  operator: MeasureLeafOperator;
+  offsetN: number;
+  offsetUnit: MeasureLeafOffsetUnit;
+  offsetDirection: MeasureLeafOffsetDirection;
+  custom: boolean;
+  customLabel: string;
+  customMetric?: QueryFormMetric;
+  customOffset: boolean;
+  error?: string;
+};
+const INITIAL_MEASURE_EDITOR: MeasureEditor = {
+  open: false,
+  metricKey: null,
+  metricLabel: '',
+  operator: 'ix',
+  offsetN: 1,
+  offsetUnit: 'year',
+  offsetDirection: 'past',
+  custom: false,
+  customLabel: '',
+  customOffset: false,
+};
+
 export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
   const { onChange, multi, datasource, savedMetrics } = props;
   const setControlValue = props.actions?.setControlValue;
@@ -437,32 +425,30 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       ensureIsArray(props.value),
     );
   }, [props.formData, props.value]);
-  const [
-    localMetricFormatting,
-    setLocalMetricFormatting,
-    readMetricFormatting,
-  ] = useAcknowledgedValue(metricFormatting);
-  const [localMetricDatabars, setLocalMetricDatabars, readMetricDatabars] =
-    useAcknowledgedValue(metricDatabars);
+  const formattingControl = useControlMap(
+    'metricFormatting',
+    metricFormatting,
+    setControlValue,
+  );
+  const databarControl = useControlMap(
+    'metricDatabars',
+    metricDatabars,
+    setControlValue,
+  );
+  const {
+    value: localMetricFormatting,
+    read: readMetricFormatting,
+    replace: commitFormatting,
+    update: updateFormatting,
+  } = formattingControl;
+  const {
+    value: localMetricDatabars,
+    read: readMetricDatabars,
+    replace: commitDatabars,
+    update: updateDatabar,
+  } = databarControl;
 
-  const extra = useMemo<{ disallow_adhoc_metrics?: boolean }>(() => {
-    let parsedExtra: { disallow_adhoc_metrics?: boolean } = {};
-    if (!datasource?.extra) {
-      return parsedExtra;
-    }
-    if (typeof datasource.extra === 'string') {
-      try {
-        parsedExtra = JSON.parse(datasource.extra);
-      } catch {
-        parsedExtra = {};
-      }
-      return parsedExtra;
-    }
-    if (typeof datasource.extra === 'object') {
-      return datasource.extra as { disallow_adhoc_metrics?: boolean };
-    }
-    return parsedExtra;
-  }, [datasource?.extra]);
+  const disallowAdhocMetrics = disallowsAdhocMetrics(datasource?.extra);
 
   const savedMetricSet = useMemo(
     () => new Set(savedMetrics.map(({ metric_name }) => metric_name)),
@@ -502,27 +488,9 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
     DatasourcePanelDndItem | typeof EMPTY_OBJECT
   >({});
   const [newMetricPopoverVisible, setNewMetricPopoverVisible] = useState(false);
-  const [measureSelectorVisible, setMeasureSelectorVisible] = useState(false);
-  const [measureSelectorMetricKey, setMeasureSelectorMetricKey] = useState<
-    string | null
-  >(null);
-  const [measureSelectorMetricLabel, setMeasureSelectorMetricLabel] =
-    useState('');
-  const [leafOperator, setLeafOperator] = useState<MeasureLeafOperator>('ix');
-  const [leafOffsetN, setLeafOffsetN] = useState(1);
-  const [leafOffsetUnit, setLeafOffsetUnit] =
-    useState<MeasureLeafOffsetUnit>('year');
-  const [leafOffsetDirection, setLeafOffsetDirection] =
-    useState<MeasureLeafOffsetDirection>('past');
-  const [customMeasureEnabled, setCustomMeasureEnabled] = useState(false);
-  const [customMeasureLabel, setCustomMeasureLabel] = useState('');
-  const [customMeasureMetric, setCustomMeasureMetric] =
-    useState<QueryFormMetric>();
-  const [customMeasureOffsetEnabled, setCustomMeasureOffsetEnabled] =
-    useState(false);
-  const [customMeasureError, setCustomMeasureError] = useState<
-    string | undefined
-  >(undefined);
+  const [editor, setEditor] = useState(INITIAL_MEASURE_EDITOR);
+  const edit = (patch: Partial<MeasureEditor>) =>
+    setEditor(previous => ({ ...previous, ...patch }));
 
   const coercedMetrics = useMemo(
     () =>
@@ -612,7 +580,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
         nextMetricKeys,
         measureLeavesRef.current,
       );
-      if (setControlValue) {
+      if (setControlValue !== undefined) {
         const activeMetricKeys = collectActiveMetricKeys(
           optionValues as ValueType[],
         );
@@ -628,8 +596,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
           ),
         ) as PivotMetricFormattingMap;
         if (!isEqual(baseFormatting, nextFormatting)) {
-          setLocalMetricFormatting(nextFormatting);
-          setControlValue('metricFormatting', nextFormatting);
+          commitFormatting(nextFormatting);
         }
         const baseDatabars = readMetricDatabars() || {};
         const nextDatabars = Object.fromEntries(
@@ -651,8 +618,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
           return acc;
         }, {});
         if (!isEqual(baseDatabars, cleanedDatabars)) {
-          setLocalMetricDatabars(cleanedDatabars);
-          setControlValue('metricDatabars', cleanedDatabars);
+          commitDatabars(cleanedDatabars);
         }
         if (!isEqual(nextLeaves, measureLeavesRef.current)) {
           updateMeasureLeaves(nextLeaves, true);
@@ -666,9 +632,9 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       setControlValue,
       updateMeasureLeaves,
       readMetricFormatting,
-      setLocalMetricFormatting,
+      commitFormatting,
       readMetricDatabars,
-      setLocalMetricDatabars,
+      commitDatabars,
     ],
   );
 
@@ -678,30 +644,13 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       field: keyof PivotMetricFormatting,
       metric?: PivotMetricFormattingValue,
     ) => {
-      if (!setControlValue) {
-        return;
-      }
-      const baseFormatting = readMetricFormatting() || {};
-      const current = baseFormatting[metricKey] || {};
-      const updated = {
-        ...current,
-        [field]: metric,
-      };
-      if (!metric) {
-        delete updated[field];
-      }
-      const hasValues = Object.values(updated).some(Boolean);
-      const nextFormatting = { ...baseFormatting };
-      if (hasValues) {
-        nextFormatting[metricKey] = updated;
-      } else {
-        delete nextFormatting[metricKey];
-      }
-      setLocalMetricFormatting(nextFormatting);
-
-      setControlValue('metricFormatting', nextFormatting);
+      updateFormatting(metricKey, current => {
+        const next = { ...current, [field]: metric };
+        if (!metric) delete next[field];
+        return Object.values(next).some(Boolean) ? next : undefined;
+      });
     },
-    [setControlValue, readMetricFormatting, setLocalMetricFormatting],
+    [updateFormatting],
   );
 
   const handleMetricDatabarChange = useCallback(
@@ -743,31 +692,16 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
           return;
         }
       }
-      const current = baseDatabars[metricKey] || {};
-      const updated: PivotMetricDatabar = {
-        ...current,
-        [field]: nextValue,
-      };
-      if (field === 'colorMetric' && nextValue) {
-        updated.colorMode = 'byMetric';
-      }
-      if (field === 'colorMode' && nextValue !== 'byMetric') {
-        delete updated.colorMetric;
-      }
-      if (field === 'colorMetric' && !nextValue) {
-        updated.colorMode = 'static';
-      }
-      const nextDatabars = { ...baseDatabars };
-      if (!updated.type) {
-        delete nextDatabars[metricKey];
-      } else {
-        nextDatabars[metricKey] = updated;
-      }
-      setLocalMetricDatabars(nextDatabars);
-
-      setControlValue('metricDatabars', nextDatabars);
+      updateDatabar(metricKey, current => {
+        const next: PivotMetricDatabar = { ...current, [field]: nextValue };
+        if (field === 'colorMetric')
+          next.colorMode = nextValue ? 'byMetric' : 'static';
+        if (field === 'colorMode' && nextValue !== 'byMetric')
+          delete next.colorMetric;
+        return next.type ? next : undefined;
+      });
     },
-    [setControlValue, value, readMetricDatabars, setLocalMetricDatabars],
+    [setControlValue, value, readMetricDatabars, updateDatabar],
   );
 
   const availableMetrics = useMemo(() => {
@@ -793,66 +727,56 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
 
   const openMeasureSelector = useCallback(
     (metricKey: string, metricLabel: string) => {
-      setMeasureSelectorMetricKey(metricKey);
-      setMeasureSelectorMetricLabel(metricLabel);
-      setLeafOperator('ix');
-      setLeafOffsetN(1);
-      setLeafOffsetUnit('year');
-      setLeafOffsetDirection('past');
-      setCustomMeasureEnabled(false);
-      setCustomMeasureLabel('');
-      setCustomMeasureMetric(undefined);
-      setCustomMeasureOffsetEnabled(false);
-      setCustomMeasureError(undefined);
-      setMeasureSelectorVisible(true);
+      setEditor({
+        ...INITIAL_MEASURE_EDITOR,
+        open: true,
+        metricKey,
+        metricLabel,
+      });
     },
     [],
   );
+  const closeMeasureSelector = () => edit({ open: false, error: undefined });
 
-  const closeMeasureSelector = useCallback(() => {
-    setMeasureSelectorVisible(false);
-    setCustomMeasureError(undefined);
-  }, []);
-
-  const handleSaveMeasureLeaf = useCallback(() => {
-    if (!measureSelectorMetricKey) {
+  const handleSaveMeasureLeaf = () => {
+    if (!editor.metricKey) {
       return;
     }
-    setCustomMeasureError(undefined);
+    edit({ error: undefined });
     const offset = {
-      n: leafOffsetN,
-      unit: leafOffsetUnit,
-      direction: leafOffsetDirection,
+      n: editor.offsetN,
+      unit: editor.offsetUnit,
+      direction: editor.offsetDirection,
     };
-    const nextLeaf = customMeasureEnabled
+    const nextLeaf = editor.custom
       ? (() => {
-          const label = customMeasureLabel.trim();
+          const label = editor.customLabel.trim();
           if (!label) {
-            setCustomMeasureError(t('Custom label is empty.'));
+            edit({ error: t('Custom label is empty.') });
             return null;
           }
-          if (!customMeasureMetric) {
-            setCustomMeasureError(t('Select a custom measure.'));
+          if (!editor.customMetric) {
+            edit({ error: t('Select a custom measure.') });
             return null;
           }
-          if (isPivotExcelFormula(customMeasureMetric)) {
-            setCustomMeasureError(t('Custom Excel is not supported here.'));
+          if (isPivotExcelFormula(editor.customMetric)) {
+            edit({ error: t('Custom Excel is not supported here.') });
             return null;
           }
-          const normalizedMetric = normalizeMetricReferenceValue(
-            customMeasureMetric as ValueType,
+          const normalizedMetric = normalizeEditorMetric(
+            editor.customMetric as ValueType,
           );
           return buildCustomLeaf({
             label,
             metric: normalizedMetric,
-            offset: customMeasureOffsetEnabled ? offset : undefined,
+            offset: editor.customOffset ? offset : undefined,
           });
         })()
-      : buildBuiltInLeaf(leafOperator, offset);
+      : buildBuiltInLeaf(editor.operator, offset);
     if (!nextLeaf) {
       return;
     }
-    const leaves = measureLeavesRef.current[measureSelectorMetricKey] ?? [
+    const leaves = measureLeavesRef.current[editor.metricKey] ?? [
       buildValueLeaf(),
     ];
     const existingIndex = leaves.findIndex(
@@ -867,24 +791,12 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
     updateMeasureLeaves(
       {
         ...measureLeavesRef.current,
-        [measureSelectorMetricKey]: nextLeaves,
+        [editor.metricKey]: nextLeaves,
       },
       true,
     );
     closeMeasureSelector();
-  }, [
-    closeMeasureSelector,
-    customMeasureEnabled,
-    customMeasureLabel,
-    customMeasureMetric,
-    customMeasureOffsetEnabled,
-    leafOffsetDirection,
-    leafOffsetN,
-    leafOffsetUnit,
-    leafOperator,
-    measureSelectorMetricKey,
-    updateMeasureLeaves,
-  ]);
+  };
 
   const handleRemoveMeasureLeaf = useCallback(
     (metricKey: string, index: number) => {
@@ -930,7 +842,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
   const canDrop = useCallback(
     (item: DatasourcePanelDndItem) => {
       if (
-        extra.disallow_adhoc_metrics &&
+        disallowAdhocMetrics &&
         (item.type !== DndItemType.Metric ||
           !savedMetricSet.has(item.value.metric_name))
       ) {
@@ -951,7 +863,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
           : false;
       return !isMetricAlreadyInValues;
     },
-    [extra.disallow_adhoc_metrics, savedMetricSet, value],
+    [disallowAdhocMetrics, savedMetricSet, value],
   );
 
   const onNewMetric = useCallback(
@@ -972,7 +884,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       ) {
         return;
       }
-      if (setControlValue) {
+      if (setControlValue !== undefined) {
         const baseFormatting = readMetricFormatting() || {};
         const baseDatabars = readMetricDatabars() || {};
         const {
@@ -985,12 +897,10 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
           newMetric: changedMetric,
         });
         if (!isEqual(baseFormatting, nextFormatting)) {
-          setLocalMetricFormatting(nextFormatting);
-          setControlValue('metricFormatting', nextFormatting);
+          commitFormatting(nextFormatting);
         }
         if (!isEqual(baseDatabars, nextDatabars)) {
-          setLocalMetricDatabars(nextDatabars);
-          setControlValue('metricDatabars', nextDatabars);
+          commitDatabars(nextDatabars);
         }
       }
       const oldKey = getMetricKey(oldMetric as QueryFormMetric | Metric);
@@ -1024,8 +934,8 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       value,
       readMetricFormatting,
       readMetricDatabars,
-      setLocalMetricFormatting,
-      setLocalMetricDatabars,
+      commitFormatting,
+      commitDatabars,
     ],
   );
 
@@ -1078,7 +988,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
   );
 
   const handleDropLabel = useCallback(() => {
-    const normalized = value.map(normalizeMetricReferenceValue);
+    const normalized = value.map(normalizeEditorMetric);
     onChange(multi ? normalized : normalized[0]);
   }, [multi, onChange, value]);
 
@@ -1264,28 +1174,17 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       })),
     [props.columns],
   );
-  const leafPreviewLabel = useMemo(() => {
-    if (customMeasureEnabled) {
-      const label = customMeasureLabel.trim();
-      return label || t('Custom');
-    }
-    return buildMeasureLeafLabel(leafOperator, {
-      n: leafOffsetN,
-      unit: leafOffsetUnit,
-      direction: leafOffsetDirection,
-    });
-  }, [
-    customMeasureEnabled,
-    customMeasureLabel,
-    leafOffsetDirection,
-    leafOffsetN,
-    leafOffsetUnit,
-    leafOperator,
-  ]);
+  const leafPreviewLabel = editor.custom
+    ? editor.customLabel.trim() || t('Custom')
+    : buildMeasureLeafLabel(editor.operator, {
+        n: editor.offsetN,
+        unit: editor.offsetUnit,
+        direction: editor.offsetDirection,
+      });
   const canSaveMeasureLeaf =
-    !!measureSelectorMetricKey &&
-    (!customMeasureEnabled ||
-      (customMeasureLabel.trim().length > 0 && !!customMeasureMetric));
+    !!editor.metricKey &&
+    (!editor.custom ||
+      (editor.customLabel.trim().length > 0 && !!editor.customMetric));
 
   return (
     <div className="metrics-select">
@@ -1301,7 +1200,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       />
       <Modal
         title={t('Measure selector')}
-        show={measureSelectorVisible}
+        show={editor.open}
         onHide={closeMeasureSelector}
         onHandledPrimaryAction={handleSaveMeasureLeaf}
         primaryButtonName={t('Save')}
@@ -1310,27 +1209,26 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       >
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           <Typography.Text type="secondary">
-            {t('Metric: %s', measureSelectorMetricLabel)}
+            {t('Metric: %s', editor.metricLabel)}
           </Typography.Text>
           <Space align="center" size={8}>
             <Switch
-              checked={customMeasureEnabled}
+              checked={editor.custom}
               onChange={checked => {
-                setCustomMeasureEnabled(checked);
-                setCustomMeasureError(undefined);
+                edit({ custom: checked, error: undefined });
               }}
             />
             <Typography.Text>{t('Custom measure')}</Typography.Text>
           </Space>
-          {customMeasureEnabled ? (
+          {editor.custom ? (
             <>
               <Space direction="vertical" size={8} style={{ width: '100%' }}>
                 <Typography.Text>{t('Custom label')}</Typography.Text>
                 <Input
                   aria-label={t('Custom label')}
                   placeholder={t('Label')}
-                  value={customMeasureLabel}
-                  onChange={event => setCustomMeasureLabel(event.target.value)}
+                  value={editor.customLabel}
+                  onChange={event => edit({ customLabel: event.target.value })}
                 />
               </Space>
               <MetricFormatSelector
@@ -1338,25 +1236,24 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
                 allowExcel={false}
                 label={t('Measure')}
                 tooltip={t('Metric used for this custom measure.')}
-                value={customMeasureMetric}
+                value={editor.customMetric}
                 metrics={measureSelectorMetrics}
                 onChange={metric => {
                   if (metric && isPivotExcelFormula(metric)) {
                     return;
                   }
-                  setCustomMeasureMetric(metric);
-                  setCustomMeasureError(undefined);
+                  edit({ customMetric: metric, error: undefined });
                 }}
                 columns={props.columns}
                 savedMetrics={savedMetrics}
                 datasource={props.datasource}
-                allowCustomSql={!extra.disallow_adhoc_metrics}
+                allowCustomSql={!disallowAdhocMetrics}
                 allowSavedMetrics
               />
               <Space align="center" size={8}>
                 <Switch
-                  checked={customMeasureOffsetEnabled}
-                  onChange={checked => setCustomMeasureOffsetEnabled(checked)}
+                  checked={editor.customOffset}
+                  onChange={checked => edit({ customOffset: checked })}
                 />
                 <Typography.Text>{t('Apply time offset')}</Typography.Text>
               </Space>
@@ -1367,34 +1264,35 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
               <Select
                 ariaLabel={t('Operation')}
                 options={LEAF_OPERATOR_OPTIONS}
-                value={leafOperator}
+                value={editor.operator}
                 onChange={value =>
-                  setLeafOperator(value as MeasureLeafOperator)
+                  edit({ operator: value as MeasureLeafOperator })
                 }
                 css={{ width: 220 }}
               />
             </Space>
           )}
-          {(!customMeasureEnabled || customMeasureOffsetEnabled) && (
+          {(!editor.custom || editor.customOffset) && (
             <>
               <Space direction="vertical" size={8} style={{ width: '100%' }}>
                 <Typography.Text>{t('Period')}</Typography.Text>
                 <Space size={8}>
                   <InputNumber
                     min={1}
-                    value={leafOffsetN}
+                    value={editor.offsetN}
                     onChange={value =>
-                      setLeafOffsetN(
-                        typeof value === 'number' && value > 0 ? value : 1,
-                      )
+                      edit({
+                        offsetN:
+                          typeof value === 'number' && value > 0 ? value : 1,
+                      })
                     }
                   />
                   <Select
                     ariaLabel={t('Period unit')}
                     options={LEAF_UNIT_OPTIONS}
-                    value={leafOffsetUnit}
+                    value={editor.offsetUnit}
                     onChange={value =>
-                      setLeafOffsetUnit(value as MeasureLeafOffsetUnit)
+                      edit({ offsetUnit: value as MeasureLeafOffsetUnit })
                     }
                     css={{ width: 160 }}
                   />
@@ -1405,20 +1303,19 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
                 <Radio.Group
                   options={LEAF_DIRECTION_OPTIONS}
                   optionType="button"
-                  value={leafOffsetDirection}
+                  value={editor.offsetDirection}
                   onChange={event =>
-                    setLeafOffsetDirection(
-                      event.target.value as MeasureLeafOffsetDirection,
-                    )
+                    edit({
+                      offsetDirection: event.target
+                        .value as MeasureLeafOffsetDirection,
+                    })
                   }
                 />
               </Space>
             </>
           )}
-          {customMeasureError && (
-            <Typography.Text type="danger">
-              {customMeasureError}
-            </Typography.Text>
+          {editor.error && (
+            <Typography.Text type="danger">{editor.error}</Typography.Text>
           )}
           <Typography.Text>
             {t('Preview: %s', leafPreviewLabel)}

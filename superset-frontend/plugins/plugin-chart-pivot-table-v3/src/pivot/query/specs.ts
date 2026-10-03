@@ -31,12 +31,7 @@ import {
 import { GenericDataType } from '@apache-superset/core/common';
 import {
   type MeasureHierarchy,
-  type MetricFormattingScope,
   type PivotAxis,
-  type PivotDimensionFormattingMap,
-  type PivotDimensionSortingMap,
-  type PivotMetricDatabarMap,
-  type PivotMetricFormattingMap,
   type PivotRuntimeLayout,
   type PivotPath,
   type PivotPathValue,
@@ -93,6 +88,7 @@ import {
   resolveAxisProjection,
   type PivotAxisProjection,
 } from '../runtime/projection';
+import { isSubtotalToken } from '../core/tokens';
 import { type PivotFactCoverage } from '../runtime/types';
 import { stableStringify } from '../shared/stableStringify';
 
@@ -177,120 +173,122 @@ export const toChartDataQueries = ({
     };
   });
 
-type QueryShape = {
-  rowGroupby: QueryFormColumn[];
-  colGroupby: QueryFormColumn[];
-  metrics: QueryFormMetric[];
-};
-
-const buildQueryShape = ({
-  rowDepth,
-  columnDepth,
-  hasValueCells,
-  needsTotals,
-  rowGroupby,
-  colGroupby,
-  metrics,
-  availableMetrics = metrics,
-  metricFormattingScope,
-  metricFormatting,
-  metricDatabars,
-  rowFormatting,
-  colFormatting,
-  rowSorting,
-  colSorting,
-  measureHierarchy,
-}: {
-  rowDepth: number;
-  columnDepth: number;
-  hasValueCells: boolean;
-  needsTotals: boolean;
-  rowGroupby: QueryFormColumn[];
-  colGroupby: QueryFormColumn[];
-  metrics: QueryFormMetric[];
-  availableMetrics?: QueryFormMetric[];
-  metricFormattingScope?: MetricFormattingScope;
-  metricFormatting?: PivotMetricFormattingMap;
-  metricDatabars?: PivotMetricDatabarMap;
-  rowFormatting?: PivotDimensionFormattingMap;
-  colFormatting?: PivotDimensionFormattingMap;
-  rowSorting?: PivotDimensionSortingMap;
-  colSorting?: PivotDimensionSortingMap;
-  measureHierarchy?: MeasureHierarchy;
-}): QueryShape => {
-  const rowGroupbyForQuery = rowGroupby.slice(0, rowDepth);
-  const colGroupbyForQuery = colGroupby.slice(0, columnDepth);
-  const metricKeys = new Set(
-    metrics.map(getMetricKey).filter((key): key is string => Boolean(key)),
+/** Resolves configuration-backed query inputs once for a planning operation. */
+const compileQueryContext = (
+  formData: PivotTableQueryFormData,
+  layout: LayoutContext,
+) => {
+  const { metrics } = layout;
+  const compileMetrics = <T>(
+    settings: Record<string, T> | undefined,
+    collect: (entry: Record<string, T>) => QueryFormMetric[],
+  ) =>
+    new Map(
+      Object.entries(settings ?? {}).map(([key, value]) => [
+        key,
+        collect({ [key]: value }),
+      ]),
+    );
+  const formatting = compileMetrics(formData.metricFormatting, entry =>
+    collectMetricFormattingMetricsForQuery(entry, metrics),
   );
-  const filterMetricKeyedMap = <T>(
-    map: Record<string, T> | undefined,
-  ): Record<string, T> | undefined => {
-    if (!map) {
-      return undefined;
-    }
-    return Object.fromEntries(
-      Object.entries(map).filter(([metricKey]) => metricKeys.has(metricKey)),
+  const databars = compileMetrics(formData.metricDatabars, entry =>
+    collectMetricDatabarMetricsForQuery(entry, metrics),
+  );
+  const dimensionInputs = {
+    rowFormatting: compileMetrics(formData.rowFormatting, entry =>
+      collectDimensionFormattingMetricsForQuery(
+        entry,
+        Object.keys(entry),
+        metrics,
+      ),
+    ),
+    colFormatting: compileMetrics(formData.colFormatting, entry =>
+      collectDimensionFormattingMetricsForQuery(
+        entry,
+        Object.keys(entry),
+        metrics,
+      ),
+    ),
+    rowSorting: compileMetrics(formData.rowSorting, entry =>
+      collectDimensionSortingMetricsForQuery(
+        entry,
+        Object.keys(entry),
+        metrics,
+      ),
+    ),
+    colSorting: compileMetrics(formData.colSorting, entry =>
+      collectDimensionSortingMetricsForQuery(
+        entry,
+        Object.keys(entry),
+        metrics,
+      ),
+    ),
+  };
+  const selectInputs = (
+    inputs: Map<string, QueryFormMetric[]>,
+    keys: Set<string>,
+  ) =>
+    Array.from(inputs).flatMap(([key, dependencies]) =>
+      keys.has(key) ? dependencies : [],
+    );
+  const needsAxisTotal = (axis: PivotAxis) => {
+    const dimensions =
+      axis === 'row'
+        ? layout.pivotProgram.rowDimensions
+        : layout.pivotProgram.columnDimensions;
+    const formattingInputs =
+      axis === 'row'
+        ? dimensionInputs.rowFormatting
+        : dimensionInputs.colFormatting;
+    return (
+      selectInputs(formattingInputs, new Set(dimensions.map(getColumnLabel)))
+        .length > 0 ||
+      hasTotalSorting(
+        axis === 'row' ? formData.rowSorting : formData.colSorting,
+        dimensions,
+      )
     );
   };
-
-  const extraMetrics: QueryFormMetric[] = [];
-  if (
-    metricFormattingScope === 'values'
-      ? hasValueCells
-      : hasValueCells || needsTotals
-  ) {
-    extraMetrics.push(
-      ...collectMetricFormattingMetricsForQuery(
-        filterMetricKeyedMap(metricFormatting),
-        availableMetrics,
-      ),
-    );
-  }
-  if (hasValueCells) {
-    extraMetrics.push(
-      ...collectMetricDatabarMetricsForQuery(
-        filterMetricKeyedMap(metricDatabars),
-        availableMetrics,
-      ),
-    );
-  }
-  extraMetrics.push(
-    ...collectDimensionFormattingMetricsForQuery(
-      rowFormatting,
-      rowGroupbyForQuery,
-      availableMetrics,
-    ),
-    ...collectDimensionFormattingMetricsForQuery(
-      colFormatting,
-      colGroupbyForQuery,
-      availableMetrics,
-    ),
-    ...collectDimensionSortingMetricsForQuery(
-      rowSorting,
-      rowGroupbyForQuery,
-      availableMetrics,
-    ),
-    ...collectDimensionSortingMetricsForQuery(
-      colSorting,
-      colGroupbyForQuery,
-      availableMetrics,
-    ),
-  );
-  extraMetrics.push(
-    ...collectMeasureLeafMetricsForQuery(
-      measureHierarchy,
-      metrics,
-      availableMetrics,
-    ),
-  );
-
   return {
-    rowGroupby: rowGroupbyForQuery,
-    colGroupby: colGroupbyForQuery,
-    metrics: mergeMetrics(metrics, extraMetrics),
+    formData,
+    layout,
+    queryContextKey: buildPivotFactQueryContextKey(formData),
+    rowNeedsTotal: needsAxisTotal('row'),
+    colNeedsTotal: needsAxisTotal('col'),
+    metricsFor: (
+      coverage: PivotFactCoverage,
+      selectedMetrics: QueryFormMetric[],
+      hierarchy: MeasureHierarchy,
+      hasValueCells: boolean,
+      needsTotals: boolean,
+    ) => {
+      const keys = new Set(selectedMetrics.map(getMetricKey));
+      const rowKeys = new Set(coverage.rowDimensions.map(getColumnLabel));
+      const colKeys = new Set(coverage.columnDimensions.map(getColumnLabel));
+      return mergeMetrics(selectedMetrics, [
+        ...((
+          formData.metricFormattingScope === 'values'
+            ? hasValueCells
+            : hasValueCells || needsTotals
+        )
+          ? selectInputs(formatting, keys)
+          : []),
+        ...(hasValueCells ? selectInputs(databars, keys) : []),
+        ...selectInputs(dimensionInputs.rowFormatting, rowKeys),
+        ...selectInputs(dimensionInputs.colFormatting, colKeys),
+        ...selectInputs(dimensionInputs.rowSorting, rowKeys),
+        ...selectInputs(dimensionInputs.colSorting, colKeys),
+        ...collectMeasureLeafMetricsForQuery(
+          hierarchy,
+          selectedMetrics,
+          metrics,
+        ),
+      ]);
+    },
   };
 };
+type QueryContext = ReturnType<typeof compileQueryContext>;
 
 type PlannedQuerySpecParams = {
   formData: PivotTableQueryFormData;
@@ -532,37 +530,22 @@ const resolveFactMaterialization = ({
     : undefined;
 
 const resolveFetchContext = ({
-  formData,
-  layout,
+  context,
   axis,
-  path,
+  projection,
   coverageTarget,
 }: {
-  formData: PivotTableQueryFormData;
-  layout: LayoutContext;
+  context: QueryContext;
   axis: PivotAxis;
-  path: PivotPath;
+  projection: PivotAxisProjection;
   coverageTarget: ExpansionCoverageTarget;
 }) => {
-  const { metrics } = layout;
-  const rowGroupby = layout.pivotProgram.rowDimensions;
-  const colGroupby = layout.pivotProgram.columnDimensions;
-  const hasRowTotalSorting = hasTotalSorting(formData.rowSorting, rowGroupby);
-  const hasColTotalSorting = hasTotalSorting(formData.colSorting, colGroupby);
-  const maxRowSubtotalDepth = Math.max(rowGroupby.length - 1, 0);
-  const rowSubtotalLevels = layout.rowSubtotalLevels.filter(
-    level => level <= maxRowSubtotalDepth,
-  );
-  const maxColSubtotalDepth = Math.max(colGroupby.length - 1, 0);
-  const colSubtotalLevels = layout.colSubtotalLevelsForQuery.filter(
-    level => level <= maxColSubtotalDepth,
-  );
-  const projection: PivotAxisProjection = resolveAxisProjection({
-    program: layout.pivotProgram,
-    axis,
-    path,
-  });
-  const { rowDepth, columnDepth: colDepth } = coverageTarget.need;
+  const { formData, layout } = context;
+  const {
+    metrics,
+    rowSubtotalLevels,
+    colSubtotalLevelsForQuery: colSubtotalLevels,
+  } = layout;
   const branchAnchorDepth =
     pathsFromAxisScope(
       axis === 'row'
@@ -570,18 +553,6 @@ const resolveFetchContext = ({
         : coverageTarget.need.columnScope,
     )[0]?.length ?? 0;
 
-  const hasRowFormatting =
-    collectDimensionFormattingMetricsForQuery(
-      formData.rowFormatting,
-      rowGroupby,
-      metrics,
-    ).length > 0;
-  const hasColFormatting =
-    collectDimensionFormattingMetricsForQuery(
-      formData.colFormatting,
-      colGroupby,
-      metrics,
-    ).length > 0;
   const materializedMetrics = filterMetricsByScope(
     metrics,
     projection.metricKeys,
@@ -599,24 +570,13 @@ const resolveFetchContext = ({
     !!formData.colTotals ||
     rowSubtotalLevels.length > 0 ||
     colSubtotalLevels.length > 0;
-  const queryShape = buildQueryShape({
-    rowDepth,
-    columnDepth: colDepth,
-    hasValueCells: true,
+  const metricsForQuery = context.metricsFor(
+    coverageTarget.need,
+    materializedMetrics,
+    materializedMeasureHierarchy,
+    true,
     needsTotals,
-    rowGroupby: coverageTarget.need.rowDimensions,
-    colGroupby: coverageTarget.need.columnDimensions,
-    metrics: materializedMetrics,
-    availableMetrics: metrics,
-    metricFormattingScope: formData.metricFormattingScope,
-    metricFormatting: formData.metricFormatting,
-    metricDatabars: formData.metricDatabars,
-    rowFormatting: formData.rowFormatting,
-    colFormatting: formData.colFormatting,
-    rowSorting: formData.rowSorting,
-    colSorting: formData.colSorting,
-    measureHierarchy: materializedMeasureHierarchy,
-  });
+  );
   const coverages = buildBranchFactCoverages({
     program: layout.pivotProgram,
     axis,
@@ -626,14 +586,12 @@ const resolveFetchContext = ({
     columnSubtotalLevels: colSubtotalLevels,
     rowTotals: layout.rowTotals,
     columnTotals: layout.colTotals,
-    includeRowTotalForColumnFormatting:
-      axis === 'col' && (hasColFormatting || hasColTotalSorting),
-    includeColumnTotalForRowFormatting:
-      axis === 'row' && (hasRowFormatting || hasRowTotalSorting),
+    includeRowTotalForColumnFormatting: axis === 'col' && context.colNeedsTotal,
+    includeColumnTotalForRowFormatting: axis === 'row' && context.rowNeedsTotal,
   });
 
   return {
-    metricsForQuery: queryShape.metrics,
+    metricsForQuery,
     measureHierarchy: materializedMeasureHierarchy,
     requiredTimeOffsets,
     materialization: resolveFactMaterialization({
@@ -721,31 +679,38 @@ const buildPlannedQuerySpec = ({
 };
 
 const buildAxisExpansionSpecs = ({
-  formData,
-  layout,
+  context,
   axis,
   path,
   coverageTarget,
   filters,
   scope,
 }: {
-  formData: PivotTableQueryFormData;
-  layout: LayoutContext;
+  context: QueryContext;
   axis: PivotAxis;
   path: PivotPath;
   coverageTarget: ExpansionCoverageTarget;
   filters: QueryObjectFilterClause[];
   scope: PivotFactStoreBatchScope;
 }): PlannedQuerySpec[] => {
-  if (!canRequestAxisExpansion({ program: layout.pivotProgram, axis, path })) {
-    return [];
-  }
-
-  const ctx = resolveFetchContext({
-    formData,
-    layout,
+  const { formData, layout, queryContextKey } = context;
+  const projection = resolveAxisProjection({
+    program: layout.pivotProgram,
     axis,
     path,
+  });
+  if (
+    path.some(isSubtotalToken) ||
+    !(
+      projection.nextLevelKind === 'dimension' ||
+      projection.skippedPreValuesDimensions.length
+    )
+  )
+    return [];
+  const ctx = resolveFetchContext({
+    context,
+    axis,
+    projection,
     coverageTarget,
   });
 
@@ -757,7 +722,7 @@ const buildAxisExpansionSpecs = ({
       measureHierarchy: ctx.measureHierarchy,
       requiredTimeOffsets: ctx.requiredTimeOffsets,
       materialization: ctx.materialization,
-      queryContextKey: buildPivotFactQueryContextKey(formData),
+      queryContextKey,
       scope,
       filters,
     }),
@@ -920,55 +885,33 @@ type ExpansionSpecContext = {
   layout: LayoutContext;
 };
 
-export const buildInitialQuerySpecs = (
-  formData: PivotTableQueryFormData,
-  layout: LayoutContext = buildLayoutContext(formData),
+const buildRootSpecs = (
+  context: QueryContext,
+  needs = context.layout.rootCoverageNeeds,
 ): PlannedQuerySpec[] => {
-  const { metrics } = layout;
-  const rowGroupby = layout.pivotProgram.rowDimensions;
-  const colGroupby = layout.pivotProgram.columnDimensions;
-  const { rowSubtotalLevels, colSubtotalLevelsForQuery: colSubtotalLevels } =
-    layout;
+  const { formData, layout, queryContextKey } = context;
   const needsTotals =
     layout.rowTotals ||
     layout.colTotals ||
-    rowSubtotalLevels.length > 0 ||
-    colSubtotalLevels.length > 0;
-  const queryContextKey = buildPivotFactQueryContextKey(formData);
-  const hasMetrics = layout.pivotProgram.metricKeys.length > 0;
-  const rootNeeds = layout.rootCoverageNeeds;
-
-  return rootNeeds.map(need => {
-    const { rowDepth, columnDepth } = need;
-    const hasValueCells = hasMetrics && (rowDepth > 0 || columnDepth > 0);
-    const includeTotals = needsTotals && (rowDepth === 0 || columnDepth === 0);
+    layout.rowSubtotalLevels.length > 0 ||
+    layout.colSubtotalLevelsForQuery.length > 0;
+  return needs.map(({ rowDepth, columnDepth }) => {
     const coverage = buildFactCoverage({
-      rowDimensions: layout.pivotProgram.rowDimensions,
-      columnDimensions: layout.pivotProgram.columnDimensions,
+      ...layout.pivotProgram,
       rowDepth,
       columnDepth,
-    });
-    const queryShape = buildQueryShape({
-      rowDepth,
-      columnDepth,
-      hasValueCells,
-      needsTotals: includeTotals,
-      rowGroupby,
-      colGroupby,
-      metrics,
-      metricFormattingScope: formData.metricFormattingScope,
-      metricFormatting: formData.metricFormatting,
-      metricDatabars: formData.metricDatabars,
-      rowFormatting: formData.rowFormatting,
-      colFormatting: formData.colFormatting,
-      rowSorting: formData.rowSorting,
-      colSorting: formData.colSorting,
-      measureHierarchy: layout.measureHierarchy,
     });
     return buildPlannedQuerySpec({
       formData,
       coverage,
-      metrics: queryShape.metrics,
+      metrics: context.metricsFor(
+        coverage,
+        layout.metrics,
+        layout.measureHierarchy,
+        layout.pivotProgram.metricKeys.length > 0 &&
+          (rowDepth > 0 || columnDepth > 0),
+        needsTotals && (rowDepth === 0 || columnDepth === 0),
+      ),
       measureHierarchy: layout.measureHierarchy,
       requiredTimeOffsets: layout.requiredTimeOffsets,
       queryContextKey,
@@ -978,13 +921,19 @@ export const buildInitialQuerySpecs = (
   });
 };
 
+export const buildInitialQuerySpecs = (
+  formData: PivotTableQueryFormData,
+  layout: LayoutContext = buildLayoutContext(formData),
+): PlannedQuerySpec[] => buildRootSpecs(compileQueryContext(formData, layout));
+
 const buildAxisPathExpansionSpecs = ({
-  formData,
-  layout,
+  context,
   targets,
-}: ExpansionSpecContext & {
+}: {
+  context: QueryContext;
   targets: ExpansionCoverageTarget[];
 }): PlannedQuerySpec[] => {
+  const { formData } = context;
   const coverageTarget = targets[0];
   if (!coverageTarget) {
     return [];
@@ -993,17 +942,13 @@ const buildAxisPathExpansionSpecs = ({
     coverageTarget.need.rowScope.kind === 'root' &&
     coverageTarget.need.columnScope.kind === 'root'
   ) {
-    return buildInitialQuerySpecs(formData, {
-      ...layout,
-      rootCoverageNeeds: [coverageTarget.need],
-    });
+    return buildRootSpecs(context, [coverageTarget.need]);
   }
   const { axis } = coverageTarget;
   const path = parsePath(coverageTarget.pathKey);
   const scopedPaths = targets.flatMap(targetScopePaths);
   return buildAxisExpansionSpecs({
-    formData,
-    layout,
+    context,
     axis,
     path,
     coverageTarget,
@@ -1020,12 +965,13 @@ const buildAxisPathExpansionSpecs = ({
 };
 
 const buildIntersectionTargetExpansionSpecs = ({
-  formData,
-  layout,
+  context,
   target,
-}: ExpansionSpecContext & {
+}: {
+  context: QueryContext;
   target: ExpansionCoverageTarget;
 }): PlannedQuerySpec[] => {
+  const { formData, layout } = context;
   const rowPaths = pathsFromAxisScope(target.need.rowScope);
   const columnPaths = pathsFromAxisScope(target.need.columnScope);
   const anchor = resolveIntersectionExpansionAnchor({
@@ -1049,8 +995,7 @@ const buildIntersectionTargetExpansionSpecs = ({
   return groupPaths(rowPaths).flatMap(rowGroup =>
     columnGroups.flatMap(columnGroup =>
       buildAxisExpansionSpecs({
-        formData,
-        layout,
+        context,
         axis: anchor.axis,
         path: anchor.path,
         coverageTarget: target,
@@ -1083,6 +1028,7 @@ export const buildExpansionQuerySpecPhases = ({
 }: ExpansionSpecContext & {
   targets: ExpansionCoverageTarget[];
 }): PlannedQuerySpec[][] => {
+  const context = compileQueryContext(formData, layout);
   const intersections = targets.filter(isIntersectionCoverageTarget);
   const targetGroups = optimizeExpansionFetchPlan({
     targets: targets.filter(target => !isIntersectionCoverageTarget(target)),
@@ -1090,15 +1036,13 @@ export const buildExpansionQuerySpecPhases = ({
   return [
     targetGroups.flatMap(targetGroup =>
       buildAxisPathExpansionSpecs({
-        formData,
-        layout,
+        context,
         targets: targetGroup,
       }),
     ),
     intersections.flatMap(target =>
       buildIntersectionTargetExpansionSpecs({
-        formData,
-        layout,
+        context,
         target,
       }),
     ),

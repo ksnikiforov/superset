@@ -62,7 +62,7 @@ import {
 import {
   assertChunkedWorkCurrent,
   type ChunkedWorkOptions,
-  maybeYieldChunkedWork,
+  DEFAULT_RUNTIME_CHUNK_SIZE,
   yieldChunkedWork,
 } from './chunkedWork';
 import { formatPivotLabelValue } from '../viewModel';
@@ -100,18 +100,17 @@ const mergeValues = <T extends { isSubtotal?: boolean }>(
   return { ...existingValues, ...incomingValues };
 };
 
-const mergeTreeValueMaps = <
+const mergeTreeValueMapsInto = <
   T extends {
     values?: Record<string, DataRecordValue>;
     isSubtotal?: boolean;
     isPartial?: boolean;
   },
 >(
-  left?: Record<string, T>,
-  right?: Record<string, T>,
+  result: Record<string, T>,
+  incoming: Record<string, T>,
 ) => {
-  const result: Record<string, T> = { ...left };
-  Object.entries(right || {}).forEach(([key, item]) => {
+  Object.entries(incoming).forEach(([key, item]) => {
     const existing = result[key];
     if (!existing) {
       result[key] = item;
@@ -125,15 +124,13 @@ const mergeTreeValueMaps = <
       ...(values ? { values } : {}),
     };
   });
-  return result;
 };
 
-const mergeTreeCells = (
-  left?: PivotTreeData['cells'],
-  right?: PivotTreeData['cells'],
+const mergeTreeCellsInto = (
+  result: PivotTreeData['cells'],
+  incoming: PivotTreeData['cells'],
 ) => {
-  const result: PivotTreeData['cells'] = { ...left };
-  Object.entries(right || {}).forEach(([key, cell]) => {
+  Object.entries(incoming).forEach(([key, cell]) => {
     const existing = result[key];
     if (!existing) {
       result[key] = cell;
@@ -178,14 +175,14 @@ const mergeTreeCells = (
       isSubtotal: cell.isSubtotal ?? existing.isSubtotal,
     };
   });
-  return result;
 };
 
-const mergeTrees = (left?: PivotTreeData, right?: PivotTreeData) => ({
-  rows: mergeTreeValueMaps<PivotTreeNode>(left?.rows, right?.rows),
-  cols: mergeTreeValueMaps<PivotTreeNode>(left?.cols, right?.cols),
-  cells: mergeTreeCells(left?.cells, right?.cells),
-});
+/** Merges into a privately owned accumulator, without copying the growing tree. */
+const mergeTreeInto = (target: PivotTreeData, source: PivotTreeData) => {
+  mergeTreeValueMapsInto(target.rows, source.rows);
+  mergeTreeValueMapsInto(target.cols, source.cols);
+  mergeTreeCellsInto(target.cells, source.cells);
+};
 
 const buildBatchMaterializationProgram = ({
   program,
@@ -475,15 +472,18 @@ const createFactTreeBuilder = ({
 const injectAxisSubtotalLeaves = ({
   tree,
   axis,
-  depth,
+  depths,
   fullDepth,
 }: {
   tree: PivotTreeData;
   axis: 'row' | 'col';
-  depth: number;
+  depths: number[];
   fullDepth: number;
 }) => {
-  if (depth <= 0 || depth >= fullDepth) {
+  const levels = new Set(
+    depths.filter(depth => depth > 0 && depth < fullDepth),
+  );
+  if (!levels.size) {
     return tree;
   }
   const next: PivotTreeData = {
@@ -495,7 +495,7 @@ const injectAxisSubtotalLeaves = ({
   const nextNodes = axis === 'row' ? next.rows : next.cols;
   const subtotalNodes = Object.values(sourceNodes).filter(
     node =>
-      node.path.length === depth &&
+      levels.has(node.path.length) &&
       node.path.length > 0 &&
       (axis === 'col' || !node.path.some(val => isSubtotalToken(val))),
   );
@@ -522,7 +522,7 @@ const injectAxisSubtotalLeaves = ({
         : tree.cols[cell.colKey]?.path;
     if (
       !basePath ||
-      basePath.length !== depth ||
+      !levels.has(basePath.length) ||
       basePath.length === 0 ||
       (axis === 'row' && basePath.some(val => isSubtotalToken(val)))
     ) {
@@ -552,13 +552,8 @@ export const injectRowSubtotalLeaves = (
   tree: PivotTreeData,
   depth: number,
   fullDepth: number,
-) => injectAxisSubtotalLeaves({ tree, axis: 'row', depth, fullDepth });
-
-const injectColumnSubtotalLeaves = (
-  tree: PivotTreeData,
-  depth: number,
-  fullDepth: number,
-) => injectAxisSubtotalLeaves({ tree, axis: 'col', depth, fullDepth });
+) =>
+  injectAxisSubtotalLeaves({ tree, axis: 'row', depths: [depth], fullDepth });
 
 export const labelRowSubtotalLeaves = (
   tree: PivotTreeData,
@@ -805,20 +800,7 @@ const applyMeasureAxis = ({
       colSubtotalLevels.includes(metricNodePolicy.countDimDepth(path));
     let hasChildren = path.length < fullDepth;
     if (isMetricNode && !leafTierVisible) {
-      if (
-        axis === 'row' &&
-        valueAxis === 'row' &&
-        insertIndex >= rowGroupby.length
-      ) {
-        hasChildren = false;
-      }
-      if (
-        axis === 'col' &&
-        valueAxis === 'col' &&
-        insertIndex >= colGroupby.length
-      ) {
-        hasChildren = false;
-      }
+      if (axis === valueAxis && valuesAtEnd) hasChildren = false;
     }
     if (isLeafNode && !leafTierVisible) {
       hasChildren = false;
@@ -854,87 +836,40 @@ const applyMeasureAxis = ({
     return node;
   };
 
-  const addCell = ({
-    rowPath,
-    colPath,
-    values,
-    partialValueKeys,
-    isSubtotal,
+  const addCell = (
+    valuePath: PivotPath,
+    oppositePath: PivotPath,
+    content: Pick<
+      PivotResultCell,
+      'values' | 'partialValueKeys' | 'isSubtotal'
+    >,
     overwrite = false,
-  }: {
-    rowPath: PivotPath;
-    colPath: PivotPath;
-    values: Record<string, DataRecordValue>;
-    partialValueKeys?: string[];
-    isSubtotal?: boolean;
-    overwrite?: boolean;
-  }) => {
-    const rowKey = serializePath(rowPath);
-    const colKey = serializePath(colPath);
+  ) => {
+    const valueKey = serializePath(valuePath);
+    const oppositeKey = serializePath(oppositePath);
+    const rowKey = valueAxis === 'row' ? valueKey : oppositeKey;
+    const colKey = valueAxis === 'col' ? valueKey : oppositeKey;
     const cellKey = serializeCellKey(rowKey, colKey);
-    if (!overwrite && result.cells[cellKey]) {
-      return;
-    }
-    result.cells[cellKey] = {
-      rowKey,
-      colKey,
-      values,
-      partialValueKeys,
-      isSubtotal,
-    };
+    if (overwrite || !result.cells[cellKey])
+      result.cells[cellKey] = { rowKey, colKey, ...content };
   };
 
-  const addSingleMetricBaseCells = ({
-    valuePath,
-    oppositePath,
-    colPrefix,
-    values,
-    partialValueKeys,
-    isSubtotal,
-  }: {
-    valuePath: PivotPath;
-    oppositePath: PivotPath;
-    colPrefix?: PivotPath;
-    values: Record<string, DataRecordValue>;
-    partialValueKeys?: string[];
-    isSubtotal?: boolean;
-  }) => {
-    if (metricKeys.length !== 1) {
-      return;
-    }
+  const addSingleMetricBaseCells = (
+    valuePath: PivotPath,
+    oppositePath: PivotPath,
+    prefix: PivotPath,
+    content: Pick<
+      PivotResultCell,
+      'values' | 'partialValueKeys' | 'isSubtotal'
+    >,
+  ) => {
+    if (!hasSingleMetric) return;
     if (valueAxis === 'row') {
-      addCell({
-        rowPath: valuePath,
-        colPath: oppositePath,
-        values,
-        partialValueKeys,
-        isSubtotal,
-      });
-      return;
-    }
-    if (insertIndex === 0) {
-      addCell({
-        rowPath: oppositePath,
-        colPath: colPrefix ?? [],
-        values,
-        partialValueKeys,
-        isSubtotal,
-      });
-    }
-    if (
-      insertIndex >= colGroupby.length ||
-      insertIndex === 0 ||
-      (insertIndex > 0 &&
-        insertIndex < colGroupby.length &&
-        valuePath.length <= insertIndex)
-    ) {
-      addCell({
-        rowPath: oppositePath,
-        colPath: valuePath,
-        values,
-        partialValueKeys,
-        isSubtotal,
-      });
+      addCell(valuePath, oppositePath, content);
+    } else {
+      if (insertIndex === 0) addCell(prefix, oppositePath, content);
+      if (valuesAtEnd || insertIndex === 0 || valuePath.length <= insertIndex)
+        addCell(valuePath, oppositePath, content);
     }
   };
 
@@ -1018,14 +953,12 @@ const applyMeasureAxis = ({
         isSubtotal: true,
         isCollapsedMetric: undefined,
       });
-      addCell({
-        rowPath: oppositePath,
-        colPath: path,
-        values,
-        partialValueKeys,
-        isSubtotal: true,
-        overwrite: true,
-      });
+      addCell(
+        path,
+        oppositePath,
+        { values, partialValueKeys, isSubtotal: true },
+        true,
+      );
     };
 
     const isTotalValuePath =
@@ -1054,9 +987,7 @@ const applyMeasureAxis = ({
         oppositeAxisDepth,
         oppositeNode?.isSubtotal || undefined,
       );
-      addCell({
-        rowPath: valuePath,
-        colPath: oppositePath,
+      addCell(valuePath, oppositePath, {
         values: cellValues,
         partialValueKeys,
         isSubtotal: cell.isSubtotal,
@@ -1142,14 +1073,16 @@ const applyMeasureAxis = ({
           oppositeNode?.isSubtotal || undefined,
         );
 
-        addCell({
-          rowPath: valueAxis === 'row' ? projectedValuePath : oppositePath,
-          colPath: valueAxis === 'col' ? projectedValuePath : oppositePath,
-          values: mergedValues,
-          partialValueKeys,
-          isSubtotal: cell.isSubtotal,
-          overwrite: true,
-        });
+        addCell(
+          projectedValuePath,
+          oppositePath,
+          {
+            values: mergedValues,
+            partialValueKeys,
+            isSubtotal: cell.isSubtotal,
+          },
+          true,
+        );
         if (
           valueAxis === 'row' &&
           cell.isSubtotal &&
@@ -1175,10 +1108,7 @@ const applyMeasureAxis = ({
             addColumnSubtotalMetricAlias(metricAxisPath, mergedValues);
           }
         }
-        addSingleMetricBaseCells({
-          valuePath,
-          oppositePath,
-          colPrefix: valuePrefix,
+        addSingleMetricBaseCells(valuePath, oppositePath, valuePrefix, {
           values: mergedValues,
           partialValueKeys,
           isSubtotal: cell.isSubtotal,
@@ -1247,61 +1177,21 @@ const buildBatchMaterializationProjection = ({
 const applyBatchSubtotalLeaves = (
   tree: PivotTreeData,
   projection: ReturnType<typeof buildBatchMaterializationProjection>,
-) => {
-  let nextTree = tree;
-  if (projection.columnSubtotalDepth !== undefined) {
-    nextTree = injectColumnSubtotalLeaves(
-      nextTree,
-      projection.columnSubtotalDepth,
-      projection.columnFullDepth,
-    );
-  }
-  projection.rowSubtotalDepths.forEach(depth => {
-    nextTree = injectRowSubtotalLeaves(
-      nextTree,
-      depth,
-      projection.rowFullDepth,
-    );
+) =>
+  injectAxisSubtotalLeaves({
+    tree: injectAxisSubtotalLeaves({
+      tree,
+      axis: 'col',
+      depths:
+        projection.columnSubtotalDepth === undefined
+          ? []
+          : [projection.columnSubtotalDepth],
+      fullDepth: projection.columnFullDepth,
+    }),
+    axis: 'row',
+    depths: projection.rowSubtotalDepths,
+    fullDepth: projection.rowFullDepth,
   });
-  return nextTree;
-};
-
-const buildTreeFromFactBatch = (
-  input: Parameters<typeof buildBatchMaterializationProjection>[0],
-) => {
-  const projection = buildBatchMaterializationProjection(input);
-  const builder = createFactTreeBuilder(projection);
-  projection.facts.forEach(builder.addFact);
-  return applyBatchSubtotalLeaves(builder.finish(), projection);
-};
-
-const buildTreeFromFactBatchAsync = async (
-  input: Parameters<typeof buildBatchMaterializationProjection>[0] &
-    ChunkedWorkOptions,
-) => {
-  const { chunkSize, shouldContinue, yieldToMain } = input;
-  const projection = buildBatchMaterializationProjection(input);
-  const builder = createFactTreeBuilder(projection);
-  for (let idx = 0; idx < projection.facts.length; idx += 1) {
-    builder.addFact(projection.facts[idx]);
-    // eslint-disable-next-line no-await-in-loop
-    await maybeYieldChunkedWork({
-      processed: idx + 1,
-      chunkSize,
-      shouldContinue,
-      yieldToMain,
-    });
-  }
-  const tree = builder.finish();
-  if (
-    projection.columnSubtotalDepth !== undefined ||
-    projection.rowSubtotalDepths.length > 0
-  ) {
-    await yieldChunkedWork({ shouldContinue, yieldToMain });
-  }
-  assertChunkedWorkCurrent(shouldContinue);
-  return applyBatchSubtotalLeaves(tree, projection);
-};
 
 const finalizeMaterializedTree = (
   tree: PivotTreeData,
@@ -1325,48 +1215,6 @@ const finalizeMaterializedTree = (
     metrics,
     formData.metricLabelMap as Record<string, string> | undefined,
   );
-
-const materializePivotTree = (
-  input: MaterializePivotTreeInput,
-): PivotTreeData => {
-  const { batches } = input;
-  const branchTree = batches.reduce<PivotTreeData>(
-    (acc, batch) =>
-      mergeTrees(
-        acc,
-        buildTreeFromFactBatch({
-          ...input,
-          batch,
-        }),
-      ),
-    {} as PivotTreeData,
-  );
-  return finalizeMaterializedTree(branchTree, input);
-};
-
-const materializePivotTreeAsync = async (
-  input: MaterializePivotTreeInput & ChunkedWorkOptions,
-): Promise<PivotTreeData> => {
-  const { batches, chunkSize, shouldContinue, yieldToMain } = input;
-  let branchTree = {} as PivotTreeData;
-  for (let idx = 0; idx < batches.length; idx += 1) {
-    // eslint-disable-next-line no-await-in-loop
-    const nextTree = await buildTreeFromFactBatchAsync({
-      ...input,
-      batch: batches[idx],
-      chunkSize,
-      shouldContinue,
-      yieldToMain,
-    });
-    // eslint-disable-next-line no-await-in-loop
-    await yieldChunkedWork({ shouldContinue, yieldToMain });
-    branchTree = mergeTrees(branchTree, nextTree);
-  }
-  await yieldChunkedWork({ shouldContinue, yieldToMain });
-  const tree = finalizeMaterializedTree(branchTree, input);
-  await yieldChunkedWork({ shouldContinue, yieldToMain });
-  return tree;
-};
 
 const groupFactStoreBatchesByMaterializationPlan = ({
   batches,
@@ -1403,13 +1251,9 @@ const materializeInputFromPlanGroup = (
     batches,
   }: ReturnType<typeof groupFactStoreBatchesByMaterializationPlan>[number],
 ): MaterializePivotTreeInput => ({
+  ...plan,
   batches,
-  metrics: plan.metrics,
   formData,
-  measureHierarchy: plan.measureHierarchy,
-  rowSubtotalLevels: plan.rowSubtotalLevels,
-  colSubtotalLevels: plan.colSubtotalLevels,
-  pivotProgram: plan.pivotProgram,
 });
 
 const columnRefKey = (column: QueryFormColumn) =>
@@ -1483,73 +1327,74 @@ const coverageMatchesProgram = (
   );
 };
 
-const materializeFactStoreBatches = ({
-  batches,
-  layout,
-  formData,
-}: {
-  batches: PivotFactStoreBatch[];
-  layout: LayoutContext;
-  formData: PivotTableQueryFormData;
-}): PivotTreeData =>
-  groupFactStoreBatchesByMaterializationPlan({
-    batches: batches.filter(batch =>
-      coverageMatchesProgram(batch, layout.pivotProgram),
-    ),
-    layout,
-  }).reduce<PivotTreeData>(
-    (tree, group) =>
-      mergeTrees(
-        tree,
-        materializePivotTree(materializeInputFromPlanGroup(formData, group)),
-      ),
-    emptyPivotTree(),
-  );
-
-export const materializeLoadedPivotTreeFromFactStore = ({
-  store,
-  layout,
-  formData,
-}: {
+type MaterializationInput = {
   store: PivotFactStore;
   layout: LayoutContext;
   formData: PivotTableQueryFormData;
-}): PivotTreeData =>
-  materializeFactStoreBatches({
-    batches: store.getFactBatches(buildPivotFactQueryContextKey(formData)),
-    layout,
-    formData,
-  });
+};
 
-export const materializeLoadedPivotTreeFromFactStoreAsync = async ({
-  store,
-  layout,
-  formData,
-  chunkSize,
-  shouldContinue,
-  yieldToMain,
-}: {
-  store: PivotFactStore;
-  layout: LayoutContext;
-  formData: PivotTableQueryFormData;
-} & ChunkedWorkOptions): Promise<PivotTreeData> => {
-  let mergedTree = emptyPivotTree();
-  const queryContextKey = buildPivotFactQueryContextKey(formData);
+/** One traversal for immediate and scheduled execution; only completed trees escape. */
+function* materializeWork(
+  { store, layout, formData }: MaterializationInput,
+  chunkSize = DEFAULT_RUNTIME_CHUNK_SIZE,
+): Generator<void, PivotTreeData> {
+  const result = emptyPivotTree();
   const groups = groupFactStoreBatchesByMaterializationPlan({
     batches: store
-      .getFactBatches(queryContextKey)
+      .getFactBatches(buildPivotFactQueryContextKey(formData))
       .filter(batch => coverageMatchesProgram(batch, layout.pivotProgram)),
     layout,
   });
-  for (let idx = 0; idx < groups.length; idx += 1) {
-    // eslint-disable-next-line no-await-in-loop
-    const nextTree = await materializePivotTreeAsync({
-      ...materializeInputFromPlanGroup(formData, groups[idx]),
-      chunkSize,
-      shouldContinue,
-      yieldToMain,
-    });
-    mergedTree = mergeTrees(mergedTree, nextTree);
+  for (const group of groups) {
+    const input = materializeInputFromPlanGroup(formData, group);
+    const branch = emptyPivotTree();
+    for (const batch of input.batches) {
+      const projection = buildBatchMaterializationProjection({
+        ...input,
+        batch,
+      });
+      const builder = createFactTreeBuilder(projection);
+      for (let i = 0; i < projection.facts.length; i += 1) {
+        builder.addFact(projection.facts[i]);
+        if ((i + 1) % chunkSize === 0) yield;
+      }
+      if (
+        projection.columnSubtotalDepth !== undefined ||
+        projection.rowSubtotalDepths.length
+      )
+        yield;
+      const batchTree = applyBatchSubtotalLeaves(builder.finish(), projection);
+      yield;
+      mergeTreeInto(branch, batchTree);
+    }
+    yield;
+    const tree = finalizeMaterializedTree(branch, input);
+    yield;
+    mergeTreeInto(result, tree);
   }
-  return mergedTree;
+  return result;
+}
+
+export const materializeLoadedPivotTreeFromFactStore = (
+  input: MaterializationInput,
+): PivotTreeData => {
+  const work = materializeWork(input);
+  let step = work.next();
+  while (!step.done) step = work.next();
+  return step.value;
+};
+
+export const materializeLoadedPivotTreeFromFactStoreAsync = async (
+  input: MaterializationInput & ChunkedWorkOptions,
+): Promise<PivotTreeData> => {
+  const work = materializeWork(input, input.chunkSize);
+  assertChunkedWorkCurrent(input.shouldContinue);
+  let step = work.next();
+  while (!step.done) {
+    // eslint-disable-next-line no-await-in-loop
+    await yieldChunkedWork(input);
+    step = work.next();
+  }
+  assertChunkedWorkCurrent(input.shouldContinue);
+  return step.value;
 };
