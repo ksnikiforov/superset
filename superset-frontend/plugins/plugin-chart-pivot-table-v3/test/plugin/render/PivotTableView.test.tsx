@@ -51,6 +51,7 @@ const baseTree: PivotTreeData = {
 };
 
 const baseFormatting: PivotFormattingResult = {
+  hasPartialData: false,
   metricFormattingScope: 'values',
   metricDatabars: {},
   databarColumnMinWidths: new Map(),
@@ -526,4 +527,30 @@ test('sortable headers support keyboard sorting and contextual expansion labels'
   expect(sort).toHaveBeenCalledTimes(2);
   fireEvent.keyDown(toggle, { key: 'Enter' });
   expect(sort).toHaveBeenCalledTimes(2);
+});
+
+test('partial data uses the shared compact tooltip and leaves worksheet contents unchanged', async () => {
+  renderView(false, {
+    formatting: { ...baseFormatting, hasPartialData: true },
+    exportChartId: 378,
+  });
+  const warning = screen.getByLabelText('Partial data');
+  expect(warning.closest('th')).toHaveClass('pivot-sticky-corner');
+  fireEvent.mouseOver(warning);
+  expect(await screen.findByRole('tooltip')).toHaveTextContent(
+    'The row limit set for the chart was reached',
+  );
+  expect(
+    screen.queryByText(
+      'Pivot results reached the row limit. Increase the limit or narrow the filters.',
+    ),
+  ).not.toBeInTheDocument();
+  expect(getPivotV3ExportSheetDataForChart(378)).toEqual([
+    [{ value: 'Rows', type: 'string', isHeader: true }],
+  ]);
+});
+
+test('complete visible data has no partial-data icon', () => {
+  renderView(false);
+  expect(screen.queryByLabelText('Partial data')).not.toBeInTheDocument();
 });

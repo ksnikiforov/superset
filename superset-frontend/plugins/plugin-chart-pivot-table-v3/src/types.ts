@@ -59,6 +59,8 @@ export interface PivotTableStylesProps {
 }
 
 export interface PivotTreeNode {
+  /** The displayed group is known only from a truncated query. */
+  isPartial?: boolean;
   axis: PivotAxis;
   key: string;
   parentKey?: string;
@@ -74,6 +76,8 @@ export interface PivotTreeNode {
 }
 
 export interface PivotResultCell {
+  /** Value keys whose source query was truncated. */
+  partialValueKeys?: string[];
   rowKey: string;
   colKey: string;
   values: Record<string, DataRecordValue>;

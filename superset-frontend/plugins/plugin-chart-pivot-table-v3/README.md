@@ -25,8 +25,8 @@ Pivot Table v3 queries database aggregates and loads branches on expansion. It s
 
 - Initial and persisted expansion use the same coverage planner as manual expansion.
 - Independent branches on one axis can finish separately. Pending row and column expansions reveal together after their intersection coverage arrives.
-- The committed table remains visible during loading. Collapsing cancels pending expansion intent on both axes. Requests have a 30-second deadline; Retry repeats the failed expansion or layout/filter operation.
-- Truncated results can be displayed but cannot satisfy complete coverage. Increase the row limit or narrow the filters before retrying.
+- The committed table remains visible during loading. Collapsing cancels pending expansion intent on both axes while preserving pending layout/filter edits. The refresh resumes with the collapsed branch; a failed refresh retains its error and target for explicit Retry. Requests have a 30-second deadline; Retry repeats the failed expansion or layout/filter operation.
+- Truncated results can be displayed but cannot satisfy complete coverage. A compact warning in the table corner uses Superset's standard row-limit tooltip. It appears only when rendered group labels or metric values come from truncated results; hidden metrics, blank parent values, and collapsed cached branches do not trigger it. Increase the row limit or narrow the filters before retrying.
 - Selecting an already selected cell clears its cross-filter; the context menu exposes the same selection state.
 - Hidden parent values stay blank in both databars and Excel. Excel projection is built on export, with separate dimension, metric, and value-tier row columns.
 - Sortable column headers support Enter and Space. Expansion controls expose contextual labels and expanded state.

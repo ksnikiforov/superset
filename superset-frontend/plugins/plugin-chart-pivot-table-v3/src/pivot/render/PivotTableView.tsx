@@ -36,9 +36,9 @@ import {
   UpOutlined,
 } from '@ant-design/icons';
 import { t } from '@apache-superset/core/translation';
-import { styled } from '@apache-superset/core/theme';
+import { styled, useTheme } from '@apache-superset/core/theme';
 import { Alert } from '@apache-superset/core/components';
-import { Button, Loading } from '@superset-ui/core/components';
+import { Button, Icons, Loading } from '@superset-ui/core/components';
 import {
   type PivotTreeData,
   type PivotTreeNode,
@@ -52,11 +52,13 @@ import {
   registerPivotV3ExportSheetDataForChart,
   unregisterPivotV3ExportSheetDataForChart,
 } from '../../export/buildPivotV3ExportTable';
-import { type ChartDataWarning } from '../data/ChartDataClient';
 import { rootKey } from '../viewModel';
 import { createMetricNodePolicy } from '../metricsTotals';
 import { type RenderModel } from './renderModel';
 import { type PivotFormattingResult } from '../chart/usePivotFormatting';
+
+// eslint-disable-next-line import/no-extraneous-dependencies
+import RowCountLabel from 'src/components/RowCountLabel';
 
 const ROW_INDENT_PX = 14;
 const ROW_TOGGLE_SLOT_PX = 16;
@@ -296,7 +298,6 @@ export type PivotTableViewProps = {
   expandedCols: Set<string>;
   errorMessage?: string;
   onRetry: () => void;
-  warnings?: ChartDataWarning[];
   showGlobalLoader: boolean;
   showCornerLoader?: boolean;
   stickyHeaders: boolean;
@@ -340,7 +341,6 @@ export const PivotTableView = ({
   expandedCols,
   errorMessage,
   onRetry,
-  warnings = [],
   showGlobalLoader,
   showCornerLoader = false,
   stickyHeaders,
@@ -366,6 +366,7 @@ export const PivotTableView = ({
   rowAxisLabels = [],
   exportChartId,
 }: PivotTableViewProps) => {
+  const theme = useTheme();
   const { visibleRows, visibleCols, columnHeaderRows, showRowRoot } =
     renderModel;
   const {
@@ -523,6 +524,18 @@ export const PivotTableView = ({
       style={cornerHeaderStyle}
     >
       {showCornerLoader ? <Spinner aria-label={t('Loading')} /> : t('Rows')}
+      {formatting.hasPartialData && (
+        <RowCountLabel
+          isLimitReached
+          label={
+            <Icons.WarningOutlined
+              aria-label={t('Partial data')}
+              iconSize="s"
+              iconColor={theme.colorWarning}
+            />
+          }
+        />
+      )}
     </th>
   );
 
@@ -533,15 +546,6 @@ export const PivotTableView = ({
       width={width}
       style={containerStyle}
     >
-      {warnings.some(warning => warning.type === 'truncation') && (
-        <Alert
-          type="warning"
-          showIcon
-          message={t(
-            'Pivot results reached the row limit. Increase the limit or narrow the filters.',
-          )}
-        />
-      )}
       {errorMessage ? (
         <ErrorWrapper>
           <ErrorContent>

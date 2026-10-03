@@ -61,6 +61,7 @@ import { formatMetricValue, rootKey } from '../viewModel';
 import { buildMeasureLeafOutputKey, isValueLeaf } from '../measureLeaves';
 import {
   deriveMetricKey as deriveMetricKeyBase,
+  hasVisiblePartialData,
   formatNodeLabel as formatNodeLabelBase,
   shouldHideRowValues as shouldHideRowValuesBase,
 } from '../cellUtils';
@@ -323,6 +324,7 @@ type ExcelFormattingMap<Field extends string> = Record<
 >;
 
 export type PivotFormattingResult = {
+  hasPartialData: boolean;
   metricFormattingScope: MetricFormattingScope;
   metricDatabars: PivotMetricDatabarMap;
   databarColumnMinWidths: Map<string, number>;
@@ -1160,6 +1162,11 @@ export const usePivotFormatting = ({
   );
 
   return {
+    hasPartialData: hasVisiblePartialData(
+      renderModel,
+      deriveMetricKey,
+      shouldHideRowValues,
+    ),
     metricFormattingScope,
     metricDatabars,
     databarColumnMinWidths,

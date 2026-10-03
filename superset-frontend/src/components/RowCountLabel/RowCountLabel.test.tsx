@@ -60,3 +60,10 @@ test('RowCountLabel renders loading', () => {
   userEvent.hover(screen.getByText(expectedText));
   expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
 });
+
+test('RowCountLabel accepts known partial status with a custom label and no synthetic row count', async () => {
+  render(<RowCountLabel isLimitReached label={<span>Partial data</span>} />);
+  userEvent.hover(screen.getByText('Partial data'));
+  expect(await screen.findByRole('tooltip')).toHaveTextContent('The row limit');
+  expect(screen.queryByText('0 rows')).not.toBeInTheDocument();
+});

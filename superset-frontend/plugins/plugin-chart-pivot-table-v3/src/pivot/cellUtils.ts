@@ -27,6 +27,7 @@ import {
 import { serializeCellKey, serializePath } from './core/path';
 import { buildMeasureLeafOutputKey } from './measureLeaves';
 import { getValuesLevelIndex } from './runtime/projection';
+import type { RenderModel } from './render/renderModel';
 import type { PivotProgram } from './runtime/types';
 import {
   createMetricNodePolicy,
@@ -291,3 +292,21 @@ export const buildFormattingValueMaps = ({
   });
   return { rowValuesMap, colValuesMap };
 };
+
+/** Report partial data only in the labels and values rendered by the table. */
+export const hasVisiblePartialData = (
+  model: RenderModel,
+  metricKeyForCell: (row: PivotTreeNode, col: PivotTreeNode) => string,
+  hideRowValues: (row: PivotTreeNode) => boolean,
+): boolean =>
+  model.visibleRows.some(node => node.isPartial) ||
+  model.columnHeaderRows.some(headers =>
+    headers.some(header => header.node.isPartial),
+  ) ||
+  model.visibleCellEntries.some(({ cell, rowNode, colNode }) => {
+    if (hideRowValues(rowNode) || !cell.partialValueKeys?.length) return false;
+    const key = metricKeyForCell(rowNode, colNode);
+    return (
+      cell.values[key] !== undefined && cell.partialValueKeys.includes(key)
+    );
+  });

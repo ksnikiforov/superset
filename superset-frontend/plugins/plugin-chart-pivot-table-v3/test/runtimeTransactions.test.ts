@@ -267,7 +267,9 @@ test('empty warnings do not hide initial truncation or grant complete coverage',
     initialProps: configFor(p, initial),
   });
   expect(
-    result.current.warnings.some(warning => warning.type === 'truncation'),
+    Object.values(result.current.tree.cells).some(
+      cell => cell.partialValueKeys?.length,
+    ),
   ).toBe(true);
   unmount();
 });
@@ -360,7 +362,7 @@ test('upstream refresh hydration retry retains the refreshed query context', asy
   unmount();
 });
 
-test('collapse cannot publish a canceled filter refresh hydration', async () => {
+test('collapse preserves the pending filter edit and rejects canceled child hydration', async () => {
   const p = plan();
   fetchMock.mockImplementation(({ specs }) =>
     Promise.resolve(resultsFor(specs)),
@@ -375,27 +377,43 @@ test('collapse cannot publish a canceled filter refresh hydration', async () => 
   await waitFor(() => expect(result.current.expandedRows.has('A')).toBe(true));
   const visible = result.current.tree;
   let finish!: () => void;
+  const filteredResults = (specs: QuerySpec[]) =>
+    resultsFor(specs).map(response => ({
+      ...response,
+      data: response.data?.filter(row => row.r1 === 'A'),
+    }));
   fetchMock
-    .mockImplementationOnce(({ specs }) => Promise.resolve(resultsFor(specs)))
+    .mockImplementationOnce(({ specs }) =>
+      Promise.resolve(filteredResults(specs)),
+    )
     .mockImplementationOnce(
       ({ specs }) =>
         new Promise(resolve => {
           finish = () => resolve(resultsFor(specs));
         }),
     );
+  fetchMock.mockImplementation(({ specs }) =>
+    Promise.resolve(filteredResults(specs)),
+  );
   await act(async () => result.current.applyDimensionFilterChange('r1', ['A']));
   await waitFor(() => expect(finish).toBeDefined());
   act(() => result.current.handleToggle('row', result.current.tree.rows.A));
+  expect(result.current.uiSelectedFilters).toEqual({ r1: ['A'] });
+  await waitFor(() => expect(result.current.tree).not.toBe(visible));
+  expect(result.current.tree.rows.B).toBeUndefined();
+  const refreshed = result.current.tree;
   await act(async () => finish());
-  expect(result.current.tree).toBe(visible);
+  expect(result.current.tree).toBe(refreshed);
   expect(result.current.expandedRows.has('A')).toBe(false);
   expect(result.current.loadingKeys.size).toBe(0);
-  expect(result.current.uiSelectedFilters).toEqual({});
-  expect(setControlValue).toHaveBeenCalledWith('pivotSelectedFilters', {});
+  expect(result.current.uiSelectedFilters).toEqual({ r1: ['A'] });
+  expect(setControlValue).toHaveBeenLastCalledWith('pivotSelectedFilters', {
+    r1: ['A'],
+  });
   unmount();
 });
 
-test('collapse restores controls after canceling a pending layout refresh', async () => {
+test('collapse preserves a pending layout edit until its refreshed table is ready', async () => {
   const p = buildInitialPivotUpdatePlan({
     formData: { ...plan().formData, interactionMode: 'user_controlled' },
   });
@@ -421,26 +439,167 @@ test('collapse restores controls after canceling a pending layout refresh', asyn
         finish = () => resolve(resultsFor(specs));
       }),
   );
-  act(() =>
-    result.current.applyRuntimeLayoutChange({
-      ...initialProps.runtimeLayout,
-      rows: ['c1', 'r1'],
-      cols: ['r2', 'c2'],
-    }),
-  );
+  const desiredLayout = {
+    ...initialProps.runtimeLayout,
+    rows: ['c1', 'r1'],
+    cols: ['r2', 'c2'],
+  };
+  act(() => result.current.applyRuntimeLayoutChange(desiredLayout));
   await waitFor(() => expect(finish).toBeDefined());
   act(() => result.current.handleToggle('row', result.current.tree.rows.A));
+  expect(result.current.uiRuntimeLayout).toEqual(desiredLayout);
+  await waitFor(() => expect(result.current.tree).not.toBe(visible));
+  const refreshed = result.current.tree;
   await act(async () => finish());
-  expect(result.current.tree).toBe(visible);
-  expect(result.current.uiRuntimeLayout).toEqual(initialProps.runtimeLayout);
+  expect(result.current.tree).toBe(refreshed);
+  expect(result.current.uiRuntimeLayout).toEqual(desiredLayout);
+  expect(result.current.appliedLayoutFormData.groupbyRows).toContain('c1');
   expect(initialProps.setControlValue).toHaveBeenLastCalledWith(
     'pivotSelectedFilters',
     {},
   );
   expect(initialProps.setControlValue).toHaveBeenCalledWith(
     'pivotRuntimeLayout',
-    initialProps.runtimeLayout,
+    desiredLayout,
   );
   expect(result.current.cornerLoading).toBe(false);
+  unmount();
+});
+
+test('collapse retains a failed filter edit and its retry', async () => {
+  fetchMock.mockImplementation(async ({ specs }) => resultsFor(specs));
+  const { result, waitFor, unmount } = setup();
+  await act(async () =>
+    result.current.handleToggle('row', result.current.tree.rows.A),
+  );
+  await waitFor(() => expect(result.current.expandedRows.has('A')).toBe(true));
+  fetchMock.mockRejectedValueOnce(new Error('Filter request failed'));
+  await act(async () => result.current.applyDimensionFilterChange('r1', ['A']));
+  await waitFor(() =>
+    expect(result.current.errorMessage).toContain('Filter request failed'),
+  );
+  act(() => result.current.handleToggle('row', result.current.tree.rows.A));
+  expect(result.current.uiSelectedFilters).toEqual({ r1: ['A'] });
+  expect(result.current.errorMessage).toContain('Filter request failed');
+  expect(result.current.expandedRows.has('A')).toBe(false);
+  await act(async () => result.current.handleRetry());
+  await waitFor(() => expect(result.current.errorMessage).toBeUndefined());
+  expect(result.current.uiSelectedFilters).toEqual({ r1: ['A'] });
+  expect(result.current.appliedLayoutFormData.extra_form_data?.filters).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ col: 'r1', val: ['A'] }),
+    ]),
+  );
+  unmount();
+});
+
+test('collapse adopts a pending upstream refresh and rejects its canceled hydration', async () => {
+  fetchMock.mockImplementation(async ({ specs }) => resultsFor(specs));
+  const { result, rerender, waitFor, unmount } = setup();
+  await act(async () =>
+    result.current.handleToggle('row', result.current.tree.rows.A),
+  );
+  await waitFor(() => expect(result.current.expandedRows.has('A')).toBe(true));
+  const updated = buildInitialPivotUpdatePlan({
+    formData: { ...plan().formData, time_range: '2025-01-01 : 2026-01-01' },
+  });
+  let finish!: () => void;
+  fetchMock.mockImplementationOnce(
+    ({ specs }) =>
+      new Promise(resolve => {
+        finish = () => resolve(resultsFor(specs));
+      }),
+  );
+  await act(async () => rerender(configFor(updated, initialFor(updated))));
+  await waitFor(() => expect(finish).toBeDefined());
+  act(() => result.current.handleToggle('row', result.current.tree.rows.A));
+  await waitFor(() =>
+    expect(result.current.appliedLayoutFormData.time_range).toBe(
+      updated.formData.time_range,
+    ),
+  );
+  const refreshed = result.current.tree;
+  await act(async () => finish());
+  expect(result.current.tree).toBe(refreshed);
+  expect(result.current.expandedRows.has('A')).toBe(false);
+  unmount();
+});
+
+test('collapse preserves a failed upstream refresh for explicit retry', async () => {
+  fetchMock.mockImplementation(async ({ specs }) => resultsFor(specs));
+  const { result, rerender, waitFor, unmount } = setup();
+  await act(async () =>
+    result.current.handleToggle('row', result.current.tree.rows.A),
+  );
+  await waitFor(() => expect(result.current.expandedRows.has('A')).toBe(true));
+  const updated = buildInitialPivotUpdatePlan({
+    formData: { ...plan().formData, time_range: '2025-01-01 : 2026-01-01' },
+  });
+  fetchMock.mockRejectedValueOnce(new Error('Source refresh failed'));
+  await act(async () => rerender(configFor(updated, initialFor(updated))));
+  await waitFor(() =>
+    expect(result.current.errorMessage).toContain('Source refresh failed'),
+  );
+  const requests = fetchMock.mock.calls.length;
+  act(() => result.current.handleToggle('row', result.current.tree.rows.A));
+  expect(result.current.errorMessage).toContain('Source refresh failed');
+  expect(fetchMock).toHaveBeenCalledTimes(requests);
+  expect(result.current.expandedRows.has('A')).toBe(false);
+  await act(async () => result.current.handleRetry());
+  await waitFor(() =>
+    expect(result.current.appliedLayoutFormData.time_range).toBe(
+      updated.formData.time_range,
+    ),
+  );
+  expect(result.current.errorMessage).toBeUndefined();
+  unmount();
+});
+
+test('retry after failed source-layout collapse discards expansion paths from the previous dimensions', async () => {
+  fetchMock.mockImplementation(async ({ specs }) => resultsFor(specs));
+  const { result, rerender, waitFor, unmount } = setup();
+  for (const key of ['A', 'B']) {
+    await act(async () =>
+      result.current.handleToggle('row', result.current.tree.rows[key]),
+    );
+    await waitFor(() =>
+      expect(result.current.expandedRows.has(key)).toBe(true),
+    );
+  }
+  await act(async () =>
+    result.current.handleToggle('col', result.current.tree.cols.C),
+  );
+  await waitFor(() => expect(result.current.expandedCols.has('C')).toBe(true));
+  const updated = buildInitialPivotUpdatePlan({
+    formData: { ...plan().formData, groupbyRows: ['r2', 'r1'] },
+  });
+  fetchMock.mockRejectedValueOnce(new Error('New layout hydration failed'));
+  await act(async () => rerender(configFor(updated, initialFor(updated))));
+  await waitFor(() =>
+    expect(result.current.errorMessage).toContain(
+      'New layout hydration failed',
+    ),
+  );
+  const requests = fetchMock.mock.calls.length;
+  act(() => result.current.handleToggle('row', result.current.tree.rows.A));
+  expect(fetchMock).toHaveBeenCalledTimes(requests);
+  await act(async () => result.current.handleRetry());
+  await waitFor(() =>
+    expect(result.current.appliedLayoutFormData.groupbyRows).toEqual(
+      updated.formData.groupbyRows,
+    ),
+  );
+  const retrySpecs = fetchMock.mock.calls
+    .slice(requests)
+    .flatMap(([request]) => request.specs);
+  expect(
+    retrySpecs.some(spec =>
+      spec.filters.some(
+        filter => filter.col === 'r2' && 'val' in filter && filter.val === 'B',
+      ),
+    ),
+  ).toBe(false);
+  expect(result.current.expandedRows.has('B')).toBe(false);
+  expect(result.current.expandedCols.has('C')).toBe(true);
   unmount();
 });

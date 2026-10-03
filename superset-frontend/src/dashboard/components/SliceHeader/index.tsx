@@ -26,7 +26,7 @@ import {
   useState,
 } from 'react';
 import { t } from '@apache-superset/core/translation';
-import { getExtensionsRegistry, QueryData } from '@superset-ui/core';
+import { getExtensionsRegistry, QueryData, VizType } from '@superset-ui/core';
 import {
   css,
   styled,
@@ -221,7 +221,10 @@ const SliceHeader = forwardRef<HTMLDivElement, SliceHeaderProps>(
 
     const canExplore = !editMode && supersetCanExplore;
     const showRowLimitWarning =
-      shouldShowRowLimitWarning && sqlRowCount >= rowLimit && rowLimit > 0;
+      shouldShowRowLimitWarning &&
+      formData.viz_type !== VizType.PivotTableV3 &&
+      sqlRowCount >= rowLimit &&
+      rowLimit > 0;
 
     useEffect(() => {
       const headerElement = headerRef.current;

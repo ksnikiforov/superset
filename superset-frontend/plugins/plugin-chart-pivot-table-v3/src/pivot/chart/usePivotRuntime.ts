@@ -34,7 +34,6 @@ import {
   type PivotTreeNode,
   type PivotExpansionState,
 } from '../../types';
-import { type ChartDataWarning } from '../data/ChartDataClient';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import {
   createLatestRequestLifecycle,
@@ -133,7 +132,6 @@ type RuntimeModel = {
   pending?: Visible;
   busy: 'layout' | 'filters' | 'initial' | null;
   loadingKeys: Set<string>;
-  warnings: ChartDataWarning[];
   error?: string;
   failed?: 'layout' | 'filters' | 'expansion';
   epoch: number;
@@ -227,7 +225,6 @@ export const usePivotRuntime = (config: UsePivotRuntimeConfig) => {
       },
       busy: null,
       loadingKeys: new Set(),
-      warnings: [],
       epoch: 0,
       local: false,
       clearedFilters: false,
@@ -384,16 +381,6 @@ export const usePivotRuntime = (config: UsePivotRuntimeConfig) => {
           'revealedExpanded' in result ? result.revealedExpanded : undefined,
         ),
       };
-      if ('warnings' in result && result.warnings) {
-        model.warnings = [
-          ...new Map(
-            [...model.warnings, ...result.warnings].map(warning => [
-              stableStringify(warning),
-              warning,
-            ]),
-          ).values(),
-        ];
-      }
       model.pending = undefined;
       persistExpansion();
       render();
@@ -427,6 +414,7 @@ export const usePivotRuntime = (config: UsePivotRuntimeConfig) => {
   };
   const refresh = async (kind: 'layout' | 'filters') => {
     const target = model.draft;
+    const factBatches = (model.pending ?? model.visible).store.getFactBatches();
     model.epoch += 1;
     const { epoch } = model;
     session.reset(model.visible.intent);
@@ -442,7 +430,7 @@ export const usePivotRuntime = (config: UsePivotRuntimeConfig) => {
       sourceMeasureLeavesByMetric: config.sourceMeasureLeavesByMetric,
       runtimeLayout: target.layout,
       selection: target.filters,
-      factBatches: (model.pending ?? model.visible).store.getFactBatches(),
+      factBatches,
     });
     if (epoch !== model.epoch || result.status === 'stale') return;
     if (result.status !== 'success') {
@@ -477,7 +465,6 @@ export const usePivotRuntime = (config: UsePivotRuntimeConfig) => {
       }
       model.visible = visible;
       model.pending = undefined;
-      model.warnings = result.warnings;
       model.busy = null;
       persist(target.layout, target.filters);
       persistExpansion();
@@ -514,7 +501,11 @@ export const usePivotRuntime = (config: UsePivotRuntimeConfig) => {
       manualExpanded: session.intent.expanded[axis],
       manualCollapsed: session.intent.collapsed[axis],
     });
-    model.error = undefined;
+    const failedRefresh =
+      model.failed === 'layout' ||
+      model.failed === 'filters' ||
+      (model.failed === 'expansion' && model.pending !== undefined);
+    if (!failedRefresh) model.error = undefined;
     if (decision.kind === 'expand') {
       session.updateAxis(
         axis,
@@ -526,16 +517,10 @@ export const usePivotRuntime = (config: UsePivotRuntimeConfig) => {
       model.epoch += 1;
       lifecycle.invalidate();
       session.reset(visible.intent);
-      if (
-        !isSameRuntimeLayout(model.draft.layout, visible.layout) ||
-        !isEqual(model.draft.filters, visible.filters)
-      ) {
-        model.draft = { layout: visible.layout, filters: visible.filters };
-        model.clearedFilters = !hasSelectedFilters(visible.filters);
-        persist(visible.layout, visible.filters);
-      }
-      model.failed = undefined;
-      model.pending = undefined;
+      const refreshKind =
+        model.busy === 'layout' || model.busy === 'filters' ? model.busy : null;
+      const pendingSource = model.pending;
+      if (!failedRefresh) model.failed = undefined;
       model.busy = null;
       const { intent } = session;
       const collapsed = resolveCollapsedExpansionState({
@@ -567,6 +552,18 @@ export const usePivotRuntime = (config: UsePivotRuntimeConfig) => {
       };
       persistExpansion();
       render();
+      if (refreshKind) {
+        refresh(refreshKind);
+      } else if (pendingSource) {
+        model.pending = {
+          ...pendingSource,
+          expanded: reconcile(pendingSource.tree, pendingSource.plan),
+          intent: session.committedState,
+        };
+        if (!failedRefresh) revealExpansion();
+      } else {
+        model.pending = undefined;
+      }
     }
   };
 
@@ -702,7 +699,6 @@ export const usePivotRuntime = (config: UsePivotRuntimeConfig) => {
       intent: session.committedState,
     };
     if (!model.local) model.draft = { layout, filters: visible.filters };
-    model.warnings = [];
     model.error = undefined;
     const { epoch } = model;
     const pending = needsHydration(store, plan);
@@ -750,21 +746,6 @@ export const usePivotRuntime = (config: UsePivotRuntimeConfig) => {
     config.selectedFiltersFromProps,
   ]);
 
-  const context = buildPivotFactQueryContextKey(model.visible.plan.formData);
-  const warnings =
-    model.visible.store
-      .getFactBatches(context)
-      .some(batch => batch.complete === false) &&
-    !model.warnings.some(warning => warning.type === 'truncation')
-      ? [
-          ...model.warnings,
-          {
-            type: 'truncation' as const,
-            rowLimit:
-              Number(model.visible.plan.formData.row_limit) || undefined,
-          },
-        ]
-      : model.warnings;
   const retry = () => {
     model.error = undefined;
     if (model.failed === 'layout' || model.failed === 'filters')
@@ -782,7 +763,6 @@ export const usePivotRuntime = (config: UsePivotRuntimeConfig) => {
     loadingKeys: model.loadingKeys,
     isInitialExpansionHydrating: model.busy === 'initial',
     cornerLoading: model.busy === 'layout',
-    warnings,
     errorMessage: model.error,
     handleToggle,
     handleRetry: retry,

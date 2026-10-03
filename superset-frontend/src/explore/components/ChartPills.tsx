@@ -17,7 +17,7 @@
  * under the License.
  */
 import { forwardRef, RefObject } from 'react';
-import { QueryData } from '@superset-ui/core';
+import { QueryData, VizType } from '@superset-ui/core';
 import { css, SupersetTheme } from '@apache-superset/core/theme';
 import {
   CachedLabel,
@@ -94,6 +94,9 @@ export const ChartPills = forwardRef(
         >
           {!isLoading && !hideRowCount && firstQueryResponse && (
             <RowCountLabel
+              isLimitReached={
+                formData?.viz_type === VizType.PivotTableV3 ? false : undefined
+              }
               rowcount={actualRowCount}
               limit={Number(rowLimit ?? 0)}
             />

@@ -33,7 +33,6 @@ import { usePivotInteractions } from './usePivotInteractions';
 import { type PivotLayoutResult } from './usePivotLayout';
 import { type PivotRenderModelResult } from './usePivotRenderModel';
 import { type PivotTableViewProps } from '../render/PivotTableView';
-import { type ChartDataWarning } from '../data/ChartDataClient';
 
 type UsePivotTableViewSurfaceInput = {
   width: number;
@@ -46,7 +45,6 @@ type UsePivotTableViewSurfaceInput = {
   loadingKeys: Set<string>;
   isInitialExpansionHydrating: boolean;
   errorMessage?: string;
-  warnings: ChartDataWarning[];
   cornerLoading: boolean;
   formData: PivotTableProps['formData'];
   appliedLayoutFormData: PivotTableProps['formData'];
@@ -77,7 +75,6 @@ export const usePivotTableViewSurface = ({
   loadingKeys,
   isInitialExpansionHydrating,
   errorMessage,
-  warnings,
   cornerLoading,
   formData,
   appliedLayoutFormData,
@@ -153,7 +150,6 @@ export const usePivotTableViewSurface = ({
     expandedCols,
     errorMessage,
     onRetry,
-    warnings,
     showGlobalLoader: isInitialExpansionHydrating,
     showCornerLoader: cornerLoading,
     stickyHeaders,
