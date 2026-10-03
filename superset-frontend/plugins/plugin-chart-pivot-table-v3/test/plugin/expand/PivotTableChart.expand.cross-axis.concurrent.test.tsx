@@ -145,7 +145,7 @@ describe('PivotTableChart cross-axis concurrent expands', () => {
     fetchPivotBranchMock.mockReset();
   });
 
-  it('hydrates intersection values when row+col expansion results resolve out of order', async () => {
+  test('hydrates intersection values when row+col expansion results resolve out of order', async () => {
     const baseTree = buildTree(records, 1, 1);
     const fullRowBranch = buildTree(
       records.filter(row => row.r1 === 'A'),

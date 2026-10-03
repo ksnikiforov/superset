@@ -95,7 +95,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     verboseMap: {},
   };
 
-  it('renders row subtotals inline by default when enabled', () => {
+  test('renders row subtotals inline by default when enabled', () => {
     const rootKey = serializePath([]);
     const groupKey = serializePath(['Bikes']);
     const subtotalKey = serializePath(['Bikes', SUBTOTAL_TOKEN]);
@@ -253,7 +253,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(valueCell.textContent?.trim()).toBe('30');
   });
 
-  it('labels single-metric subtotal rows as "<Group> Total"', () => {
+  test('labels single-metric subtotal rows as "<Group> Total"', () => {
     const rootKey = serializePath([]);
     const groupKey = serializePath(['Bikes']);
     const subtotalKey = serializePath([
@@ -362,7 +362,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(screen.queryByText('Bikes metric1')).not.toBeInTheDocument();
   });
 
-  it('keeps row subtotal values inline and suppresses subtotal rows when expanded at top position (multi-metric columns)', () => {
+  test('keeps row subtotal values inline and suppresses subtotal rows when expanded at top position (multi-metric columns)', () => {
     const rootKey = serializePath([]);
     const urgentKey = serializePath(['1-URGENT']);
     const subtotalKey = serializePath(['1-URGENT', SUBTOTAL_TOKEN]);
@@ -551,7 +551,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(values).toEqual(expect.arrayContaining(['10', '0.05']));
   });
 
-  it('places row subtotals after children when rowSubtotalPosition is end', () => {
+  test('places row subtotals after children when rowSubtotalPosition is end', () => {
     const rootKey = serializePath([]);
     const groupKey = serializePath(['Bikes']);
     const subtotalKey = serializePath(['Bikes', SUBTOTAL_TOKEN]);
@@ -717,7 +717,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('keeps row subtotal values inline while collapsed when rowSubtotalPosition is end (multi-metric columns)', () => {
+  test('keeps row subtotal values inline while collapsed when rowSubtotalPosition is end (multi-metric columns)', () => {
     const rootKey = serializePath([]);
     const urgentKey = serializePath(['1-URGENT']);
     const subtotalKey = serializePath(['1-URGENT', SUBTOTAL_TOKEN]);
@@ -891,7 +891,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(values).toEqual(expect.arrayContaining(['10', '0.05']));
   });
 
-  it('shows orderPriority subtotals at the bottom when metrics are first on rows', () => {
+  test('shows orderPriority subtotals at the bottom when metrics are first on rows', () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = ['orderPriority', 'shipMode', 'orderStatus'];
     const colGroupby = ['shipInstruction', 'customerSegment'];
@@ -1005,7 +1005,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     );
   });
 
-  it('shows orderPriority subtotals at the bottom when metrics are between the first row dimension and the rest', () => {
+  test('shows orderPriority subtotals at the bottom when metrics are between the first row dimension and the rest', () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = ['row1', 'orderPriority', 'shipMode', 'orderStatus'];
     const colGroupby = ['shipInstruction', 'customerSegment'];
@@ -1128,7 +1128,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     );
   });
 
-  it('respects top subtotal positioning after the metric tier', () => {
+  test('respects top subtotal positioning after the metric tier', () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = [
       'shipMode',
@@ -1273,7 +1273,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(rowHeaders).not.toContain('COLLECT COD Total');
   });
 
-  it('forces row subtotals to the bottom when multiple metrics are selected', () => {
+  test('forces row subtotals to the bottom when multiple metrics are selected', () => {
     const rootKey = serializePath([]);
     const colKey = rootKey;
     const group = 'Bikes';
@@ -1427,7 +1427,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     });
   });
 
-  it('suppresses metric grand total rows when a single metric is on rows', () => {
+  test('suppresses metric grand total rows when a single metric is on rows', () => {
     const rootKey = serializePath([]);
     const totalKey = serializePath([SUBTOTAL_TOKEN]);
     const metricTotalKey = serializePath([
@@ -1537,7 +1537,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(rowHeaders).not.toContain('Total averageOrderValue');
   });
 
-  it('renders metric-specific row grand totals when metrics are on rows', () => {
+  test('renders metric-specific row grand totals when metrics are on rows', () => {
     const metrics = ['averageOrderValue', 'weightedDiscount', 'countOrders'];
     const detail = buildTreeFromRecords(
       [
@@ -1638,7 +1638,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(totalValue.textContent?.trim()).toBe('100');
   });
 
-  it('uses the metric display label for row grand totals and never renders "Total count"', () => {
+  test('uses the metric display label for row grand totals and never renders "Total count"', () => {
     const metrics = ['sum__num', 'count'];
     const detail = buildTreeFromRecords(
       [
@@ -1803,7 +1803,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       );
     };
 
-    it.each([2, 3, 4, 5])(
+    test.each([2, 3, 4, 5])(
       'places metric grand totals after ship modes with %i metrics',
       metricCount => {
         const metrics = buildMetrics(metricCount);
@@ -1880,7 +1880,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     );
   });
 
-  it('orders metric grand totals by selection when metrics are on rows', () => {
+  test('orders metric grand totals by selection when metrics are on rows', () => {
     const metrics = ['metricB', 'metricA', 'metricC'];
     const detail = buildTreeFromRecords(
       [
@@ -1974,7 +1974,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect([...totalIndexes].sort((a, b) => a - b)).toEqual(totalIndexes);
   });
 
-  it('orders metric subtotal rows by selection when metrics are on rows', () => {
+  test('orders metric subtotal rows by selection when metrics are on rows', () => {
     const metrics = ['metricB', 'metricA', 'metricC'];
     const rowGroupby = ['shipMode', 'orderPriority'];
     const detail = buildTreeFromRecords(
@@ -2086,7 +2086,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect([...subtotalIndexes].sort((a, b) => a - b)).toEqual(subtotalIndexes);
   });
 
-  it('omits the grand total row when multiple metrics are on rows and keeps grand total column values', () => {
+  test('omits the grand total row when multiple metrics are on rows and keeps grand total column values', () => {
     const metrics = ['averageOrderValue', 'countOrders'];
     const detail = buildTreeFromRecords(
       [
@@ -2193,7 +2193,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(totalCells[grandIndex].textContent?.trim()).toBe('100');
   });
 
-  it('omits the grand total row when only metrics are on rows with multiple measures', () => {
+  test('omits the grand total row when only metrics are on rows with multiple measures', () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const detail = buildTreeFromRecords(
       [{ shipMode: 'AIR', averageOrderValue: 10, weightedDiscount: 20 }],
@@ -2270,7 +2270,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     );
   });
 
-  it('bolds expanded metric headers when metrics are first on rows', () => {
+  test('bolds expanded metric headers when metrics are first on rows', () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = ['discountBand'];
     const detail = buildTreeFromRecords(
@@ -2356,7 +2356,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(childHeader).not.toHaveClass('subtotal-cell');
   });
 
-  it('bolds expanded row dimensions when metrics are on columns', () => {
+  test('bolds expanded row dimensions when metrics are on columns', () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = ['discountBand', 'shipMode'];
     const detail = buildTreeFromRecords(
@@ -2455,7 +2455,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(childHeader).not.toHaveClass('subtotal-cell');
   });
 
-  it('keeps expanded dimension rows bold under metrics-first layouts', () => {
+  test('keeps expanded dimension rows bold under metrics-first layouts', () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = ['discountBand', 'shipMode'];
     const detail = buildTreeFromRecords(
@@ -2559,7 +2559,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(childHeader).not.toHaveClass('subtotal-cell');
   });
 
-  it('avoids duplicate metric rows from subtotal queries when metrics are last on rows', () => {
+  test('avoids duplicate metric rows from subtotal queries when metrics are last on rows', () => {
     const metrics = ['averageOrderValue', 'countOrders'];
     const detail = buildTreeFromRecords(
       [
@@ -2950,7 +2950,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     return { labeledTree, metrics, rowGroupby };
   };
 
-  it('renders top-level metric subtotals and suppresses returnFlag totals when top position is selected with multiple metrics', () => {
+  test('renders top-level metric subtotals and suppresses returnFlag totals when top position is selected with multiple metrics', () => {
     const { labeledTree, metrics, rowGroupby, layoutRows } =
       buildMetricSubtotalTree();
 
@@ -3044,7 +3044,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(returnFlagIndent).toBeGreaterThan(metricIndent);
   });
 
-  it('renders top-level metric subtotals and returnFlag totals when bottom position is selected with multiple metrics', () => {
+  test('renders top-level metric subtotals and returnFlag totals when bottom position is selected with multiple metrics', () => {
     const { labeledTree, metrics, rowGroupby, layoutRows } =
       buildMetricSubtotalTree();
 
@@ -3137,7 +3137,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(returnFlagIndent).toBeGreaterThan(metricIndent);
   });
 
-  it('suppresses metric-labeled subtotals when row subtotals are disabled', () => {
+  test('suppresses metric-labeled subtotals when row subtotals are disabled', () => {
     const { labeledTree, metrics, rowGroupby } = buildMetricSubtotalTree();
 
     const { container } = render(
@@ -3197,7 +3197,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(rowHeaders).not.toContain('N weightedDiscount');
   });
 
-  it('pushes metric subtotals for A/B/C to the bottom and matches indentation when metrics are between C and D (top position)', () => {
+  test('pushes metric subtotals for A/B/C to the bottom and matches indentation when metrics are between C and D (top position)', () => {
     const { labeledTree, metrics, rowGroupby } = buildDeepMetricSubtotalTree([
       1, 2, 3,
     ]);
@@ -3289,7 +3289,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(getRowIndent('C weightedDiscount')).toBe(indentC);
   });
 
-  it('adds single-metric E totals and keeps A/B/C subtotals aligned when metrics are between C and D (bottom position)', () => {
+  test('adds single-metric E totals and keeps A/B/C subtotals aligned when metrics are between C and D (bottom position)', () => {
     const { labeledTree, metrics, rowGroupby } = buildDeepMetricSubtotalTree([
       1, 2, 3, 5,
     ]);
@@ -3396,7 +3396,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(eCells.some(cell => cell.textContent?.trim())).toBe(false);
   });
 
-  it('pushes A-E metric subtotals to the bottom when values are between E and F (layout 1)', () => {
+  test('pushes A-E metric subtotals to the bottom when values are between E and F (layout 1)', () => {
     const { labeledTree, metrics, rowGroupby } =
       buildVeryDeepMetricSubtotalTree([1, 2, 3, 4, 5]);
 
@@ -3517,7 +3517,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(getRowIndent('E weightedDiscount')).toBe(indentE);
   });
 
-  it('renders G/H/I totals under each metric branch and keeps A-E subtotals aligned (layout 2)', () => {
+  test('renders G/H/I totals under each metric branch and keeps A-E subtotals aligned (layout 2)', () => {
     const { labeledTree, metrics, rowGroupby } =
       buildVeryDeepMetricSubtotalTree([1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
@@ -3683,7 +3683,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     assertRowHasNoValues(/^I$/);
   });
 
-  it('does not duplicate metric subtotals for the same group when multiple levels are enabled', () => {
+  test('does not duplicate metric subtotals for the same group when multiple levels are enabled', () => {
     const { labeledTree, metrics, rowGroupby } = buildMetricSubtotalTree();
 
     const { container } = render(
@@ -3744,7 +3744,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     ).toHaveLength(1);
   });
 
-  it('does not render metric total rows when metrics are the first row level', () => {
+  test('does not render metric total rows when metrics are the first row level', () => {
     const metrics = ['measure1', 'measure2'];
     const measure1Token = encodeMetricKey('measure1');
     const measure2Token = encodeMetricKey('measure2');
@@ -3945,7 +3945,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     );
   });
 
-  it('omits the grand total row when multiple measure leaves are visible', () => {
+  test('omits the grand total row when multiple measure leaves are visible', () => {
     const metricKey = 'grossRevenue';
     const valueLeaf = buildValueLeaf();
     const ixLeaf = buildBuiltInLeaf('ix', {

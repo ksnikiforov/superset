@@ -20,7 +20,7 @@
 import {
   resolveCollapsedExpansionState,
   resolveExpandedForMetrics,
-  resolveExpansionReinitializationPlan,
+  reconcileExpansionState,
   resolveExpansionToggleDecision,
 } from '../../../src/pivot/expansion/stateTransitions';
 import { planHydrationIteration } from '../../../src/pivot/expansion/planner';
@@ -127,14 +127,8 @@ describe('pivot/expansion/stateTransitions', () => {
 
   test('reinitializes expansion state when query context changes', () => {
     const { tree, aKey } = buildTree({ includeIntersectionCell: true });
-    const result = resolveExpansionReinitializationPlan({
-      previousSemanticSignature: 'same',
-      nextSemanticSignature: 'same',
-      previousQueryContextKey: 'unfiltered',
-      nextQueryContextKey: 'filtered',
-      previousData: tree,
-      data: tree,
-      currentTree: tree,
+    const result = reconcileExpansionState({
+      tree,
       previousLayout: {
         rows: ['country', 'city'],
         cols: ['month', 'day'],
@@ -143,7 +137,7 @@ describe('pivot/expansion/stateTransitions', () => {
         rows: ['country', 'city'],
         cols: ['month', 'day'],
       },
-      sessionState: {
+      state: {
         rows: [aKey],
         cols: [],
         collapsedRows: [],
@@ -155,7 +149,6 @@ describe('pivot/expansion/stateTransitions', () => {
 
     expect(result).toBeDefined();
     expect(result?.persistedState.rows).toEqual([aKey]);
-    expect(result?.shouldPersistReset).toBe(false);
   });
 
   test('resolves expansion toggles with ancestor and manual state', () => {

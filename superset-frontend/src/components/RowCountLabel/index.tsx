@@ -26,6 +26,7 @@ type RowCountLabelProps = {
   limit?: number;
   loading?: boolean;
   label?: JSX.Element;
+  isLimitReached?: boolean;
 };
 
 const limitReachedMsg = t(
@@ -33,8 +34,8 @@ const limitReachedMsg = t(
 );
 
 export default function RowCountLabel(props: RowCountLabelProps) {
-  const { rowcount = 0, limit = null, loading, label } = props;
-  const limitReached = limit && rowcount >= limit;
+  const { rowcount = 0, limit = null, loading, label, isLimitReached } = props;
+  const limitReached = isLimitReached ?? (limit && rowcount >= limit);
   const type =
     limitReached || (rowcount === 0 && !loading) ? 'error' : 'default';
   const formattedRowCount = getNumberFormatter()(rowcount);

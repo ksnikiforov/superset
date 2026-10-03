@@ -77,7 +77,6 @@ import {
 import { coerceValueForColumn, normalizeTemporalValue } from './pathFilters';
 import {
   buildFactCoverage,
-  buildInitialRootCoverageNeeds,
   normalizeFactValueKeys,
   pathsFromAxisScope,
 } from '../runtime/coverage';
@@ -143,7 +142,12 @@ export const toChartDataQueries = ({
     const comparison = spec.meta?.timeComparison;
     const filters = [
       ...((baseQueryObject.filters ?? []) as QueryObjectFilterClause[]),
-      ...spec.filters,
+      ...spec.filters.map(filter =>
+        comparison &&
+        getColumnLabel(filter.col) === comparison.temporalColumnLabel
+          ? { ...filter, grain: comparison.timeGrain }
+          : filter,
+      ),
     ];
     const requiredTimeOffsets = spec.meta?.requiredTimeOffsets ?? [];
     const timeOffsets =
@@ -783,7 +787,7 @@ const buildPathSetFilterClauses = ({
     const nonNullValues = values.filter(value => !isNullish(value));
     if (nonNullValues.length === 0) {
       filters.push({
-        col: getColumnLabel(column),
+        col: column,
         op: 'IS NULL',
       } as UnaryQueryObjectFilterClause);
       continue;
@@ -793,14 +797,14 @@ const buildPathSetFilterClauses = ({
     ) as DataRecordValue[];
     if (coercedValues.length === 1 && nonNullValues.length === values.length) {
       filters.push({
-        col: getColumnLabel(column),
+        col: column,
         op: '==',
         val: coercedValues[0],
       } as QueryObjectFilterClause);
       continue;
     }
     filters.push({
-      col: getColumnLabel(column),
+      col: column,
       op: 'IN',
       val: coercedValues,
     } as SetQueryObjectFilterClause);
@@ -897,7 +901,9 @@ export const optimizeExpansionFetchPlan = ({
       target.need.valueKeys,
       target.axis === 'row' ? target.need.columnScope : target.need.rowScope,
     ]);
-    groups.set(groupKey, [...(groups.get(groupKey) ?? []), target]);
+    const group = groups.get(groupKey);
+    if (group) group.push(target);
+    else groups.set(groupKey, [target]);
   });
 
   groups.forEach(group => {
@@ -912,107 +918,6 @@ export const optimizeExpansionFetchPlan = ({
 type ExpansionSpecContext = {
   formData: PivotTableQueryFormData;
   layout: LayoutContext;
-};
-
-const buildAxisPathExpansionSpecs = ({
-  formData,
-  layout,
-  targets,
-}: ExpansionSpecContext & {
-  targets: ExpansionCoverageTarget[];
-}): PlannedQuerySpec[] => {
-  const coverageTarget = targets[0];
-  if (!coverageTarget) {
-    return [];
-  }
-  const { axis } = coverageTarget;
-  const path = parsePath(coverageTarget.pathKey);
-  const scopedPaths = targets.flatMap(targetScopePaths);
-  return buildAxisExpansionSpecs({
-    formData,
-    layout,
-    axis,
-    path,
-    coverageTarget,
-    filters: buildPathSetFilterClauses({
-      axisGroupby:
-        axis === 'row'
-          ? coverageTarget.need.rowDimensions
-          : coverageTarget.need.columnDimensions,
-      paths: scopedPaths,
-      colTypeMap: formData.colTypeMap,
-    }),
-    scope: targetAxisScope(coverageTarget, scopedPaths),
-  });
-};
-
-const buildIntersectionTargetExpansionSpecs = ({
-  formData,
-  layout,
-  target,
-}: ExpansionSpecContext & {
-  target: ExpansionCoverageTarget;
-}): PlannedQuerySpec[] => {
-  const rowPaths = pathsFromAxisScope(target.need.rowScope);
-  const columnPaths = pathsFromAxisScope(target.need.columnScope);
-  const anchor = resolveIntersectionExpansionAnchor({
-    layout,
-    rowPaths,
-    columnPaths,
-  });
-  return buildAxisExpansionSpecs({
-    formData,
-    layout,
-    axis: anchor.axis,
-    path: anchor.path,
-    coverageTarget: target,
-    filters: [
-      ...buildPathSetFilterClauses({
-        axisGroupby: target.need.rowDimensions,
-        paths: rowPaths,
-        colTypeMap: formData.colTypeMap,
-      }),
-      ...buildPathSetFilterClauses({
-        axisGroupby: target.need.columnDimensions,
-        paths: columnPaths,
-        colTypeMap: formData.colTypeMap,
-      }),
-    ],
-    scope: {
-      kind: 'intersection',
-      rowPaths,
-      columnPaths,
-    },
-  });
-};
-
-export const buildExpansionQuerySpecPhases = ({
-  formData,
-  layout,
-  targets,
-}: ExpansionSpecContext & {
-  targets: ExpansionCoverageTarget[];
-}): PlannedQuerySpec[][] => {
-  const intersections = targets.filter(isIntersectionCoverageTarget);
-  const targetGroups = optimizeExpansionFetchPlan({
-    targets: targets.filter(target => !isIntersectionCoverageTarget(target)),
-  });
-  return [
-    targetGroups.flatMap(targetGroup =>
-      buildAxisPathExpansionSpecs({
-        formData,
-        layout,
-        targets: targetGroup,
-      }),
-    ),
-    intersections.flatMap(target =>
-      buildIntersectionTargetExpansionSpecs({
-        formData,
-        layout,
-        target,
-      }),
-    ),
-  ].filter(phase => phase.length > 0);
 };
 
 export const buildInitialQuerySpecs = (
@@ -1031,15 +936,7 @@ export const buildInitialQuerySpecs = (
     colSubtotalLevels.length > 0;
   const queryContextKey = buildPivotFactQueryContextKey(formData);
   const hasMetrics = layout.pivotProgram.metricKeys.length > 0;
-  const rootNeeds = buildInitialRootCoverageNeeds({
-    program: layout.pivotProgram,
-    axisCoverageNeeds: layout.axisCoverageNeeds,
-    needsTotals,
-    valueKeys: buildFactValueKeys({
-      metricKeys: layout.pivotProgram.metricKeys,
-      requiredTimeOffsets: layout.requiredTimeOffsets,
-    }),
-  });
+  const rootNeeds = layout.rootCoverageNeeds;
 
   return rootNeeds.map(need => {
     const { rowDepth, columnDepth } = need;
@@ -1079,6 +976,133 @@ export const buildInitialQuerySpecs = (
       filters: [],
     });
   });
+};
+
+const buildAxisPathExpansionSpecs = ({
+  formData,
+  layout,
+  targets,
+}: ExpansionSpecContext & {
+  targets: ExpansionCoverageTarget[];
+}): PlannedQuerySpec[] => {
+  const coverageTarget = targets[0];
+  if (!coverageTarget) {
+    return [];
+  }
+  if (
+    coverageTarget.need.rowScope.kind === 'root' &&
+    coverageTarget.need.columnScope.kind === 'root'
+  ) {
+    return buildInitialQuerySpecs(formData, {
+      ...layout,
+      rootCoverageNeeds: [coverageTarget.need],
+    });
+  }
+  const { axis } = coverageTarget;
+  const path = parsePath(coverageTarget.pathKey);
+  const scopedPaths = targets.flatMap(targetScopePaths);
+  return buildAxisExpansionSpecs({
+    formData,
+    layout,
+    axis,
+    path,
+    coverageTarget,
+    filters: buildPathSetFilterClauses({
+      axisGroupby:
+        axis === 'row'
+          ? coverageTarget.need.rowDimensions
+          : coverageTarget.need.columnDimensions,
+      paths: scopedPaths,
+      colTypeMap: formData.colTypeMap,
+    }),
+    scope: targetAxisScope(coverageTarget, scopedPaths),
+  });
+};
+
+const buildIntersectionTargetExpansionSpecs = ({
+  formData,
+  layout,
+  target,
+}: ExpansionSpecContext & {
+  target: ExpansionCoverageTarget;
+}): PlannedQuerySpec[] => {
+  const rowPaths = pathsFromAxisScope(target.need.rowScope);
+  const columnPaths = pathsFromAxisScope(target.need.columnScope);
+  const anchor = resolveIntersectionExpansionAnchor({
+    layout,
+    rowPaths,
+    columnPaths,
+  });
+  // SQL filter conjunctions cannot express IN (..., NULL). Group by nullness
+  // at every path level so each selector describes exactly the requested scope.
+  const groupPaths = (paths: PivotPath[]) => {
+    const groups = new Map<string, PivotPath[]>();
+    paths.forEach(path => {
+      const key = path.map(value => (isNullish(value) ? 'n' : 'v')).join('');
+      const group = groups.get(key);
+      if (group) group.push(path);
+      else groups.set(key, [path]);
+    });
+    return Array.from(groups.values());
+  };
+  const columnGroups = groupPaths(columnPaths);
+  return groupPaths(rowPaths).flatMap(rowGroup =>
+    columnGroups.flatMap(columnGroup =>
+      buildAxisExpansionSpecs({
+        formData,
+        layout,
+        axis: anchor.axis,
+        path: anchor.path,
+        coverageTarget: target,
+        filters: [
+          ...buildPathSetFilterClauses({
+            axisGroupby: target.need.rowDimensions,
+            paths: rowGroup,
+            colTypeMap: formData.colTypeMap,
+          }),
+          ...buildPathSetFilterClauses({
+            axisGroupby: target.need.columnDimensions,
+            paths: columnGroup,
+            colTypeMap: formData.colTypeMap,
+          }),
+        ],
+        scope: {
+          kind: 'intersection',
+          rowPaths: rowGroup,
+          columnPaths: columnGroup,
+        },
+      }),
+    ),
+  );
+};
+
+export const buildExpansionQuerySpecPhases = ({
+  formData,
+  layout,
+  targets,
+}: ExpansionSpecContext & {
+  targets: ExpansionCoverageTarget[];
+}): PlannedQuerySpec[][] => {
+  const intersections = targets.filter(isIntersectionCoverageTarget);
+  const targetGroups = optimizeExpansionFetchPlan({
+    targets: targets.filter(target => !isIntersectionCoverageTarget(target)),
+  });
+  return [
+    targetGroups.flatMap(targetGroup =>
+      buildAxisPathExpansionSpecs({
+        formData,
+        layout,
+        targets: targetGroup,
+      }),
+    ),
+    intersections.flatMap(target =>
+      buildIntersectionTargetExpansionSpecs({
+        formData,
+        layout,
+        target,
+      }),
+    ),
+  ].filter(phase => phase.length > 0);
 };
 
 export type SelectionFilterMap = Record<string, DataRecordValue[]>;
@@ -1246,7 +1270,7 @@ export const buildSelectionFilteredFormData = ({
       ? {
           ...formData,
           extra_form_data: {
-            ...(formData.extra_form_data ?? {}),
+            ...formData.extra_form_data,
             filters: [
               ...(formData.extra_form_data?.filters ?? []),
               ...selectionFilters,

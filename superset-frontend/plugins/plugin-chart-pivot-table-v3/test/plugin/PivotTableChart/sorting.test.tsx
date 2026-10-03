@@ -73,7 +73,7 @@ describe('PivotTableChart sorting', () => {
     return Number.parseFloat((bar as HTMLElement).style.left);
   };
 
-  it('sorts rows by metric totals when configured', () => {
+  test('sorts rows by metric totals when configured', () => {
     const metrics = ['metric1'];
     const groupbyRows = ['country'];
     const groupbyColumns: string[] = [];
@@ -133,7 +133,7 @@ describe('PivotTableChart sorting', () => {
     expect(labels).toEqual(['Canada', 'Brazil']);
   });
 
-  it('sorts rows by dimension values when no metric is configured', () => {
+  test('sorts rows by dimension values when no metric is configured', () => {
     const metrics = ['metric1'];
     const groupbyRows = ['country'];
     const groupbyColumns: string[] = [];
@@ -193,7 +193,7 @@ describe('PivotTableChart sorting', () => {
     expect(labels).toEqual(['Brazil', 'Argentina']);
   });
 
-  it('keeps null metric totals at bottom for dimension row sorting', () => {
+  test('keeps null metric totals at bottom for dimension row sorting', () => {
     const metrics = ['metric1'];
     const groupbyRows = ['country'];
     const groupbyColumns: string[] = [];
@@ -289,7 +289,7 @@ describe('PivotTableChart sorting', () => {
     expect(getBodyRowLabels(container)).toEqual(['A', 'C', 'B']);
   });
 
-  it('does not sort when clicking a non-metric column header under multi-metric layout', () => {
+  test('does not sort when clicking a non-metric column header under multi-metric layout', () => {
     const metrics = ['m1', 'm2'];
     const groupbyRows = ['country'];
     const groupbyColumns = ['year'];
@@ -353,7 +353,7 @@ describe('PivotTableChart sorting', () => {
     expect(getBodyRowLabels(container)).toEqual(['A', 'B', 'C']);
   });
 
-  it('cycles metric header sorting asc desc none and keeps nulls at bottom', () => {
+  test('cycles metric header sorting asc desc none and keeps nulls at bottom', () => {
     const metrics = ['m1', 'm2'];
     const groupbyRows = ['country'];
     const groupbyColumns = ['year'];
@@ -433,7 +433,7 @@ describe('PivotTableChart sorting', () => {
     expect(getBodyRowLabels(container)).toEqual(['A', 'B', 'C', 'D']);
   });
 
-  it('recomputes waterfall offsets when interactive column sorting changes row order', () => {
+  test('recomputes waterfall offsets when interactive column sorting changes row order', () => {
     const metrics = ['metric1'];
     const groupbyRows = ['country'];
     const groupbyColumns = ['year'];
@@ -516,7 +516,7 @@ describe('PivotTableChart sorting', () => {
     expect(bLeftAfterSort).toBe(0);
   });
 
-  it('recomputes waterfall offsets for selected non-value leaves in interactive sorting', () => {
+  test('recomputes waterfall offsets for selected non-value leaves in interactive sorting', () => {
     const metrics = ['m1'];
     const groupbyRows = ['country'];
     const groupbyColumns = ['year'];
@@ -620,7 +620,7 @@ describe('PivotTableChart sorting', () => {
     expect(bLeftAfterSort).toBe(0);
   });
 
-  it('sorts by the clicked measure leaf metric when measure hierarchy is enabled', () => {
+  test('sorts by the clicked measure leaf metric when measure hierarchy is enabled', () => {
     const metrics = ['m1', 'm2'];
     const groupbyRows = ['country'];
     const groupbyColumns = ['year'];
@@ -715,7 +715,7 @@ describe('PivotTableChart sorting', () => {
     expect(getBodyRowLabels(container)).toEqual(['Zeta', 'Alpha']);
   });
 
-  it('sorts metric group headers by the selected Value leaf in measure hierarchy', () => {
+  test('sorts metric group headers by the selected Value leaf in measure hierarchy', () => {
     const metrics = ['m1', 'm2'];
     const groupbyRows = ['country'];
     const groupbyColumns = ['year'];
@@ -811,7 +811,7 @@ describe('PivotTableChart sorting', () => {
     expect(getBodyRowLabels(container)).toEqual(['Zeta', 'Alpha']);
   });
 
-  it('keeps active metric sorting stable when moving from Value-only to multi-leaf', () => {
+  test('keeps active metric sorting stable when moving from Value-only to multi-leaf', () => {
     const metrics = ['m1', 'm2'];
     const groupbyRows = ['country'];
     const groupbyColumns = ['year'];
@@ -988,7 +988,7 @@ describe('PivotTableChart sorting', () => {
     expect(getBodyRowLabels(container)).toEqual(['Zeta', 'Alpha']);
   });
 
-  it('prefers Value leaf for dimension sorting when Value is selected', () => {
+  test('prefers Value leaf for dimension sorting when Value is selected', () => {
     const metrics = ['m1'];
     const groupbyRows = ['country'];
     const groupbyColumns: string[] = [];
@@ -1065,7 +1065,7 @@ describe('PivotTableChart sorting', () => {
     expect(getBodyRowLabels(container)).toEqual(['Zeta', 'Alpha']);
   });
 
-  it('resolves dimension sorting metrics to selected measure leaves', () => {
+  test('resolves dimension sorting metrics to selected measure leaves', () => {
     const metrics = ['m1'];
     const groupbyRows = ['country'];
     const groupbyColumns: string[] = [];

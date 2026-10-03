@@ -133,7 +133,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     );
   };
 
-  it('expands with updated groupby rows after instant layout changes', async () => {
+  test('expands with updated groupby rows after instant layout changes', async () => {
     const metrics = ['grossRevenue'];
     const initialRows = ['shipMode', 'orderPriority'];
     const updatedRows = ['shipMode', 'revenueBand'];
@@ -242,7 +242,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(lastCall?.formData.groupbyRows).toEqual(updatedRows);
   });
 
-  it('prunes stale toggles when trimming row dimensions', async () => {
+  test('prunes stale toggles when trimming row dimensions', async () => {
     const metrics = ['grossRevenue'];
     const initialRows = ['shipMode', 'orderPriority', 'lineStatus'];
     const initialRecords = [
@@ -317,7 +317,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('does not fetch when removing a covered trailing row dimension after expanding a top-level row', async () => {
+  test('does not fetch when removing a covered trailing row dimension after expanding a top-level row', async () => {
     const metrics = ['m1'];
     const initialRows = ['r1', 'r2', 'r3'];
     const records = [
@@ -411,7 +411,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(fetchPivotBranchMock).not.toHaveBeenCalled();
   });
 
-  it('keeps expanded row hierarchy visible while trimming a covered trailing row', async () => {
+  test('keeps expanded row hierarchy visible while trimming a covered trailing row', async () => {
     const metrics = ['m1', 'm2'];
     const initialRows = ['r1', 'r2', 'r3'];
     const records = [
@@ -505,7 +505,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(screen.queryByText('A2')).toBeInTheDocument();
   });
 
-  it('keeps expanded rows stable when trailing trim coincides with stale parent data refresh', async () => {
+  test('keeps expanded rows stable when trailing trim coincides with stale parent data refresh', async () => {
     const metrics = ['m1', 'm2'];
     const initialRows = ['r1', 'r2', 'r3'];
     const records = [
@@ -625,7 +625,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(screen.getByText('A2')).toBeInTheDocument();
   });
 
-  it('reuses loaded coverage when removing trailing row dimension after deep expansion is loaded', async () => {
+  test('reuses loaded coverage when removing trailing row dimension after deep expansion is loaded', async () => {
     const metrics = ['m1', 'm2'];
     const initialRows = ['r1', 'r2', 'r3'];
     const records = [
@@ -718,7 +718,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     await waitFor(() => expect(screen.getByText('A1')).toBeInTheDocument());
   });
 
-  it('shows grand total and restores row members after removing then re-adding the last row dimension', async () => {
+  test('shows grand total and restores row members after removing then re-adding the last row dimension', async () => {
     const metrics = ['m1', 'm2'];
     const initialRows = ['r1'];
     const detailTree = buildTreeFromRecords(
@@ -833,7 +833,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('reloads data when replacing the leading row dimension in user-controlled mode', async () => {
+  test('reloads data when replacing the leading row dimension in user-controlled mode', async () => {
     const metrics = ['m1'];
     const initialRows = ['row1'];
     const initialRecords = [
@@ -974,7 +974,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     });
   });
 
-  it('reloads when adding the first row dimension after clearing rows in user-controlled mode', async () => {
+  test('reloads when adding the first row dimension after clearing rows in user-controlled mode', async () => {
     const metrics = ['m1'];
     const initialRows = ['name'];
     const initialRecords = [
@@ -1090,7 +1090,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     });
   });
 
-  it('fetches only when the first row key changes in a multistep row-toggle sequence', async () => {
+  test('fetches only when the first row key changes in a multistep row-toggle sequence', async () => {
     const metrics = ['m1'];
     const initialRows = ['name'];
     const initialRecords = [
@@ -1235,7 +1235,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     });
   });
 
-  it('shows grand total column and restores column members after removing then re-adding the last column dimension', async () => {
+  test('shows grand total column and restores column members after removing then re-adding the last column dimension', async () => {
     const metrics = ['m1', 'm2'];
     const initialCols = ['c1'];
     const detailTree = buildTreeFromRecords(
@@ -1354,7 +1354,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('clears stale expanded state values after trimming a column dimension when Values is first', async () => {
+  test('clears stale expanded state values after trimming a column dimension when Values is first', async () => {
     const metrics = ['m1', 'm2'];
     const initialCols = ['gender', 'state'];
     const records = [
@@ -1455,7 +1455,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('seamless-reloads when trimming a trailing column value-axis dimension without cached parent cells', async () => {
+  test('seamless-reloads when trimming a trailing column value-axis dimension without cached parent cells', async () => {
     const metrics = ['m1', 'm2'];
     const initialCols = ['col1', 'col2'];
     const records = [
@@ -1569,7 +1569,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     const fetchCall = fetchMock.mock.calls[0]?.[0];
     expect(
       new Set(
-        (fetchCall?.specs as PlannedQuerySpec[]).map(
+        ((fetchCall?.specs ?? []) as PlannedQuerySpec[]).map(
           spec =>
             `${spec.meta.factSelector.coverage.rowDepth}|${spec.meta.factSelector.coverage.columnDepth}`,
         ),
@@ -1582,7 +1582,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     ).toBe(false);
   });
 
-  it('keeps Values-first metric branches expandable after re-adding a trimmed column dimension', async () => {
+  test('keeps Values-first metric branches expandable after re-adding a trimmed column dimension', async () => {
     const metrics = ['m1', 'm2'];
     const initialCols = ['gender', 'state'];
     const records = [
@@ -1701,7 +1701,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     });
   });
 
-  it('clears stale cached column leaves when removing one dimension and later adding another', async () => {
+  test('clears stale cached column leaves when removing one dimension and later adding another', async () => {
     const metrics = ['m1', 'm2'];
     const initialCols = ['gender', 'state'];
     const records = [
@@ -1861,7 +1861,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('shows column expand toggles after inserting before trailing values through seamless reload', async () => {
+  test('shows column expand toggles after inserting before trailing values through seamless reload', async () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const initialCols = ['discountBand'];
     const initialRecords = [
@@ -1981,7 +1981,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     });
   });
 
-  it('clears stale order priority rows after trimming and reordering rows', async () => {
+  test('clears stale order priority rows after trimming and reordering rows', async () => {
     const metrics = ['grossRevenue'];
     const initialRows = [
       'shipMode',
@@ -2175,7 +2175,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     );
   });
 
-  it('seamless-reloads when row chip reorder changes the leading row key', async () => {
+  test('seamless-reloads when row chip reorder changes the leading row key', async () => {
     const metrics = ['measure1', 'measure2'];
     const rowGroupby = ['row1', 'row2'];
     const colGroupby = ['col1'];
@@ -2272,7 +2272,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     ).toEqual(['row2', 'row1']);
   });
 
-  it('locally reorders covered non-leading dimensions on the value axis stack', async () => {
+  test('locally reorders covered non-leading dimensions on the value axis stack', async () => {
     const metrics = ['measure1', 'measure2'];
     const colGroupby = ['col1', 'col2', 'col3'];
     const records = [
@@ -2362,7 +2362,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('seamless-reloads when reordering changes the leading value-axis key', async () => {
+  test('seamless-reloads when reordering changes the leading value-axis key', async () => {
     const metrics = ['measure1', 'measure2'];
     const colGroupby = ['col1', 'col2', 'col3'];
     const records = [
@@ -2452,7 +2452,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
   });
 
-  it('moves Values to rows for multi-metric interaction without leaving stale column metrics', async () => {
+  test('moves Values to rows for multi-metric interaction without leaving stale column metrics', async () => {
     const metrics = ['measure1', 'measure2'];
     const rowGroupby = ['row1'];
     const colGroupby = ['col1'];
@@ -2569,7 +2569,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     });
   });
 
-  it('keeps layout editing live while a Values placement fetch is pending', async () => {
+  test('keeps layout editing live while a Values placement fetch is pending', async () => {
     const metrics = ['m1', 'm2'];
     const rowGroupby = ['r1'];
     const records = [{ r1: 'A', c1: 'X', m1: 10, m2: 20 }];
@@ -2685,7 +2685,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     ).toEqual(['c1']);
   });
 
-  it('keeps rows populated when moving the last row dimension to columns with Values on rows', async () => {
+  test('keeps rows populated when moving the last row dimension to columns with Values on rows', async () => {
     const metrics = ['m1', 'm2'];
     const rowGroupby = ['r1'];
     const records = [
@@ -2845,7 +2845,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     });
   });
 
-  it('keeps local Value chip placement after a parent rerender while seamless fetch is pending', async () => {
+  test('keeps local Value chip placement after a parent rerender while seamless fetch is pending', async () => {
     const metrics = ['measure1', 'measure2'];
     const rowGroupby = ['row1'];
     const colGroupby = ['col1'];
@@ -2890,7 +2890,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
         specs: Array<unknown>;
         requestGroupId?: string;
       }) => {
-        if (requestGroupId === 'pivot-v3-seamless') {
+        if (requestGroupId?.startsWith('pivot-v3-seamless-')) {
           await seamlessFetchPromise;
         }
         return specs.map(() => ({ data: records }));
@@ -2988,7 +2988,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(within(colStrip).queryByText('Value')).not.toBeInTheDocument();
   });
 
-  it('keeps the committed table visible during seamless hydration', async () => {
+  test('keeps the committed table visible during seamless hydration', async () => {
     const metrics = ['m1', 'm2'];
     const rowGroupby = ['r1', 'r2'];
     const colGroupby = ['c1'];
@@ -3044,19 +3044,17 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     );
 
     let resolveBranch:
-      | ((
-          value: {
-            data: PivotTreeData | undefined;
-            factBatches?: PivotFactStoreBatch[];
-          },
-        ) => void)
+      | ((value: {
+          data: PivotTreeData | undefined;
+          factBatches?: PivotFactStoreBatch[];
+        }) => void)
       | undefined;
     const branchPromise = new Promise<{
       data: PivotTreeData | undefined;
       factBatches?: PivotFactStoreBatch[];
     }>(resolve => {
-        resolveBranch = resolve;
-      });
+      resolveBranch = resolve;
+    });
     fetchPivotBranchMock.mockImplementation(
       async (params: FetchPivotExpansionRequest) => {
         if (
@@ -3135,7 +3133,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     }
   });
 
-  it('keeps expanded row descendants visible after moving Values to rows at axis end', async () => {
+  test('keeps expanded row descendants visible after moving Values to rows at axis end', async () => {
     const metrics = ['m1', 'm2'];
     const rowGroupby = ['r1', 'r2'];
     const colGroupby = ['c1'];
@@ -3304,18 +3302,16 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     ).toEqual(['r1', 'r2', METRICS_PLACEHOLDER]);
     expect(lastFetch?.formData?.pivotExpansionState).toBeUndefined();
     const plannedSpecs = lastFetch?.specs ?? [];
-    const plannedSummary = plannedSpecs.map(
-      (spec: PlannedQuerySpec) => {
-        const scope = spec.meta?.factSelector?.scope;
-        const path = scope?.kind === 'axisPaths' ? (scope.paths[0] ?? []) : [];
-        const axis = scope && 'axis' in scope ? scope.axis : 'none';
-        return `${scope?.kind ?? 'unknown'}:${axis}:${serializePath(
-          path,
-        )}:${spec.meta?.factSelector?.coverage?.rowDepth ?? 0}:${
-          spec.meta?.factSelector?.coverage?.columnDepth ?? 0
-        }`;
-      },
-    );
+    const plannedSummary = plannedSpecs.map((spec: PlannedQuerySpec) => {
+      const scope = spec.meta?.factSelector?.scope;
+      const path = scope?.kind === 'axisPaths' ? (scope.paths[0] ?? []) : [];
+      const axis = scope && 'axis' in scope ? scope.axis : 'none';
+      return `${scope?.kind ?? 'unknown'}:${axis}:${serializePath(
+        path,
+      )}:${spec.meta?.factSelector?.coverage?.rowDepth ?? 0}:${
+        spec.meta?.factSelector?.coverage?.columnDepth ?? 0
+      }`;
+    });
     expect(plannedSummary).not.toContain('branch:row:A:2:1');
     expect(plannedSummary).toEqual(
       expect.arrayContaining(['root:none::1:0', 'root:none::0:1']),
@@ -3338,7 +3334,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(fetchPivotBranchMock).toHaveBeenCalledTimes(branchCallsBeforeMove);
   });
 
-  it('locally moves Values to the front on a populated column axis', async () => {
+  test('locally moves Values to the front on a populated column axis', async () => {
     const metrics = ['m1', 'm2'];
     const rowGroupby = ['r1'];
     const records = [{ r1: 'R1', c1: 'C1', m1: 10, m2: 20 }];
@@ -3473,7 +3469,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
   });
 
-  it('keeps visible column headers after adding the first column dimension to a Values-only column axis', async () => {
+  test('keeps visible column headers after adding the first column dimension to a Values-only column axis', async () => {
     const metrics = ['m1', 'm2'];
     const records = [
       { c1: 'A', m1: 10, m2: 20 },
@@ -3576,7 +3572,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     });
   });
 
-  it('keeps expanded columns after adding a row dimension without seamless reload', async () => {
+  test('keeps expanded columns after adding a row dimension without seamless reload', async () => {
     const metrics = ['measure1'];
     const rowGroupby = ['row1'];
     const colGroupby = ['col1'];
@@ -3748,7 +3744,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     ).toBe(false);
   });
 
-  it('keeps newly added metrics in the layout after a seamless fetch', async () => {
+  test('keeps newly added metrics in the layout after a seamless fetch', async () => {
     const metrics = ['m1', 'm2'];
     const columns = ['c1', 'c2'];
     const runtimeLayout: PivotRuntimeLayout = {
@@ -3824,7 +3820,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     });
   });
 
-  it('shows the corner loader while a measure selection fetch is pending', async () => {
+  test('shows the corner loader while a measure selection fetch is pending', async () => {
     const metrics = ['m1', 'm2'];
     const columns = ['c1', 'c2'];
     const runtimeLayout: PivotRuntimeLayout = {
@@ -3892,7 +3888,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     deferred.resolve([{ data: [{ c1: 'A', c2: 'B', m1: 10, m2: 20 }] }]);
   });
 
-  it('does not show row loaders for already expanded rows after measure data loads', async () => {
+  test('does not show row loaders for already expanded rows after measure data loads', async () => {
     const metrics = ['m1', 'm2'];
     const rows = ['r1', 'r2'];
     const runtimeLayout: PivotRuntimeLayout = {
@@ -3944,12 +3940,13 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     let resolveMeasureFetch:
       | ((results: Array<{ data: typeof nextRecords }>) => void)
       | undefined;
-    fetchMock.mockImplementation(({ specs }: { specs: Array<unknown> }) => {
-      return new Promise(resolve => {
-        resolveMeasureFetch = () =>
-          resolve(specs.map(() => ({ data: nextRecords })));
-      });
-    });
+    fetchMock.mockImplementation(
+      ({ specs }: { specs: Array<unknown> }) =>
+        new Promise(resolve => {
+          resolveMeasureFetch = () =>
+            resolve(specs.map(() => ({ data: nextRecords })));
+        }),
+    );
     fetchPivotBranchMock.mockImplementation(() => new Promise(() => undefined));
 
     render(
@@ -3986,12 +3983,13 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     const expandedRowAfterMeasure = screen
       .getByText('A')
       .closest('tr') as HTMLElement;
-    const expandedToggle =
-      within(expandedRowAfterMeasure).getByLabelText('minus-square');
+    const expandedToggle = within(expandedRowAfterMeasure).getByLabelText(
+      'minus-square',
+    );
     expect(expandedToggle.closest('button')).not.toBeDisabled();
   });
 
-  it('reuses current expansion state during seamless metric updates to avoid rubber-banding', async () => {
+  test('reuses current expansion state during seamless metric updates to avoid rubber-banding', async () => {
     const metrics = ['m1', 'm2'];
     const rows = ['r1', 'r2'];
     const runtimeLayout: PivotRuntimeLayout = {

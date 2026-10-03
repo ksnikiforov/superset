@@ -39,7 +39,7 @@ describe('PivotTableChart sticky headers', () => {
     0,
   );
 
-  it('marks sticky headers and pins the grand total row at the top', () => {
+  test('marks sticky headers and pins the grand total row at the top', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
@@ -70,7 +70,7 @@ describe('PivotTableChart sticky headers', () => {
     expect(totalRow).toHaveClass('pivot-grand-total-row--top');
   });
 
-  it('allows sticky headers to be disabled', () => {
+  test('allows sticky headers to be disabled', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
@@ -101,7 +101,7 @@ describe('PivotTableChart sticky headers', () => {
     expect(totalRow).toHaveClass('pivot-grand-total-row--bottom');
   });
 
-  it('stacks multi-level column headers with offsets when sticky headers are enabled', async () => {
+  test('stacks multi-level column headers with offsets when sticky headers are enabled', async () => {
     const multiLevelTree = buildTreeFromRecords(
       [{ country: 'Brazil', region: 'South', state: 'SC', metric1: 10 }],
       metrics,
@@ -173,7 +173,7 @@ describe('PivotTableChart sticky headers', () => {
     getBoundingClientRectSpy.mockRestore();
   });
 
-  it('renders row metric totals as grand-total rows with grand-total indentation', () => {
+  test('renders row metric totals as grand-total rows with grand-total indentation', () => {
     const rowMetrics = ['sum__num', 'count'];
     const detailTree = buildTreeFromRecords(
       [

@@ -48,7 +48,7 @@ const branchQuerySpecs = ({
 };
 
 describe('query naming (contracts)', () => {
-  it('derives expansion query identity from fact scope with divider values', () => {
+  test('derives expansion query identity from fact scope with divider values', () => {
     const dividerValue = `A${PATH_DIVIDER}B`;
     const formData = buildFormData({
       groupbyRows: ['r1', 'r2'],
@@ -68,7 +68,7 @@ describe('query naming (contracts)', () => {
     ).toBe(true);
   });
 
-  it('derives expansion query identity from fact scope with null values', () => {
+  test('derives expansion query identity from fact scope with null values', () => {
     const formData = buildFormData({
       groupbyRows: ['r1', 'r2'],
       groupbyColumns: [],
@@ -85,7 +85,7 @@ describe('query naming (contracts)', () => {
     ).toBe(true);
   });
 
-  it('derives expansion query identity from fact scope with undefined values', () => {
+  test('derives expansion query identity from fact scope with undefined values', () => {
     const formData = buildFormData({
       groupbyRows: ['r1', 'r2'],
       groupbyColumns: [],

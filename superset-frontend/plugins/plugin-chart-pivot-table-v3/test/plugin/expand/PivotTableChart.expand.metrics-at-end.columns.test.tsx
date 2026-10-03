@@ -55,7 +55,7 @@ describe('PivotTableChart expansion with metrics at the column end', () => {
     });
   };
 
-  it('expands a column dimension without blanking metric values when metrics are at the end', async () => {
+  test('expands a column dimension without blanking metric values when metrics are at the end', async () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = ['quantityBand'];
     const colGroupby = ['orderStatus', 'lineStatus'];
@@ -192,7 +192,7 @@ describe('PivotTableChart expansion with metrics at the column end', () => {
     expect(within(thead).getByText('F')).toBeInTheDocument();
   });
 
-  it('keeps metric values visible when no branch data is returned', async () => {
+  test('keeps metric values visible when no branch data is returned', async () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = ['quantityBand'];
     const colGroupby = ['orderStatus', 'lineStatus'];
@@ -312,7 +312,7 @@ describe('PivotTableChart expansion with metrics at the column end', () => {
     expect(within(getRow()).getAllByText('0.05').length).toBeGreaterThan(0);
   });
 
-  it('keeps collapsed values after expanding and collapsing a column', async () => {
+  test('keeps collapsed values after expanding and collapsing a column', async () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = ['quantityBand'];
     const colGroupby = ['orderStatus', 'lineStatus'];
@@ -472,7 +472,7 @@ describe('PivotTableChart expansion with metrics at the column end', () => {
     expect(countBlankCells(getRow())).toBe(0);
   });
 
-  it('materializes intermediate column hierarchy nodes when metrics are at the end', () => {
+  test('materializes intermediate column hierarchy nodes when metrics are at the end', () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = ['quantityBand'];
     const colGroupby = ['orderStatus', 'lineStatus'];

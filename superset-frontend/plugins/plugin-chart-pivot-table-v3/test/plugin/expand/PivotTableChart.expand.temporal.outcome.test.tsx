@@ -173,7 +173,7 @@ describe('PivotTableChart temporal expansion outcome', () => {
     } as Awaited<ReturnType<typeof SupersetClient.get>>);
   });
 
-  it('expanding temporal parent does not show chart error and reveals child values', async () => {
+  test('expanding temporal parent does not show chart error and reveals child values', async () => {
     postMock.mockImplementation(async ({ jsonPayload }) => {
       const payload = (jsonPayload as QueryPayload | undefined) ?? {};
       if (hasInvalidTemporalLiteral(payload)) {
@@ -200,7 +200,7 @@ describe('PivotTableChart temporal expansion outcome', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('keeps retry flow available after backend-like response errors', async () => {
+  test('keeps retry flow available after backend-like response errors', async () => {
     let callCount = 0;
     postMock.mockImplementation(async ({ jsonPayload }) => {
       callCount += 1;

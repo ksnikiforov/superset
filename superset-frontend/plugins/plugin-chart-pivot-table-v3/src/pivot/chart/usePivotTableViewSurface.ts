@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useMemo } from 'react';
 import { type JsonObject } from '@superset-ui/core';
 import {
   type PivotTableProps,
@@ -34,7 +33,6 @@ import { usePivotInteractions } from './usePivotInteractions';
 import { type PivotLayoutResult } from './usePivotLayout';
 import { type PivotRenderModelResult } from './usePivotRenderModel';
 import { type PivotTableViewProps } from '../render/PivotTableView';
-import { type ChartDataWarning } from '../data/ChartDataClient';
 
 type UsePivotTableViewSurfaceInput = {
   width: number;
@@ -47,16 +45,13 @@ type UsePivotTableViewSurfaceInput = {
   loadingKeys: Set<string>;
   isInitialExpansionHydrating: boolean;
   errorMessage?: string;
-  warnings: ChartDataWarning[];
-  seamlessLoading: boolean;
-  seamlessCornerLoading: boolean;
-  seamlessWarnings: ChartDataWarning[];
-  seamlessError?: string;
+  cornerLoading: boolean;
   formData: PivotTableProps['formData'];
   appliedLayoutFormData: PivotTableProps['formData'];
   layout: PivotLayoutResult;
   renderModelResult: PivotRenderModelResult;
   emitCrossFilters?: boolean;
+  selectedFilters?: PivotTableProps['selectedFilters'];
   setDataMask: PivotTableProps['setDataMask'];
   mergeOwnState: (partial: JsonObject) => JsonObject;
   treeDataSignature: string;
@@ -80,16 +75,13 @@ export const usePivotTableViewSurface = ({
   loadingKeys,
   isInitialExpansionHydrating,
   errorMessage,
-  warnings,
-  seamlessLoading,
-  seamlessCornerLoading,
-  seamlessWarnings,
-  seamlessError,
+  cornerLoading,
   formData,
   appliedLayoutFormData,
   layout,
   renderModelResult,
   emitCrossFilters,
+  selectedFilters,
   setDataMask,
   mergeOwnState,
   treeDataSignature,
@@ -132,6 +124,7 @@ export const usePivotTableViewSurface = ({
 
   const interactions = usePivotInteractions({
     emitCrossFilters,
+    selectedFilters,
     setDataMask,
     mergeOwnState,
     treeDataSignature,
@@ -144,11 +137,6 @@ export const usePivotTableViewSurface = ({
       appliedLayoutFormData.time_grain_sqla,
   });
 
-  const combinedWarnings = useMemo(
-    () => [...warnings, ...seamlessWarnings],
-    [seamlessWarnings, warnings],
-  );
-  const activeErrorMessage = seamlessError ?? errorMessage;
   const exportChartId =
     typeof formData.slice_id === 'number' ||
     typeof formData.slice_id === 'string'
@@ -160,11 +148,10 @@ export const usePivotTableViewSurface = ({
     tree,
     expandedRows,
     expandedCols,
-    errorMessage: activeErrorMessage,
+    errorMessage,
     onRetry,
-    warnings: combinedWarnings,
     showGlobalLoader: isInitialExpansionHydrating,
-    showCornerLoader: seamlessCornerLoading,
+    showCornerLoader: cornerLoading,
     stickyHeaders,
     headerOffset,
     headerRowOffsets,

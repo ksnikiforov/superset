@@ -31,14 +31,14 @@ import {
 } from '../../../../src/pivot/core/tokens';
 
 describe('pivot/core/tokens', () => {
-  it('encodes and decodes metric tokens', () => {
+  test('encodes and decodes metric tokens', () => {
     const encoded = encodeMetricKey('metric1');
     expect(isMetricToken(encoded)).toBe(true);
     expect(decodeMetricKey(encoded)).toBe('metric1');
     expect(decodeMetricKey('not-a-token')).toBeUndefined();
   });
 
-  it('encodes and decodes measure leaf tokens', () => {
+  test('encodes and decodes measure leaf tokens', () => {
     const encoded = encodeMeasureLeafKey('leaf1');
     expect(isMeasureLeafToken(encoded)).toBe(true);
     expect(decodeMeasureLeafId(encoded)).toBe('leaf1');
@@ -49,7 +49,7 @@ describe('pivot/core/tokens', () => {
     ).toBe('leaf2');
   });
 
-  it('normalizes metrics placeholder from object columns', () => {
+  test('normalizes metrics placeholder from object columns', () => {
     const placeholderObj = {
       column_name: METRICS_PLACEHOLDER,
     } as unknown as QueryFormColumn;

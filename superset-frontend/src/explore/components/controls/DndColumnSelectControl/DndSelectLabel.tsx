@@ -16,8 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { ReactNode, useCallback, useContext, useEffect, useMemo } from 'react';
-import { useDrop } from 'react-dnd';
+import {
+  ReactNode,
+  RefObject,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+} from 'react';
+import { useDrop, DropTargetMonitor } from 'react-dnd';
 import { t } from '@apache-superset/core/translation';
 import ControlHeader from 'src/explore/components/ControlHeader';
 import {
@@ -30,14 +37,13 @@ import {
   DndItemValue,
 } from 'src/explore/components/DatasourcePanel/types';
 import { Icons } from '@superset-ui/core/components/Icons';
-import { DndItemType } from '../../DndItemType';
 import { DraggingContext, DropzoneContext } from '../../ExploreContainer';
 
 export type DndSelectLabelProps = {
   name: string;
-  accept: DndItemType | DndItemType[];
+  accept: string | string[];
   ghostButtonText: string;
-  onDrop: (item: DatasourcePanelDndItem) => void;
+  onDrop: (item: DatasourcePanelDndItem, monitor: DropTargetMonitor) => void;
   canDrop: (item: DatasourcePanelDndItem) => boolean;
   canDropValue?: (value: DndItemValue) => boolean;
   onDropValue?: (value: DndItemValue) => void;
@@ -45,6 +51,7 @@ export type DndSelectLabelProps = {
   displayGhostButton?: boolean;
   onClickGhostButton: () => void;
   isLoading?: boolean;
+  containerRef?: RefObject<HTMLDivElement>;
 };
 
 export default function DndSelectLabel({
@@ -52,6 +59,7 @@ export default function DndSelectLabel({
   accept,
   valuesRenderer,
   isLoading,
+  containerRef,
   ...props
 }: DndSelectLabelProps) {
   const canDropProp = props.canDrop;
@@ -66,8 +74,8 @@ export default function DndSelectLabel({
   const [{ isOver, canDrop }, datasourcePanelDrop] = useDrop({
     accept: isLoading ? [] : accept,
 
-    drop: (item: DatasourcePanelDndItem) => {
-      props.onDrop(item);
+    drop: (item: DatasourcePanelDndItem, monitor) => {
+      props.onDrop(item, monitor);
       props.onDropValue?.(item.value);
     },
 
@@ -111,6 +119,7 @@ export default function DndSelectLabel({
         <ControlHeader {...props} />
       </HeaderContainer>
       <DndLabelsContainer
+        ref={containerRef}
         data-test="dnd-labels-container"
         canDrop={canDrop}
         isOver={isOver}

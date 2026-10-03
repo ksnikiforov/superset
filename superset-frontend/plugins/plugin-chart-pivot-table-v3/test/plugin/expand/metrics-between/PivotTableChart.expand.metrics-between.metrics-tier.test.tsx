@@ -72,7 +72,7 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
   };
   const orderRecords = [baseOrderRecord, secondaryOrderRecord];
 
-  it('shows metrics as the second layer without toggles for orderPriority → Values layout', async () => {
+  test('shows metrics as the second layer without toggles for orderPriority → Values layout', async () => {
     const baseRaw = buildTreeFromRecords(
       [
         {
@@ -222,7 +222,7 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
     );
   });
 
-  it('does not show metric toggles after expanding orderPriority', async () => {
+  test('does not show metric toggles after expanding orderPriority', async () => {
     const baseRaw = buildTreeFromRecords(
       [baseOrderRecord],
       metrics,
@@ -329,7 +329,7 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
     expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('renders a single metric subtotal per orderPriority and removes it on collapse', async () => {
+  test('renders a single metric subtotal per orderPriority and removes it on collapse', async () => {
     const rowSubtotalLevels = [1, 2];
     const records = orderRecords;
     const buildTreeAtDepth = (rowDepth: number) => {
@@ -445,7 +445,7 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
     });
   });
 
-  it('hides non-metric totals when metrics sit between row dimensions', async () => {
+  test('hides non-metric totals when metrics sit between row dimensions', async () => {
     const rowSubtotalLevels = [1, 2];
     const records = orderRecords;
     const buildTreeAtDepth = (rowDepth: number) => {
@@ -546,7 +546,7 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
     expect(within(tbody).queryByText('1-URGENT Total')).not.toBeInTheDocument();
   });
 
-  it('shows metric subtotals only when row subtotals are enabled', async () => {
+  test('shows metric subtotals only when row subtotals are enabled', async () => {
     const records = [baseOrderRecord];
     const buildTreeAtDepth = (rowDepth: number) =>
       applyMetricAxis(

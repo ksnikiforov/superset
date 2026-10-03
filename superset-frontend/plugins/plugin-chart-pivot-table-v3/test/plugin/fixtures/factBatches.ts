@@ -79,10 +79,11 @@ const stripMockFactBatches = <T>(result: MockFetchResult<T>): Partial<T> => {
 const stripMockFactBatchesWithFetch = <T extends FetchPivotExpansionResult>(
   result: MockFetchResult<T>,
   factBatches: PivotFactStoreBatch[],
-): T => ({
-  ...stripMockFactBatches(result),
-  ...(factBatches.length > 0 ? { didFetch: true as const } : {}),
-}) as T;
+): T =>
+  ({
+    ...stripMockFactBatches(result),
+    ...(factBatches.length > 0 ? { didFetch: true as const } : {}),
+  }) as T;
 
 const toFactPath = (path: PivotPath): PivotPath =>
   path.filter(

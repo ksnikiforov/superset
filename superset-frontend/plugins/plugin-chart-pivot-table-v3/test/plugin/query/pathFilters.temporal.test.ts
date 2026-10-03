@@ -29,7 +29,7 @@ describe('pathFilters temporal coercion contract', () => {
     category: GenericDataType.String,
   };
 
-  it('keeps temporal epoch numbers backend-safe for equality filters', () => {
+  test('keeps temporal epoch numbers backend-safe for equality filters', () => {
     const filters = buildPathFilters(
       ['orderYear'],
       [1483228800000],
@@ -40,7 +40,7 @@ describe('pathFilters temporal coercion contract', () => {
     ]);
   });
 
-  it('handles temporal strings for epoch-like and non-epoch-like values', () => {
+  test('handles temporal strings for epoch-like and non-epoch-like values', () => {
     expect(coerceValueForColumn('1483228800000', 'orderYear', colTypeMap)).toBe(
       1483228800000,
     );
@@ -49,7 +49,7 @@ describe('pathFilters temporal coercion contract', () => {
     );
   });
 
-  it('emits IS NULL for nullish temporal path values', () => {
+  test('emits IS NULL for nullish temporal path values', () => {
     expect(buildPathFilters(['orderYear'], [null], colTypeMap)).toEqual([
       { col: 'orderYear', op: 'IS NULL' },
     ]);
@@ -58,7 +58,7 @@ describe('pathFilters temporal coercion contract', () => {
     ]);
   });
 
-  it('keeps non-temporal coercion behavior unchanged', () => {
+  test('keeps non-temporal coercion behavior unchanged', () => {
     expect(coerceValueForColumn('42', 'grossSales', colTypeMap)).toBe(42);
     expect(coerceValueForColumn('A', 'category', colTypeMap)).toBe('A');
   });

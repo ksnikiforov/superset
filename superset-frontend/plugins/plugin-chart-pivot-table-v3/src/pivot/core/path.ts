@@ -16,40 +16,63 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { PivotPath } from '../../types';
+import { type PivotPath, type PivotPathValue } from '../../types';
 
 export const PATH_DIVIDER = '\u0000';
 export const CELL_KEY_DIVIDER = '\u0001';
+const TYPED_PATH_PREFIX = '\u0003';
 
-const escapePathDivider = (value: string) =>
-  value.split(PATH_DIVIDER).join(`${PATH_DIVIDER}${PATH_DIVIDER}`);
+type EncodedValue = [string, string];
 
-const serializePathValue = (value: PivotPath[number]) => {
-  if (value === null) {
-    return '__NULL__';
-  }
-  if (value === undefined) {
-    return '__UNDEFINED__';
-  }
-  return escapePathDivider(String(value));
+const encodeValue = (value: PivotPathValue): EncodedValue => {
+  if (value === null) return ['null', ''];
+  if (value === undefined) return ['undefined', ''];
+  if (value instanceof Date) return ['date', String(value.getTime())];
+  return [typeof value, Object.is(value, -0) ? '-0' : String(value)];
 };
 
-export const serializePath = (path: PivotPath = []) =>
-  path.map(serializePathValue).join(PATH_DIVIDER);
-
-const deserializePathValue = (value: string): PivotPath[number] => {
-  if (value === '__NULL__') {
-    return null;
+const decodeValue = ([type, value]: EncodedValue): PivotPathValue => {
+  switch (type) {
+    case 'null':
+      return null;
+    case 'undefined':
+      return undefined;
+    case 'number':
+      return Number(value);
+    case 'bigint':
+      return BigInt(value);
+    case 'boolean':
+      return value === 'true';
+    case 'date':
+      return new Date(Number(value));
+    default:
+      return value;
   }
-  if (value === '__UNDEFINED__') {
-    return undefined;
-  }
-  return value;
 };
 
+/** Encode identity without conflating types, empty values, or separators. */
+export const serializePath = (path: PivotPath = []): string => {
+  if (path.length === 0) return '';
+  const canUseLegacyKey = path.every(
+    value =>
+      typeof value === 'string' &&
+      value.length > 0 &&
+      !/[\u0000\u0001\u0003]/.test(value) &&
+      value !== '__NULL__' &&
+      value !== '__UNDEFINED__' &&
+      !Object.prototype.hasOwnProperty.call(Object.prototype, value),
+  );
+  return canUseLegacyKey
+    ? path.join(PATH_DIVIDER)
+    : `${TYPED_PATH_PREFIX}${JSON.stringify(path.map(encodeValue))}`;
+};
+
+/** Decode typed keys and legacy keys saved by earlier plugin versions. */
 export const parsePath = (key: string): PivotPath => {
-  if (!key) {
-    return [];
+  if (!key) return [];
+  if (key.startsWith(TYPED_PATH_PREFIX)) {
+    const encoded: EncodedValue[] = JSON.parse(key.slice(1));
+    return encoded.map(decodeValue);
   }
   const parts: string[] = [];
   let buffer = '';
@@ -59,8 +82,7 @@ export const parsePath = (key: string): PivotPath => {
       buffer += char;
       continue;
     }
-    const nextChar = key[idx + 1];
-    if (nextChar === PATH_DIVIDER) {
+    if (key[idx + 1] === PATH_DIVIDER) {
       buffer += PATH_DIVIDER;
       idx += 1;
       continue;
@@ -69,8 +91,13 @@ export const parsePath = (key: string): PivotPath => {
     buffer = '';
   }
   parts.push(buffer);
-  return parts.map(deserializePathValue);
+  return parts.map(value =>
+    value === '__NULL__' ? null : value === '__UNDEFINED__' ? undefined : value,
+  );
 };
 
-export const serializeCellKey = (rowKey: string, colKey: string) =>
-  `${rowKey}${CELL_KEY_DIVIDER}${colKey}`;
+/** Keep row/column boundaries unambiguous even for legacy keys. */
+export const serializeCellKey = (rowKey: string, colKey: string): string =>
+  rowKey.includes(CELL_KEY_DIVIDER) || colKey.includes(CELL_KEY_DIVIDER)
+    ? `${TYPED_PATH_PREFIX}${JSON.stringify([rowKey, colKey])}`
+    : `${rowKey}${CELL_KEY_DIVIDER}${colKey}`;

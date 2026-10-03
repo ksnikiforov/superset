@@ -82,7 +82,7 @@ describe('PivotTableChart initial depth prefetch', () => {
     fetchPivotIntersectionMock.mockReset();
   });
 
-  it('fetches missing visible bootstrap coverage through the manifest', async () => {
+  test('fetches missing visible bootstrap coverage through the manifest', async () => {
     const totalsTree = buildTree([{ r1: 'A', c1: 'B', m1: 30 }], 0, 0);
     const rowTree = buildTree([{ r1: 'A', c1: 'B', m1: 10 }], 1, 0);
     const colTree = buildTree([{ r1: 'A', c1: 'B', m1: 20 }], 0, 1);

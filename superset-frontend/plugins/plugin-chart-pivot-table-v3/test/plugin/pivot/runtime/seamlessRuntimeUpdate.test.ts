@@ -92,7 +92,7 @@ test('builds stable upstream query-context signatures', () => {
       viz_type: 'pivot_table_v3',
     } as unknown as PivotTableQueryFormData),
   ).toBe(
-    '{"adhoc_filters":[{"clause":"WHERE","comparator":"France","expressionType":"SIMPLE","operator":"==","subject":"country"}],"extra_form_data":{"filters":[{"col":"region","op":"IN","val":["EU"]}]},"extras":{"time_grain_sqla":"P1D"},"granularity_sqla":"ds","time_grain_sqla":null,"time_offsets":["1 year ago"],"time_range":null}',
+    '{"adhoc_filters":[{"clause":"WHERE","comparator":"France","expressionType":"SIMPLE","operator":"==","subject":"country"}],"datasource":null,"extra_form_data":{"filters":[{"col":"region","op":"IN","val":["EU"]}]},"extras":{"time_grain_sqla":"P1D"},"granularity_sqla":"ds","metricDefinitions":[],"row_limit":null,"time_grain_sqla":null,"time_offsets":["1 year ago"],"time_range":null}',
   );
 });
 

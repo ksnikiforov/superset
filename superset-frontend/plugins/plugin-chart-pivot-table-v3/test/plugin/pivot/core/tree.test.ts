@@ -37,7 +37,7 @@ import {
 } from '../../fixtures/metricAxis';
 
 describe('pivot/core/tree', () => {
-  it('labels null row values as (NULL)', () => {
+  test('labels null row values as (NULL)', () => {
     const tree = buildTreeFromRecords(
       [{ state: null, m1: 10 }],
       ['m1'],
@@ -51,7 +51,7 @@ describe('pivot/core/tree', () => {
     expect(tree.rows[nullKey].formattedLabel).toBe('(NULL)');
   });
 
-  it('keeps time offset metric values in cells', () => {
+  test('keeps time offset metric values in cells', () => {
     const tree = buildTreeFromRecords(
       [{ region: 'A', m1: 10, 'm1__1 year ago': 5 }],
       ['m1'],
@@ -64,7 +64,7 @@ describe('pivot/core/tree', () => {
     expect(tree.cells[cellKey]?.values['m1__1 year ago']).toBe(5);
   });
 
-  it('merges branch cell values into an existing tree', () => {
+  test('merges branch cell values into an existing tree', () => {
     const rootKey = serializePath([]);
     const baseTree: PivotTreeData = {
       rows: {
@@ -114,7 +114,7 @@ describe('pivot/core/tree', () => {
     expect(merged.cells[serializeCellKey(rootKey, rootKey)]?.values.m1).toBe(2);
   });
 
-  it('surfaces single metric values on the base column when the metric is first', () => {
+  test('surfaces single metric values on the base column when the metric is first', () => {
     const rootKey = serializePath([]);
     const tree: PivotTreeData = {
       rows: {
@@ -189,7 +189,7 @@ describe('pivot/core/tree', () => {
     ).toBe(10);
   });
 
-  it('inserts measure leaf tiers when configured', () => {
+  test('inserts measure leaf tiers when configured', () => {
     const tree = buildTreeFromRecords(
       [{ region: 'A', m1: 10 }],
       ['m1'],
@@ -227,7 +227,7 @@ describe('pivot/core/tree', () => {
     ).toBe(10);
   });
 
-  it('keeps measure leaf tiers adjacent to metric groups between dimensions', () => {
+  test('keeps measure leaf tiers adjacent to metric groups between dimensions', () => {
     const valueLeaf = buildValueLeaf();
     const ixLeaf = buildBuiltInLeaf('ix', {
       n: 1,
@@ -304,7 +304,7 @@ describe('pivot/core/tree', () => {
     expect(colTree.cols[colMisplacedPath]).toBeUndefined();
   });
 
-  it('keeps metrics flat when leaf tier is hidden', () => {
+  test('keeps metrics flat when leaf tier is hidden', () => {
     const tree = buildTreeFromRecords(
       [{ region: 'A', m1: 10 }],
       ['m1'],
@@ -336,7 +336,7 @@ describe('pivot/core/tree', () => {
     expect(flat.rows[leafKey]).toBeUndefined();
   });
 
-  it('surfaces collapsed column values when a single metric sits between columns with hidden leaves', () => {
+  test('surfaces collapsed column values when a single metric sits between columns with hidden leaves', () => {
     const valueLeaf = buildValueLeaf();
     const ixLeaf = buildBuiltInLeaf('ix', {
       n: 1,
@@ -370,7 +370,7 @@ describe('pivot/core/tree', () => {
     ).toBe(10);
   });
 
-  it('surfaces collapsed column values when a single metric has visible leaves', () => {
+  test('surfaces collapsed column values when a single metric has visible leaves', () => {
     const valueLeaf = buildValueLeaf();
     const deltaLeaf = buildBuiltInLeaf('delta', {
       n: 1,

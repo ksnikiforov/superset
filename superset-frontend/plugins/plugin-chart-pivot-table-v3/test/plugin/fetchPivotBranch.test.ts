@@ -199,7 +199,7 @@ describe('buildExpansionQuerySpecs', () => {
     (SupersetClient.post as jest.Mock).mockReset();
   });
 
-  it('keeps column depth aligned to visible dimensions when metrics are on columns', () => {
+  test('keeps column depth aligned to visible dimensions when metrics are on columns', () => {
     const formData = {
       groupbyRows: ['r1', 'r2'],
       groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
@@ -217,7 +217,7 @@ describe('buildExpansionQuerySpecs', () => {
     expect(specs[0].meta.factSelector.coverage.columnDepth).toBe(0);
   });
 
-  it('uses the visible column depth for row fetches', () => {
+  test('uses the visible column depth for row fetches', () => {
     const formData = {
       groupbyRows: ['r1', 'r2'],
       groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
@@ -235,7 +235,7 @@ describe('buildExpansionQuerySpecs', () => {
     expect(specs[0].meta.factSelector.coverage.columnDepth).toBe(0);
   });
 
-  it('limits column fetch row depth to what is visible', () => {
+  test('limits column fetch row depth to what is visible', () => {
     const formData = {
       groupbyRows: ['r1', 'r2'],
       groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
@@ -253,7 +253,7 @@ describe('buildExpansionQuerySpecs', () => {
     expect(specs[0].meta.factSelector.coverage.rowDepth).toBe(1);
   });
 
-  it('does not infer branch query depth from rendered tree shape', () => {
+  test('does not infer branch query depth from rendered tree shape', () => {
     const formData = {
       groupbyRows: ['r1', 'r2'],
       groupbyColumns: ['c1', 'c2'],
@@ -270,7 +270,7 @@ describe('buildExpansionQuerySpecs', () => {
     expect(specs[0].meta.factSelector.coverage.columnDepth).toBe(2);
   });
 
-  it('fetches metric-front column expansion with root metrics populated', async () => {
+  test('fetches metric-front column expansion with root metrics populated', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     postMock.mockResolvedValueOnce({
       json: {
@@ -374,7 +374,7 @@ describe('buildExpansionQuerySpecs', () => {
     ).toBe(4);
   });
 
-  it('fetches both col root and expanded col depth when rows fetch under metric-first columns', async () => {
+  test('fetches both col root and expanded col depth when rows fetch under metric-first columns', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     postMock.mockImplementationOnce(({ jsonPayload }) => ({
       json: {
@@ -475,7 +475,7 @@ describe('buildExpansionQuerySpecs', () => {
     ).toBe(5);
   });
 
-  it('expands metric-first columns with canonical encoded metric paths', async () => {
+  test('expands metric-first columns with canonical encoded metric paths', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     postMock.mockImplementationOnce(({ jsonPayload }) => ({
       json: {
@@ -560,7 +560,7 @@ describe('buildExpansionQuerySpecs', () => {
     expect(tree.cols[expandedColKey]).toBeTruthy();
   });
 
-  it('queries and materializes only the expanded metric branch', async () => {
+  test('queries and materializes only the expanded metric branch', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     postMock.mockImplementationOnce(
       ({ jsonPayload }: { jsonPayload?: { queries?: QueryPayload[] } }) => ({
@@ -641,7 +641,7 @@ describe('buildExpansionQuerySpecs', () => {
     ).toBeUndefined();
   });
 
-  it('keeps sorting support metrics in the same request without materializing sibling measures', async () => {
+  test('keeps sorting support metrics in the same request without materializing sibling measures', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     postMock.mockImplementationOnce(
       ({ jsonPayload }: { jsonPayload?: { queries?: QueryPayload[] } }) => ({
@@ -732,7 +732,7 @@ describe('buildExpansionQuerySpecs', () => {
     ).toBe(99);
   });
 
-  it('reuses exact branch coverage that included sorting support metrics', async () => {
+  test('reuses exact branch coverage that included sorting support metrics', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     postMock.mockImplementation(
       ({ jsonPayload }: { jsonPayload?: { queries?: QueryPayload[] } }) => ({
@@ -837,7 +837,7 @@ describe('buildExpansionQuerySpecs', () => {
     ).toBe(99);
   });
 
-  it('scopes IX 1YA measure-leaf requests to the selected metric and offset', async () => {
+  test('scopes IX 1YA measure-leaf requests to the selected metric and offset', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     const valueLeaf = buildValueLeaf();
     const ixYearLeaf = buildBuiltInLeaf('ix', {
@@ -988,7 +988,7 @@ describe('buildExpansionQuerySpecs', () => {
     ).toBe(200);
   });
 
-  it('fetches parent column depth when expanding rows under expanded columns', async () => {
+  test('fetches parent column depth when expanding rows under expanded columns', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     postMock.mockImplementationOnce(({ jsonPayload }) => ({
       json: {
@@ -1061,7 +1061,7 @@ describe('buildExpansionQuerySpecs', () => {
     );
   });
 
-  it('fetches column subtotal slices for expanded rows and maps them to subtotal leaves', async () => {
+  test('fetches column subtotal slices for expanded rows and maps them to subtotal leaves', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     postMock.mockImplementationOnce(({ jsonPayload }) => ({
       json: {
@@ -1141,7 +1141,7 @@ describe('buildExpansionQuerySpecs', () => {
     ).toBe(42);
   });
 
-  it('fetches ancestor column aggregates when expanding columns with deeper rows', async () => {
+  test('fetches ancestor column aggregates when expanding columns with deeper rows', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     postMock.mockImplementationOnce(({ jsonPayload }) => ({
       json: {
@@ -1214,7 +1214,7 @@ describe('buildExpansionQuerySpecs', () => {
     );
   });
 
-  it('fetches ancestor column aggregates for all visible row depths when rows are deeper than two levels', async () => {
+  test('fetches ancestor column aggregates for all visible row depths when rows are deeper than two levels', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     postMock.mockImplementationOnce(({ jsonPayload }) => ({
       json: {
@@ -1297,7 +1297,7 @@ describe('buildExpansionQuerySpecs', () => {
     );
   });
 
-  it('fetches ancestor column levels when expanding rows after deeper column expansions', async () => {
+  test('fetches ancestor column levels when expanding rows after deeper column expansions', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     postMock.mockImplementationOnce(({ jsonPayload }) => ({
       json: {
@@ -1384,7 +1384,7 @@ describe('buildExpansionQuerySpecs', () => {
     );
   });
 
-  it('requests row subtotal depths when row subtotals are enabled', async () => {
+  test('requests row subtotal depths when row subtotals are enabled', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     postMock.mockImplementationOnce(({ jsonPayload }) => ({
       json: {
@@ -1432,7 +1432,7 @@ describe('buildExpansionQuerySpecs', () => {
     expect(queryNames).toEqual(expect.arrayContaining([formatQueryName(1, 0)]));
   });
 
-  it('propagates extra_form_data filters into branch queries', async () => {
+  test('propagates extra_form_data filters into branch queries', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     postMock.mockResolvedValueOnce({
       json: {
@@ -1512,7 +1512,7 @@ describe('fetchBranch delta-only contract', () => {
       0,
     );
 
-  it('does not include unrelated currentTree nodes in results', async () => {
+  test('does not include unrelated currentTree nodes in results', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     postMock.mockResolvedValueOnce({
       json: {
@@ -1551,7 +1551,7 @@ describe('fetchBranch delta-only contract', () => {
     ).toBeUndefined();
   });
 
-  it('materializes from an exact fact-store hit without fetching', async () => {
+  test('materializes from an exact fact-store hit without fetching', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     const formData = buildFormData({
       groupbyRows: ['r1', 'r2'],
@@ -1602,7 +1602,7 @@ describe('fetchBranch delta-only contract', () => {
     );
   });
 
-  it('does not fetch or mark coverage when expansion only reveals Values', async () => {
+  test('does not fetch or mark coverage when expansion only reveals Values', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     const formData = buildFormData({
       groupbyRows: [],

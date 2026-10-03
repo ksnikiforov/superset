@@ -72,7 +72,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
 
   const metrics = ['averageOrderValue', 'weightedDiscount'];
 
-  it('keeps metric toggle state and values consistent after collapsing orderPriority', async () => {
+  test('keeps metric toggle state and values consistent after collapsing orderPriority', async () => {
     const rowGroupby = [
       'orderPriority',
       'shipMode',
@@ -133,12 +133,6 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const baseTree = buildTreeAtDepth(records, 1);
     const metricBranch = buildCollapsedBranch(records, 2);
     const returnFlagBranch = buildCollapsedBranch(records, 3);
-    void metricBranch;
-    void returnFlagBranch;
-    void metricBranch;
-    void returnFlagBranch;
-    void metricBranch;
-    void returnFlagBranch;
     const shipModeBranch = buildTreeAtDepth(records, 2);
     const shipModeReturnFlagBranch = buildTreeAtDepth(records, 3);
     const shipInstructionBranch = buildTreeAtDepth(records, 4);
@@ -294,7 +288,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     expect(within(tbody).queryByText('COLLECT COD')).not.toBeInTheDocument();
   });
 
-  it('renders returnFlag values and suppresses top-positioned subtotals after re-expanding a metric', async () => {
+  test('renders returnFlag values and suppresses top-positioned subtotals after re-expanding a metric', async () => {
     const rowGroupby = [
       'orderPriority',
       'shipMode',
@@ -360,43 +354,8 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
         metrics,
       );
     };
-    const buildCollapsedBranch = (data: typeof records, rowDepth: number) => {
-      const collapsedGroupby = [
-        'orderPriority',
-        'returnFlag',
-        'shipInstruction',
-      ];
-      const tree = buildTreeFromRecords(
-        data,
-        metrics,
-        collapsedGroupby,
-        colGroupby,
-        rowDepth,
-        1,
-      );
-      const withSubtotals = applyRowSubtotals(
-        tree,
-        rowDepth,
-        collapsedGroupby.length,
-      );
-      return labelRowSubtotalLeaves(
-        applyMetricAxis(
-          withSubtotals,
-          metrics,
-          MetricsLayoutEnum.ROWS,
-          collapsedGroupby,
-          colGroupby,
-          1,
-        ),
-        metrics,
-      );
-    };
 
     const baseTree = buildTreeAtDepth(records, 1);
-    const metricBranch = buildCollapsedBranch(records, 2);
-    const returnFlagBranch = buildCollapsedBranch(records, 3);
-    void metricBranch;
-    void returnFlagBranch;
     const shipModeBranch = buildTreeAtDepth(records, 2);
     const shipModeReturnFlagBranch = buildTreeAtDepth(records, 3);
     const shipInstructionBranch = buildTreeAtDepth(records, 4);
@@ -512,7 +471,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     expect(hasValue(returnFlagRow as HTMLElement)).toBeTruthy();
   });
 
-  it('keeps metric values after collapsing and re-expanding returnFlag when metrics are last', async () => {
+  test('keeps metric values after collapsing and re-expanding returnFlag when metrics are last', async () => {
     const rowGroupby = [
       'orderPriority',
       'shipMode',
@@ -694,7 +653,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     expect(reopenedValueCell).toBeTruthy();
   });
 
-  it('keeps column values out of row headers when expanding above Values', async () => {
+  test('keeps column values out of row headers when expanding above Values', async () => {
     const rowGroupby = ['orderPriority', 'shipMode', 'orderStatus'];
     const colGroupby = ['shipInstruction', 'customerSegment', 'returnFlag'];
     const records = [
@@ -865,7 +824,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     });
   });
 
-  it('expands Values and orderStatus when another level follows', async () => {
+  test('expands Values and orderStatus when another level follows', async () => {
     const rowGroupby = [
       'orderPriority',
       'shipMode',
@@ -924,12 +883,6 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       );
 
     const baseTree = buildTreeAtDepth(1);
-    const orderStatusBranch = buildCollapsedBranch(2, [
-      'orderPriority',
-      'orderStatus',
-      'orderClass',
-    ]);
-    void orderStatusBranch;
     const orderClassBranch = buildCollapsedBranch(3, [
       'orderPriority',
       'orderStatus',
@@ -1005,11 +958,6 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
-
-    const statusRow = (await waitFor(() =>
-      within(tbody).getByText(/^F$/).closest('tr'),
-    )) as HTMLElement;
-    void statusRow;
 
     expect(within(tbody).getByText('A')).toBeInTheDocument();
   });

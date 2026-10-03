@@ -52,7 +52,7 @@ const fetchTarget = ({
 };
 
 describe('runtime coverage query specs contract', () => {
-  it('records branch fact coverage and uses it for query columns', () => {
+  test('records branch fact coverage and uses it for query columns', () => {
     const formData = buildFormData({
       groupbyRows: ['country', 'state'],
       groupbyColumns: ['category', 'subcategory'],
@@ -90,7 +90,7 @@ describe('runtime coverage query specs contract', () => {
     });
   });
 
-  it('does not build branch specs when expansion only reveals Values', () => {
+  test('does not build branch specs when expansion only reveals Values', () => {
     const formData = buildFormData({
       groupbyRows: [],
       groupbyColumns: ['category', METRICS_PLACEHOLDER, 'subcategory'],
@@ -118,7 +118,7 @@ describe('runtime coverage query specs contract', () => {
     expect(specs).toEqual([]);
   });
 
-  it('builds branch specs for the dimension after Values', () => {
+  test('builds branch specs for the dimension after Values', () => {
     const formData = buildFormData({
       groupbyRows: [],
       groupbyColumns: ['category', METRICS_PLACEHOLDER, 'subcategory'],
@@ -159,7 +159,7 @@ describe('runtime coverage query specs contract', () => {
     });
   });
 
-  it('materializes canonical skipped pre-Values coverage at the visible prefix', () => {
+  test('materializes canonical skipped pre-Values coverage at the visible prefix', () => {
     const formData = buildFormData({
       groupbyRows: [
         'orderPriority',
@@ -209,7 +209,7 @@ describe('runtime coverage query specs contract', () => {
     });
   });
 
-  it('does not build branch specs for synthetic subtotal display paths', () => {
+  test('does not build branch specs for synthetic subtotal display paths', () => {
     const formData = buildFormData({
       groupbyRows: ['country', 'state', 'city'],
       groupbyColumns: [],
@@ -237,7 +237,7 @@ describe('runtime coverage query specs contract', () => {
     expect(specs).toEqual([]);
   });
 
-  it('does not build batch specs when grouped expansion only reveals Values', () => {
+  test('does not build batch specs when grouped expansion only reveals Values', () => {
     const formData = buildFormData({
       groupbyRows: ['country', METRICS_PLACEHOLDER, 'state'],
       groupbyColumns: [],
@@ -277,7 +277,7 @@ describe('runtime coverage query specs contract', () => {
     expect(specs).toEqual([]);
   });
 
-  it('does not build batch specs for synthetic subtotal display paths', () => {
+  test('does not build batch specs for synthetic subtotal display paths', () => {
     const formData = buildFormData({
       groupbyRows: ['country', 'state', 'city'],
       groupbyColumns: [],

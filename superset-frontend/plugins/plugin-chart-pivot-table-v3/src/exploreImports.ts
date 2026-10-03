@@ -45,9 +45,14 @@ export {
   HeaderContainer,
   Label,
   OptionControlContainer,
+  OptionControlLabel,
 } from 'src/explore/components/controls/OptionControls';
 export {
   StyledColumnOption,
   StyledMetricOption,
 } from 'src/explore/components/optionRenderers';
 export { setControlValue as setControlValueAction } from 'src/explore/actions/exploreActions';
+export { default as MetricDefinitionValue } from 'src/explore/components/controls/MetricControl/MetricDefinitionValue';
+export { OptionSelector } from 'src/explore/components/controls/DndColumnSelectControl/utils/optionSelector';
+export { default as DndSelectLabel } from 'src/explore/components/controls/DndColumnSelectControl/DndSelectLabel';
+export { default as OptionWrapper } from 'src/explore/components/controls/DndColumnSelectControl/OptionWrapper';

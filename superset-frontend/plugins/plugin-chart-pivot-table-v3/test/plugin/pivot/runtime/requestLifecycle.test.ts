@@ -22,7 +22,7 @@ import {
 } from '../../../../src/pivot/runtime/requestLifecycle';
 
 describe('requestLifecycle', () => {
-  it('starts monotonically increasing requests and cancels active groups', () => {
+  test('starts monotonically increasing requests and cancels active groups', () => {
     const cancel = jest.fn();
     const lifecycle = createLatestRequestLifecycle({ cancel });
 
@@ -39,7 +39,7 @@ describe('requestLifecycle', () => {
     expect(cancel).toHaveBeenNthCalledWith(1, 'pivot-v3-seamless');
   });
 
-  it('tracks multiple request groups in one current scope', () => {
+  test('tracks multiple request groups in one current scope', () => {
     const cancel = jest.fn();
     const lifecycle = createLatestRequestLifecycle({ cancel });
     const scope = lifecycle.beginScope();
@@ -58,7 +58,7 @@ describe('requestLifecycle', () => {
     expect(cancel).toHaveBeenCalledWith('batch:b');
   });
 
-  it('finishes scoped requests without cancelling completed groups later', () => {
+  test('finishes scoped requests without cancelling completed groups later', () => {
     const cancel = jest.fn();
     const lifecycle = createLatestRequestLifecycle({ cancel });
     const scope = lifecycle.beginScope();
@@ -70,7 +70,7 @@ describe('requestLifecycle', () => {
     expect(cancel).not.toHaveBeenCalled();
   });
 
-  it('marks previous scopes stale when a newer scope starts', () => {
+  test('marks previous scopes stale when a newer scope starts', () => {
     const lifecycle = createLatestRequestLifecycle();
 
     const firstScope = lifecycle.beginScope();
@@ -82,7 +82,7 @@ describe('requestLifecycle', () => {
     expect(secondScope.isCurrent()).toBe(true);
   });
 
-  it('does not let stale completion unregister a newer reused request group', () => {
+  test('does not let stale completion unregister a newer reused request group', () => {
     const cancel = jest.fn();
     const lifecycle = createLatestRequestLifecycle({ cancel });
     const firstScope = lifecycle.beginScope();
@@ -98,7 +98,7 @@ describe('requestLifecycle', () => {
     expect(cancel).toHaveBeenNthCalledWith(2, 'pivot-v3-seamless');
   });
 
-  it('detects abort errors', () => {
+  test('detects abort errors', () => {
     expect(isAbortError({ name: 'AbortError' })).toBe(true);
     expect(isAbortError(new Error('network failed'))).toBe(false);
   });

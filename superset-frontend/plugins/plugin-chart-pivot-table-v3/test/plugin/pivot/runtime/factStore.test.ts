@@ -17,7 +17,7 @@
  * under the License.
  */
 import {
-  bindPivotFactBatchToQueryContext,
+  assignMissingPivotFactQueryContextKey,
   buildPivotFactQueryContextKey,
   createPivotFactStore,
   type PivotFact,
@@ -88,16 +88,16 @@ test('upserts duplicate exact facts by request/path/value key', () => {
   expect(store.getFactBatches()[0].facts.map(fact => fact.value)).toEqual([12]);
 });
 
-test('binds existing fact batch to active query context', () => {
+test('preserves existing fact provenance when assigning missing query context', () => {
   const batch = {
     ...selector,
     queryContextKey: 'stale-query',
     facts: [buildFact()],
   };
 
-  expect(bindPivotFactBatchToQueryContext(batch, 'active-query')).toEqual({
+  expect(assignMissingPivotFactQueryContextKey(batch, 'active-query')).toEqual({
     ...batch,
-    queryContextKey: 'active-query',
+    queryContextKey: 'stale-query',
   });
 });
 

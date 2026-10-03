@@ -24,7 +24,7 @@ import {
 import { MetricsLayoutEnum } from '../../../../src/types';
 
 describe('compilePivotProgram', () => {
-  it('represents Values first on rows in the compiled program', () => {
+  test('represents Values first on rows in the compiled program', () => {
     const program = compilePivotProgram({
       groupbyRows: [METRICS_PLACEHOLDER, 'r1'],
       groupbyColumns: ['c1'],
@@ -38,7 +38,7 @@ describe('compilePivotProgram', () => {
     expect(program.metricInsertIndex).toBe(0);
   });
 
-  it('represents Values in the middle on rows in the compiled program', () => {
+  test('represents Values in the middle on rows in the compiled program', () => {
     const program = compilePivotProgram({
       groupbyRows: ['r1', METRICS_PLACEHOLDER, 'r2'],
       metrics: ['m1'],
@@ -50,7 +50,7 @@ describe('compilePivotProgram', () => {
     expect(program.metricInsertIndex).toBe(1);
   });
 
-  it('represents Values last on rows in the compiled program', () => {
+  test('represents Values last on rows in the compiled program', () => {
     const program = compilePivotProgram({
       groupbyRows: ['r1', 'r2', METRICS_PLACEHOLDER],
       metrics: ['m1'],
@@ -62,7 +62,7 @@ describe('compilePivotProgram', () => {
     expect(program.metricInsertIndex).toBe(2);
   });
 
-  it('represents Values first on columns in the compiled program', () => {
+  test('represents Values first on columns in the compiled program', () => {
     const program = compilePivotProgram({
       groupbyRows: ['r1'],
       groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
@@ -76,7 +76,7 @@ describe('compilePivotProgram', () => {
     expect(program.metricInsertIndex).toBe(0);
   });
 
-  it('represents Values in the middle on columns in the compiled program', () => {
+  test('represents Values in the middle on columns in the compiled program', () => {
     const program = compilePivotProgram({
       groupbyColumns: ['c1', METRICS_PLACEHOLDER, 'c2'],
       metrics: ['m1'],
@@ -88,7 +88,7 @@ describe('compilePivotProgram', () => {
     expect(program.metricInsertIndex).toBe(1);
   });
 
-  it('represents Values last on columns in the compiled program', () => {
+  test('represents Values last on columns in the compiled program', () => {
     const program = compilePivotProgram({
       groupbyColumns: ['c1', 'c2', METRICS_PLACEHOLDER],
       metrics: ['m1'],
@@ -100,7 +100,7 @@ describe('compilePivotProgram', () => {
     expect(program.metricInsertIndex).toBe(2);
   });
 
-  it('dedupes Values across axes favoring last moved', () => {
+  test('dedupes Values across axes favoring last moved', () => {
     const resolved = resolvePivotProgramPlacement({
       groupbyRows: ['region', METRICS_PLACEHOLDER],
       groupbyColumns: [METRICS_PLACEHOLDER],
@@ -115,7 +115,7 @@ describe('compilePivotProgram', () => {
     expect(resolved.layout).toEqual(MetricsLayoutEnum.ROWS);
   });
 
-  it('removes Values when metrics are empty', () => {
+  test('removes Values when metrics are empty', () => {
     const resolved = resolvePivotProgramPlacement({
       groupbyRows: ['country', METRICS_PLACEHOLDER],
       metrics: [],
@@ -127,7 +127,7 @@ describe('compilePivotProgram', () => {
     expect(resolved.metricPosition).toBe(-1);
   });
 
-  it('auto-inserts Values on the preferred axis when missing', () => {
+  test('auto-inserts Values on the preferred axis when missing', () => {
     const resolved = resolvePivotProgramPlacement({
       groupbyRows: ['country'],
       groupbyColumns: ['segment'],

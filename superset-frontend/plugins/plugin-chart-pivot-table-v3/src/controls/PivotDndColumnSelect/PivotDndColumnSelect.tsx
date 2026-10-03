@@ -16,13 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { useAcknowledgedValue } from '../useAcknowledgedValue';
 import { t, tn } from '@apache-superset/core/translation';
 import { styled } from '@apache-superset/core/theme';
 import {
   type ComponentProps,
   ReactNode,
   useCallback,
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -82,8 +82,8 @@ import {
   MetricOptionValue,
 } from '../PivotDndMetricSelect/PivotMetricDefinitionValue';
 import PivotOptionWrapper from './PivotOptionWrapper';
-import PivotDndSelectLabel from './PivotSelectLabel';
-import { OptionSelector } from './optionSelector';
+import { DndSelectLabel as PivotDndSelectLabel } from '../../exploreImports';
+import { OptionSelector } from '../../exploreImports';
 
 const DEFAULT_DRAG_TYPE = 'pivot_v3_dnd';
 const NOOP_CLICK_CLOSE = () => {};
@@ -256,49 +256,10 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       ensureIsArray<QueryFormColumn>(value),
     );
   }, [formData, sortingControlName, value]);
-  const formattingRef =
-    useRef<PivotDimensionFormattingMap>(dimensionFormatting);
-  const formattingPendingRef = useRef<PivotDimensionFormattingMap | null>(null);
-  const [localFormatting, setLocalFormatting] =
-    useState<PivotDimensionFormattingMap>(dimensionFormatting);
-  const sortingRef = useRef<PivotDimensionSortingMap>(dimensionSorting);
-  const sortingPendingRef = useRef<PivotDimensionSortingMap | null>(null);
-  const [localSorting, setLocalSorting] =
-    useState<PivotDimensionSortingMap>(dimensionSorting);
-
-  useEffect(() => {
-    if (formattingPendingRef.current) {
-      if (isEqual(dimensionFormatting, formattingPendingRef.current)) {
-        formattingPendingRef.current = null;
-        formattingRef.current = dimensionFormatting;
-        if (!isEqual(dimensionFormatting, localFormatting)) {
-          setLocalFormatting(dimensionFormatting);
-        }
-      }
-      return;
-    }
-    formattingRef.current = dimensionFormatting;
-    if (!isEqual(dimensionFormatting, localFormatting)) {
-      setLocalFormatting(dimensionFormatting);
-    }
-  }, [dimensionFormatting, localFormatting]);
-
-  useEffect(() => {
-    if (sortingPendingRef.current) {
-      if (isEqual(dimensionSorting, sortingPendingRef.current)) {
-        sortingPendingRef.current = null;
-        sortingRef.current = dimensionSorting;
-        if (!isEqual(dimensionSorting, localSorting)) {
-          setLocalSorting(dimensionSorting);
-        }
-      }
-      return;
-    }
-    sortingRef.current = dimensionSorting;
-    if (!isEqual(dimensionSorting, localSorting)) {
-      setLocalSorting(dimensionSorting);
-    }
-  }, [dimensionSorting, localSorting]);
+  const [localFormatting, setLocalFormatting, readFormatting] =
+    useAcknowledgedValue(dimensionFormatting);
+  const [localSorting, setLocalSorting, readSorting] =
+    useAcknowledgedValue(dimensionSorting);
 
   const toArray = useCallback(
     (val: QueryFormColumn[] | QueryFormColumn | null | undefined) =>
@@ -558,10 +519,10 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       if (!dimensionKey || !setControlValue) {
         return;
       }
-      const baseFormatting = formattingRef.current || {};
+      const baseFormatting = readFormatting() || {};
       const nextFormatting: PivotDimensionFormattingMap = { ...baseFormatting };
       const nextEntry: PivotDimensionFormatting = {
-        ...(baseFormatting[dimensionKey] || {}),
+        ...baseFormatting[dimensionKey],
       };
 
       if (field === 'applyTo') {
@@ -586,11 +547,15 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       }
 
       setLocalFormatting(nextFormatting);
-      formattingPendingRef.current = nextFormatting;
-      formattingRef.current = nextFormatting;
+
       setControlValue(formattingControlName, nextFormatting);
     },
-    [formattingControlName, setControlValue],
+    [
+      formattingControlName,
+      setControlValue,
+      readFormatting,
+      setLocalFormatting,
+    ],
   );
 
   const updateSortingMetric = useCallback(
@@ -598,7 +563,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       if (!dimensionKey || !setControlValue) {
         return;
       }
-      const baseSorting = sortingRef.current || {};
+      const baseSorting = readSorting() || {};
       const nextSorting: PivotDimensionSortingMap = { ...baseSorting };
       if (!metric) {
         const existing = baseSorting[dimensionKey];
@@ -624,11 +589,10 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
         nextSorting[dimensionKey] = nextEntry;
       }
       setLocalSorting(nextSorting);
-      sortingPendingRef.current = nextSorting;
-      sortingRef.current = nextSorting;
+
       setControlValue(sortingControlName, nextSorting);
     },
-    [setControlValue, sortingControlName],
+    [setControlValue, sortingControlName, readSorting, setLocalSorting],
   );
 
   const updateSortingOrder = useCallback(
@@ -636,22 +600,21 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       if (!dimensionKey || !setControlValue) {
         return;
       }
-      const baseSorting = sortingRef.current || {};
+      const baseSorting = readSorting() || {};
       const existing = baseSorting[dimensionKey];
       const nextSorting: PivotDimensionSortingMap = {
         ...baseSorting,
         [dimensionKey]: {
-          ...(existing || {}),
+          ...existing,
           order,
           mode: existing?.mode ?? DEFAULT_DIMENSION_SORT_MODE,
         },
       };
       setLocalSorting(nextSorting);
-      sortingPendingRef.current = nextSorting;
-      sortingRef.current = nextSorting;
+
       setControlValue(sortingControlName, nextSorting);
     },
-    [setControlValue, sortingControlName],
+    [setControlValue, sortingControlName, readSorting, setLocalSorting],
   );
 
   const getDimensionKey = useCallback(
@@ -704,13 +667,9 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
     () =>
       optionSelector.values.map((column, idx) => {
         const isPlaceholder =
-          column === METRICS_PLACEHOLDER ||
-          (isColumnMetaValue(column) &&
-            column.column_name === METRICS_PLACEHOLDER);
-        const resolvedColumn =
-          typeof column === 'string'
-            ? options.find(option => option.column_name === column)
-            : column;
+          isColumnMetaValue(column) &&
+          column.column_name === METRICS_PLACEHOLDER;
+        const resolvedColumn = column;
         const datasourceWarningMessage =
           isAdhocColumn(column) && column.datasourceWarning
             ? t('This column might be incompatible with current dataset')

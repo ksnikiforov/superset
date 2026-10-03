@@ -249,6 +249,22 @@ const resolveOffsetValue = (
   return values[buildOffsetMetricKey(metricKey, offset)];
 };
 
+/** Return the input keys that determine a displayed measure leaf. */
+export const getMeasureLeafValueKeys = (
+  metricKey: string,
+  leaf: MeasureLeafSpec,
+): string[] => {
+  const key = leaf.kind === 'custom' ? getMetricKey(leaf.metric) : metricKey;
+  if (!key) return [];
+  if (!leaf.offset) return [key];
+  const offsetKey = buildOffsetMetricKey(key, leaf.offset);
+  return leaf.kind === 'custom' || leaf.operator === 'offset_value'
+    ? [offsetKey]
+    : leaf.operator === 'value'
+      ? [key]
+      : [key, offsetKey];
+};
+
 export const computeMeasureLeafValue = ({
   values,
   metricKey,

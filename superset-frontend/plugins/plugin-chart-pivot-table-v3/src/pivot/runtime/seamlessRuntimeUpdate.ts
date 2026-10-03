@@ -18,6 +18,7 @@
  */
 import { type DataRecordValue } from '@superset-ui/core';
 import { isEqual } from 'lodash';
+import { nanoid } from 'nanoid';
 import {
   type PivotRuntimeLayout,
   type PivotTableQueryFormData,
@@ -44,9 +45,8 @@ import {
   isAbortError,
   type LatestRequestLifecycle,
   yieldToMainThread,
+  withRequestDeadline,
 } from './requestLifecycle';
-
-const SEAMLESS_REQUEST_GROUP = 'pivot-v3-seamless';
 
 type RuntimeSelection = Record<string, DataRecordValue[]>;
 
@@ -155,18 +155,21 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
       factBatches,
     });
   const requestScope = requestLifecycle.beginScope();
-  requestScope.beginRequest(SEAMLESS_REQUEST_GROUP);
+  const requestGroupId = `pivot-v3-seamless-${nanoid()}`;
+  requestScope.beginRequest(requestGroupId);
 
   try {
-    const { results } = await fetchPlannedQuerySpecs({
-      formData,
-      specs,
-      requestGroupId: SEAMLESS_REQUEST_GROUP,
-      factStore,
-      shouldContinue: requestScope.isCurrent,
-      yieldToMain: yieldToMainThread,
-    });
-    requestScope.finish(SEAMLESS_REQUEST_GROUP);
+    const { results } = await withRequestDeadline(
+      fetchPlannedQuerySpecs({
+        formData,
+        specs,
+        requestGroupId: requestGroupId,
+        factStore,
+        shouldContinue: requestScope.isCurrent,
+        yieldToMain: yieldToMainThread,
+      }),
+    );
+    requestScope.finish(requestGroupId);
     if (!requestScope.isCurrent()) {
       return { status: 'stale' as const };
     }
@@ -199,10 +202,11 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
     if (!requestScope.isCurrent()) {
       return { status: 'stale' as const };
     }
+    requestLifecycle.invalidate();
     return isAbortError(error)
       ? { status: 'aborted' as const, error }
       : { status: 'error' as const, error };
   } finally {
-    requestScope.finish(SEAMLESS_REQUEST_GROUP);
+    requestScope.finish(requestGroupId);
   }
 };

@@ -27,6 +27,7 @@ import {
   type MeasureLeafSpec,
   type PivotAxis,
   type PivotPath,
+  type PivotResultCell,
   type PivotTableQueryFormData,
   type PivotTreeData,
   type PivotTreeNode,
@@ -46,6 +47,7 @@ import { createMetricNodePolicy } from '../metricsTotals';
 import {
   buildMeasureLeafOutputKey,
   computeMeasureLeafValue,
+  getMeasureLeafValueKeys,
   isValueLeaf,
 } from '../measureLeaves';
 import { type LayoutContext } from '../layout/LayoutContext';
@@ -66,6 +68,7 @@ import {
 import { formatPivotLabelValue } from '../viewModel';
 
 type MaterializationFactBatch = {
+  complete?: boolean;
   facts: PivotFact[];
   coverage: PivotFactCoverage;
 };
@@ -92,18 +95,22 @@ const mergeValues = <T extends { isSubtotal?: boolean }>(
     return existingValues;
   }
   if (incoming.isSubtotal) {
-    return { ...incomingValues, ...(existingValues || {}) };
+    return { ...incomingValues, ...existingValues };
   }
-  return { ...(existingValues || {}), ...incomingValues };
+  return { ...existingValues, ...incomingValues };
 };
 
 const mergeTreeValueMaps = <
-  T extends { values?: Record<string, DataRecordValue>; isSubtotal?: boolean },
+  T extends {
+    values?: Record<string, DataRecordValue>;
+    isSubtotal?: boolean;
+    isPartial?: boolean;
+  },
 >(
   left?: Record<string, T>,
   right?: Record<string, T>,
 ) => {
-  const result: Record<string, T> = { ...(left || {}) };
+  const result: Record<string, T> = { ...left };
   Object.entries(right || {}).forEach(([key, item]) => {
     const existing = result[key];
     if (!existing) {
@@ -114,6 +121,7 @@ const mergeTreeValueMaps = <
     result[key] = {
       ...existing,
       ...item,
+      isPartial: (existing.isPartial && item.isPartial) || undefined,
       ...(values ? { values } : {}),
     };
   });
@@ -124,17 +132,48 @@ const mergeTreeCells = (
   left?: PivotTreeData['cells'],
   right?: PivotTreeData['cells'],
 ) => {
-  const result: PivotTreeData['cells'] = { ...(left ?? {}) };
+  const result: PivotTreeData['cells'] = { ...left };
   Object.entries(right || {}).forEach(([key, cell]) => {
     const existing = result[key];
     if (!existing) {
       result[key] = cell;
       return;
     }
-    const values = mergeValues(existing.values, cell.values, existing, cell);
+    const values = mergeValues(existing.values, cell.values, existing, cell)!;
+    const partialValueKeys: string[] = [];
+    if (existing.partialValueKeys?.length || cell.partialValueKeys?.length) {
+      const existingPartialKeys = new Set(existing.partialValueKeys);
+      const incomingPartialKeys = new Set(cell.partialValueKeys);
+      const partialKeys = new Set([
+        ...existingPartialKeys,
+        ...incomingPartialKeys,
+      ]);
+      partialKeys.forEach(valueKey => {
+        const existingHasValue = Object.hasOwn(existing.values, valueKey);
+        const incomingHasValue = Object.hasOwn(cell.values, valueKey);
+        const existingPartial = existingPartialKeys.has(valueKey);
+        const incomingPartial = incomingPartialKeys.has(valueKey);
+        // A complete value supersedes a partial value, regardless of batch order.
+        const useIncoming =
+          incomingHasValue &&
+          (!existingHasValue ||
+            (existingPartial && !incomingPartial) ||
+            (Boolean(existingPartial) === Boolean(incomingPartial) &&
+              !cell.isSubtotal));
+        const source = useIncoming ? cell : existing;
+        values[valueKey] = source.values[valueKey];
+        if (
+          useIncoming
+            ? incomingPartialKeys.has(valueKey)
+            : existingPartialKeys.has(valueKey)
+        )
+          partialValueKeys.push(valueKey);
+      });
+    }
     result[key] = {
       ...existing,
       ...cell,
+      partialValueKeys: partialValueKeys.length ? partialValueKeys : undefined,
       ...(values ? { values } : {}),
       isSubtotal: cell.isSubtotal ?? existing.isSubtotal,
     };
@@ -227,10 +266,13 @@ const deriveBatchMaterializationPlan = ({
 };
 
 const applyMeasureLeafValues = (
-  values: Record<string, DataRecordValue>,
+  cell: PivotResultCell,
   groups: MeasureAxisGroup[],
 ) => {
-  const next = { ...values };
+  const next = { ...cell.values };
+  const partialKeys = cell.partialValueKeys?.length
+    ? new Set(cell.partialValueKeys)
+    : undefined;
   groups.forEach(group => {
     group.leaves.forEach(leaf => {
       const outputKey = buildMeasureLeafOutputKey(group.metricKey, leaf);
@@ -244,10 +286,20 @@ const applyMeasureLeafValues = (
       });
       if (computed !== undefined) {
         next[outputKey] = computed;
+        if (
+          getMeasureLeafValueKeys(group.metricKey, leaf).some(key =>
+            partialKeys?.has(key),
+          )
+        ) {
+          partialKeys?.add(outputKey);
+        }
       }
     });
   });
-  return next;
+  return {
+    values: next,
+    partialValueKeys: partialKeys?.size ? Array.from(partialKeys) : undefined,
+  };
 };
 
 const createDimensionDisplayLabels = (
@@ -281,6 +333,7 @@ const createDimensionDisplayLabels = (
 };
 
 type FactTreeBuilderInput = {
+  complete?: boolean;
   rowColumns: QueryFormColumn[];
   columnColumns: QueryFormColumn[];
   rowFullDepth: number;
@@ -289,6 +342,7 @@ type FactTreeBuilderInput = {
 };
 
 const createFactTreeBuilder = ({
+  complete,
   rowColumns,
   columnColumns,
   rowFullDepth,
@@ -306,7 +360,7 @@ const createFactTreeBuilder = ({
   ) => {
     const nodes = axis === 'row' ? tree.rows : tree.cols;
     const key = serializePath(path);
-    if (nodes[key]) {
+    if (Object.prototype.hasOwnProperty.call(nodes, key)) {
       return;
     }
     const groupby = axis === 'row' ? rowColumns : columnColumns;
@@ -323,6 +377,7 @@ const createFactTreeBuilder = ({
       path,
       label,
       formattedLabel,
+      isPartial: (complete === false && path.length > 0) || undefined,
       level: path.length,
       hasChildren:
         path.length < (axis === 'row' ? rowFullDepth : columnFullDepth),
@@ -350,13 +405,13 @@ const createFactTreeBuilder = ({
 
     if (colPath.length === 0) {
       tree.rows[rowKey].values = {
-        ...(tree.rows[rowKey].values || {}),
+        ...tree.rows[rowKey].values,
         ...values,
       };
     }
     if (rowPath.length === 0) {
       tree.cols[colKey].values = {
-        ...(tree.cols[colKey].values || {}),
+        ...tree.cols[colKey].values,
         ...values,
       };
     }
@@ -366,8 +421,12 @@ const createFactTreeBuilder = ({
     tree.cells[cellKey] = {
       rowKey,
       colKey,
+      partialValueKeys:
+        complete === false
+          ? [...(existingCell?.partialValueKeys ?? []), valueKey]
+          : undefined,
       values: {
-        ...(existingCell?.values || {}),
+        ...existingCell?.values,
         ...values,
       },
       isSubtotal:
@@ -383,8 +442,8 @@ const createFactTreeBuilder = ({
     ensureNode('row', [], 'Grand total');
     ensureNode('col', [], 'Grand total');
     const mergedRootValues = {
-      ...(tree.rows[rootKey]?.values || {}),
-      ...(tree.cols[rootKey]?.values || {}),
+      ...tree.rows[rootKey]?.values,
+      ...tree.cols[rootKey]?.values,
       ...(Object.keys(grandTotalValues).length > 0 ? grandTotalValues : {}),
     };
     const hasGrandTotalValues = Object.keys(grandTotalValues).length > 0;
@@ -398,6 +457,8 @@ const createFactTreeBuilder = ({
         rowKey: rootKey,
         colKey: rootKey,
         values: rootValues,
+        partialValueKeys:
+          complete === false ? Object.keys(rootValues) : undefined,
         isSubtotal: true,
       };
     }
@@ -685,7 +746,7 @@ const applyMeasureAxis = ({
   ) => {
     const nodes = axis === 'row' ? result.rows : result.cols;
     const key = serializePath(path);
-    if (nodes[key]) {
+    if (Object.prototype.hasOwnProperty.call(nodes, key)) {
       const existing = nodes[key];
       if (
         promoteExistingNodes &&
@@ -777,6 +838,17 @@ const applyMeasureAxis = ({
       level: path.length,
       hasChildren,
       isSubtotal: isSubtotalValue,
+      isPartial:
+        (!metricKey &&
+          !leafId &&
+          path.length > 0 &&
+          (
+            sourceNode ??
+            sourceNodes[
+              serializePath(metricNodePolicy.getNonMetricPathParts(path))
+            ]
+          )?.isPartial) ||
+        undefined,
     };
     nodes[key] = node;
     return node;
@@ -786,12 +858,14 @@ const applyMeasureAxis = ({
     rowPath,
     colPath,
     values,
+    partialValueKeys,
     isSubtotal,
     overwrite = false,
   }: {
     rowPath: PivotPath;
     colPath: PivotPath;
     values: Record<string, DataRecordValue>;
+    partialValueKeys?: string[];
     isSubtotal?: boolean;
     overwrite?: boolean;
   }) => {
@@ -805,6 +879,7 @@ const applyMeasureAxis = ({
       rowKey,
       colKey,
       values,
+      partialValueKeys,
       isSubtotal,
     };
   };
@@ -814,12 +889,14 @@ const applyMeasureAxis = ({
     oppositePath,
     colPrefix,
     values,
+    partialValueKeys,
     isSubtotal,
   }: {
     valuePath: PivotPath;
     oppositePath: PivotPath;
     colPrefix?: PivotPath;
     values: Record<string, DataRecordValue>;
+    partialValueKeys?: string[];
     isSubtotal?: boolean;
   }) => {
     if (metricKeys.length !== 1) {
@@ -830,6 +907,7 @@ const applyMeasureAxis = ({
         rowPath: valuePath,
         colPath: oppositePath,
         values,
+        partialValueKeys,
         isSubtotal,
       });
       return;
@@ -839,6 +917,7 @@ const applyMeasureAxis = ({
         rowPath: oppositePath,
         colPath: colPrefix ?? [],
         values,
+        partialValueKeys,
         isSubtotal,
       });
     }
@@ -853,6 +932,7 @@ const applyMeasureAxis = ({
         rowPath: oppositePath,
         colPath: valuePath,
         values,
+        partialValueKeys,
         isSubtotal,
       });
     }
@@ -896,7 +976,10 @@ const applyMeasureAxis = ({
     const oppositePath = oppositeNode?.path || [];
     const valuePrefix = valuePath.slice(0, insertIndex);
     const valueSuffix = valuePath.slice(insertIndex);
-    const cellValues = applyMeasureLeafValues(cell.values, groups);
+    const { values: cellValues, partialValueKeys } = applyMeasureLeafValues(
+      cell,
+      groups,
+    );
     const ensureValueAxisNode = (path: PivotPath) =>
       ensureNode(
         valueAxis,
@@ -939,6 +1022,7 @@ const applyMeasureAxis = ({
         rowPath: oppositePath,
         colPath: path,
         values,
+        partialValueKeys,
         isSubtotal: true,
         overwrite: true,
       });
@@ -974,6 +1058,7 @@ const applyMeasureAxis = ({
         rowPath: valuePath,
         colPath: oppositePath,
         values: cellValues,
+        partialValueKeys,
         isSubtotal: cell.isSubtotal,
       });
       if (skipProjectedMetricsForPartialRow) {
@@ -1061,6 +1146,7 @@ const applyMeasureAxis = ({
           rowPath: valueAxis === 'row' ? projectedValuePath : oppositePath,
           colPath: valueAxis === 'col' ? projectedValuePath : oppositePath,
           values: mergedValues,
+          partialValueKeys,
           isSubtotal: cell.isSubtotal,
           overwrite: true,
         });
@@ -1094,6 +1180,7 @@ const applyMeasureAxis = ({
           oppositePath,
           colPrefix: valuePrefix,
           values: mergedValues,
+          partialValueKeys,
           isSubtotal: cell.isSubtotal,
         });
       });
@@ -1141,6 +1228,7 @@ const buildBatchMaterializationProjection = ({
   const columnFullDepth = pivotProgram.columnDimensions.length;
 
   return {
+    complete: batch.complete,
     facts: batch.facts,
     rowColumns: coverage.rowDimensions,
     columnColumns: coverage.columnDimensions,
@@ -1299,6 +1387,7 @@ const groupFactStoreBatchesByMaterializationPlan = ({
     const key = JSON.stringify(plan);
     const entry = batchesByPlan.get(key) ?? { plan, batches: [] };
     entry.batches.push({
+      complete: batch.complete,
       facts: batch.facts,
       coverage: batch.coverage,
     });

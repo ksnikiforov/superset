@@ -58,14 +58,14 @@ const getFormattingButton = (label: string) =>
   screen.getByLabelText(`Add conditional formatting for ${label}`);
 
 describe('PivotDndMetricSelect', () => {
-  it('renders a formatting button for each metric', () => {
+  test('renders a formatting button for each metric', () => {
     render(<PivotDndMetricSelect {...baseProps} />, renderOptions);
 
     expect(getFormattingButton('sum__value')).toBeInTheDocument();
     expect(getFormattingButton('avg__value')).toBeInTheDocument();
   });
 
-  it('uses saved metric verbose names in labels', () => {
+  test('uses saved metric verbose names in labels', () => {
     const savedMetrics: Metric[] = [
       {
         metric_name: 'sum__value',
@@ -85,7 +85,7 @@ describe('PivotDndMetricSelect', () => {
     expect(getFormattingButton('Sum Value')).toBeInTheDocument();
   });
 
-  it('opens the formatting popover on click', async () => {
+  test('opens the formatting popover on click', async () => {
     render(<PivotDndMetricSelect {...baseProps} />, renderOptions);
 
     await userEvent.click(getFormattingButton('sum__value'));
@@ -95,7 +95,7 @@ describe('PivotDndMetricSelect', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows manual metric input options for formatting metrics', async () => {
+  test('shows manual metric input options for formatting metrics', async () => {
     const setControlValue = jest.fn();
     render(
       <PivotDndMetricSelect
@@ -126,7 +126,7 @@ describe('PivotDndMetricSelect', () => {
     expect(manualOption).toBeInTheDocument();
   });
 
-  it('merges background and text formatting selections', async () => {
+  test('merges background and text formatting selections', async () => {
     const setControlValue = jest.fn();
     render(
       <PivotDndMetricSelect
@@ -175,7 +175,7 @@ describe('PivotDndMetricSelect', () => {
     );
   });
 
-  it('stores databar configuration when a type is selected', async () => {
+  test('stores databar configuration when a type is selected', async () => {
     const setControlValue = jest.fn();
     render(
       <PivotDndMetricSelect
@@ -210,7 +210,7 @@ describe('PivotDndMetricSelect', () => {
     );
   });
 
-  it('disables scale-like for metrics that are already scale targets', async () => {
+  test('disables scale-like for metrics that are already scale targets', async () => {
     render(
       <PivotDndMetricSelect
         {...baseProps}
@@ -242,7 +242,7 @@ describe('PivotDndMetricSelect', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
-  it('filters scale-like targets to prevent chaining', async () => {
+  test('filters scale-like targets to prevent chaining', async () => {
     render(
       <PivotDndMetricSelect
         {...baseProps}
@@ -281,7 +281,7 @@ describe('PivotDndMetricSelect', () => {
     expect(within(listbox).getByText('avg__value')).toBeInTheDocument();
   });
 
-  it('keeps databar references when a metric is renamed', () => {
+  test('keeps databar references when a metric is renamed', () => {
     const oldMetric: QueryFormMetric = {
       expressionType: 'SQL',
       sqlExpression: 'SUM(value)',
@@ -331,7 +331,7 @@ describe('PivotDndMetricSelect', () => {
     );
   });
 
-  it('keeps formatting references when a metric formula changes', () => {
+  test('keeps formatting references when a metric formula changes', () => {
     const oldMetric: QueryFormMetric = {
       expressionType: 'SQL',
       sqlExpression: 'MEASURE(grossRevenue)',
@@ -375,7 +375,7 @@ describe('PivotDndMetricSelect', () => {
     );
   });
 
-  it('keeps formatting for adhoc metrics with verbose labels', async () => {
+  test('keeps formatting for adhoc metrics with verbose labels', async () => {
     const setControlValue = jest.fn();
     const adhocMetric: QueryFormMetric = {
       expressionType: 'SIMPLE',
@@ -408,7 +408,7 @@ describe('PivotDndMetricSelect', () => {
     await waitFor(() => expect(setControlValue).not.toHaveBeenCalled());
   });
 
-  it('ignores loose persisted labeled formatting values', async () => {
+  test('ignores loose persisted labeled formatting values', async () => {
     render(
       <PivotDndMetricSelect
         {...baseProps}
@@ -442,7 +442,7 @@ describe('PivotDndMetricSelect', () => {
     });
   });
 
-  it('ignores formatting metrics missing expressionType', async () => {
+  test('ignores formatting metrics missing expressionType', async () => {
     render(
       <PivotDndMetricSelect
         {...baseProps}
@@ -480,7 +480,7 @@ describe('PivotDndMetricSelect', () => {
     });
   });
 
-  it('ignores formatting keyed by metric label instead of metric key', async () => {
+  test('ignores formatting keyed by metric label instead of metric key', async () => {
     const savedMetric = {
       metric_name: 'avg__order_value',
       verbose_name: 'averageOrderValue',
@@ -521,7 +521,7 @@ describe('PivotDndMetricSelect', () => {
     });
   });
 
-  it('keeps distinct adhoc formatting metrics with identical labels', async () => {
+  test('keeps distinct adhoc formatting metrics with identical labels', async () => {
     const formattingMetricOne: QueryFormMetric = {
       expressionType: 'SQL',
       sqlExpression: 'SUM(a)',

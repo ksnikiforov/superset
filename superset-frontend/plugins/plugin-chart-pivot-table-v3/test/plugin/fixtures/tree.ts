@@ -30,7 +30,7 @@ export const mergeTrees = (
     target?: Record<string, PivotTreeNode>,
     source?: Record<string, PivotTreeNode>,
   ) => {
-    const result: Record<string, PivotTreeNode> = { ...(target || {}) };
+    const result: Record<string, PivotTreeNode> = { ...target };
     Object.entries(source || {}).forEach(([key, node]) => {
       const existing = result[key];
       if (!existing) {
@@ -39,7 +39,7 @@ export const mergeTrees = (
       }
       const mergedValues =
         node.values && Object.keys(node.values).length > 0
-          ? { ...(existing.values || {}), ...node.values }
+          ? { ...existing.values, ...node.values }
           : existing.values;
       result[key] = {
         ...existing,
@@ -54,7 +54,7 @@ export const mergeTrees = (
     target?: Record<string, PivotResultCell>,
     source?: Record<string, PivotResultCell>,
   ) => {
-    const result = { ...(target ?? {}) } as Record<string, PivotResultCell>;
+    const result = { ...target } as Record<string, PivotResultCell>;
     Object.entries(source || {}).forEach(([key, cell]) => {
       const existing = result[key];
       if (!existing) {
@@ -63,7 +63,7 @@ export const mergeTrees = (
       }
       const mergedValues =
         cell.values && Object.keys(cell.values).length > 0
-          ? { ...(existing.values || {}), ...cell.values }
+          ? { ...existing.values, ...cell.values }
           : existing.values;
       result[key] = {
         ...existing,

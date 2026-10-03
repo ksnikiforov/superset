@@ -26,6 +26,7 @@ import {
   buildFormattingValueMaps,
   buildVisibleCellEntries,
   deriveMetricKey,
+  hasVisiblePartialData,
 } from '../../../src/pivot/cellUtils';
 import {
   METRICS_PLACEHOLDER,
@@ -38,6 +39,7 @@ import {
   buildMeasureLeafOutputKey,
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
+import { type RenderModel } from '../../../src/pivot/render/renderModel';
 import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
 
 const rootKey = serializePath([]);
@@ -113,7 +115,7 @@ describe('cellUtils helpers', () => {
     },
   };
 
-  it('buildFormattingValueMaps collects root axis values for rows and columns', () => {
+  test('buildFormattingValueMaps collects root axis values for rows and columns', () => {
     const { rowValuesMap, colValuesMap } = buildFormattingValueMaps({
       cells: tree.cells,
       rows: tree.rows,
@@ -131,7 +133,7 @@ describe('cellUtils helpers', () => {
     expect(colValuesMap.has(missingColKey)).toBe(false);
   });
 
-  it('buildVisibleCellEntries filters by visibility and existing nodes', () => {
+  test('buildVisibleCellEntries filters by visibility and existing nodes', () => {
     const entries = buildVisibleCellEntries({
       cells: tree.cells,
       rows: tree.rows,
@@ -151,7 +153,7 @@ describe('cellUtils helpers', () => {
     );
   });
 
-  it('derives leaf output keys when leaf tokens live on the other axis', () => {
+  test('derives leaf output keys when leaf tokens live on the other axis', () => {
     const metricKey = 'sales';
     const ixLeaf = buildBuiltInLeaf('ix', {
       n: 1,
@@ -181,7 +183,7 @@ describe('cellUtils helpers', () => {
     expect(result).toBe(buildMeasureLeafOutputKey(metricKey, ixLeaf));
   });
 
-  it('derives selected single-leaf output keys when metric and leaf tokens are hidden', () => {
+  test('derives selected single-leaf output keys when metric and leaf tokens are hidden', () => {
     const metricKey = 'sales';
     const ixLeaf = buildBuiltInLeaf('ix', {
       n: 1,
@@ -209,4 +211,97 @@ describe('cellUtils helpers', () => {
 
     expect(result).toBe(outputKey);
   });
+});
+
+const partialRenderModel = (): RenderModel => {
+  const rowNode = buildNode('row', ['A']);
+  const colNode = buildNode('col', ['C']);
+  return {
+    visibleRows: [rowNode],
+    visibleCols: [colNode],
+    columnHeaderRows: [],
+    showRowRoot: false,
+    visibleCellEntries: [
+      {
+        cellKey: serializeCellKey(rowNode.key, colNode.key),
+        rowNode,
+        colNode,
+        cell: {
+          rowKey: rowNode.key,
+          colKey: colNode.key,
+          values: { complete: 10, partial: 20 },
+          partialValueKeys: ['partial'],
+        },
+      },
+    ],
+  };
+};
+
+test('one displayed partial value is sufficient for the warning', () => {
+  expect(
+    hasVisiblePartialData(
+      partialRenderModel(),
+      () => 'partial',
+      () => false,
+    ),
+  ).toBe(true);
+});
+
+test('hidden metrics and blank parent values do not cause a partial warning', () => {
+  expect(
+    hasVisiblePartialData(
+      partialRenderModel(),
+      () => 'complete',
+      () => false,
+    ),
+  ).toBe(false);
+  expect(
+    hasVisiblePartialData(
+      partialRenderModel(),
+      () => 'partial',
+      () => true,
+    ),
+  ).toBe(false);
+});
+
+test('partial groups in visible row labels and column headers cause a warning without values', () => {
+  const model = partialRenderModel();
+  model.visibleCellEntries = [];
+  model.visibleRows[0] = { ...model.visibleRows[0], isPartial: true };
+  expect(
+    hasVisiblePartialData(
+      model,
+      () => 'complete',
+      () => false,
+    ),
+  ).toBe(true);
+  model.visibleRows = [];
+  model.columnHeaderRows = [
+    [
+      {
+        node: { ...model.visibleCols[0], isPartial: true },
+        rowSpan: 1,
+        colSpan: 1,
+      },
+    ],
+  ];
+  expect(
+    hasVisiblePartialData(
+      model,
+      () => 'complete',
+      () => false,
+    ),
+  ).toBe(true);
+});
+
+test('cached partial values outside the rendered projection do not cause a warning', () => {
+  const model = partialRenderModel();
+  model.visibleCellEntries = [];
+  expect(
+    hasVisiblePartialData(
+      model,
+      () => 'partial',
+      () => false,
+    ),
+  ).toBe(false);
 });

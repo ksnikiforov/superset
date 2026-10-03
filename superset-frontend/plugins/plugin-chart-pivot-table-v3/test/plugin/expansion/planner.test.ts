@@ -60,7 +60,7 @@ const fetchPathKeys = (plan: ReturnType<typeof planExpansionForAxis>) =>
   plan.map(target => target.pathKey);
 
 describe('pivot/expansion/planner', () => {
-  it('plans grouped fetch targets for an expanded node', () => {
+  test('plans grouped fetch targets for an expanded node', () => {
     const aKey = serializePath(['A']);
     const nodes: Record<string, PivotTreeNode> = {
       [rootKey]: {
@@ -99,7 +99,7 @@ describe('pivot/expansion/planner', () => {
     });
   });
 
-  it('plans fetches from semantic expandability instead of tree child shape', () => {
+  test('plans fetches from semantic expandability instead of tree child shape', () => {
     const aKey = serializePath(['A']);
     const plan = planExpansionForAxis({
       axis: 'row',
@@ -124,7 +124,7 @@ describe('pivot/expansion/planner', () => {
     });
   });
 
-  it('builds branch coverage targets before manifest diffing', () => {
+  test('builds branch coverage targets before manifest diffing', () => {
     const aKey = serializePath(['A']);
     const bKey = serializePath(['B']);
     const factSelectors: PivotFactSelector[] = [
@@ -161,7 +161,7 @@ describe('pivot/expansion/planner', () => {
     expect(plan.map(target => target.pathKey)).toEqual([aKey, bKey]);
   });
 
-  it('keeps coverage satisfaction outside axis target construction', () => {
+  test('keeps coverage satisfaction outside axis target construction', () => {
     const aKey = serializePath(['A']);
     const bKey = serializePath(['B']);
     const plan = planExpansionForAxis({
@@ -195,7 +195,7 @@ describe('pivot/expansion/planner', () => {
     expect(fetchPathKeys(plan)).toEqual([aKey, bKey]);
   });
 
-  it('does not turn subtotal display paths into fetch coverage requests', () => {
+  test('does not turn subtotal display paths into fetch coverage requests', () => {
     const metricKey = serializePath(['A', encodeMetricKey('sales')]);
     const subtotalMetricKey = serializePath([
       'A',
@@ -224,7 +224,7 @@ describe('pivot/expansion/planner', () => {
     expect(plan.map(target => target.pathKey)).toEqual([metricKey]);
   });
 
-  it('uses typed batch coverage to skip only covered sibling paths', () => {
+  test('uses typed batch coverage to skip only covered sibling paths', () => {
     const caKey = serializePath(['US', 'CA']);
     const nyKey = serializePath(['US', 'NY']);
     const txKey = serializePath(['US', 'TX']);
@@ -265,7 +265,7 @@ describe('pivot/expansion/planner', () => {
     expect(plan.map(target => target.pathKey)).toEqual([caKey, nyKey, txKey]);
   });
 
-  it('does not let typed metric branch coverage satisfy sibling metrics', () => {
+  test('does not let typed metric branch coverage satisfy sibling metrics', () => {
     const salesKey = serializePath(['A', encodeMetricKey('sales')]);
     const profitKey = serializePath(['A', encodeMetricKey('profit')]);
     const factSelectors: PivotFactSelector[] = [
@@ -307,7 +307,7 @@ describe('pivot/expansion/planner', () => {
     expect(plan.map(target => target.pathKey)).toEqual([salesKey, profitKey]);
   });
 
-  it('keeps rendered metric siblings as separate fetch targets when coverage keys differ', () => {
+  test('keeps rendered metric siblings as separate fetch targets when coverage keys differ', () => {
     const metricAKey = serializePath(['A', '__metric__sales']);
     const metricBKey = serializePath(['A', '__metric__profit']);
     const nodes: Record<string, PivotTreeNode> = {
@@ -355,7 +355,7 @@ describe('pivot/expansion/planner', () => {
     );
   });
 
-  it('plans canonical coverage when expanding a skipped pre-Values ancestor with an open metric', () => {
+  test('plans canonical coverage when expanding a skipped pre-Values ancestor with an open metric', () => {
     const program = compilePivotProgram({
       groupbyRows: [
         'orderPriority',

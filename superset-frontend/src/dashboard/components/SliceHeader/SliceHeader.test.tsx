@@ -823,3 +823,36 @@ test('Should NOT show row count warning for table chart with server pagination w
 
   mockUseUiConfig.mockRestore();
 });
+
+test('Pivot Table v3 owns partial-data warnings rather than the original query row count', () => {
+  jest.mocked(useUiConfig).mockReturnValue({
+    hideTitle: false,
+    hideTab: false,
+    hideNav: false,
+    hideChartControls: false,
+    emitDataMasks: false,
+    showRowLimitWarning: true,
+  });
+  const props = createProps({
+    formData: {
+      ...createProps().formData,
+      viz_type: VizType.PivotTableV3,
+      row_limit: 10,
+    },
+  });
+  render(<SliceHeader {...props} />, {
+    useRedux: true,
+    useRouter: true,
+    initialState: {
+      ...initialState,
+      charts: {
+        [props.slice.slice_id]: {
+          id: MOCKED_CHART_ID,
+          chartStatus: 'rendered',
+          queriesResponse: [{ sql_rowcount: 10, data: Array(10).fill({}) }],
+        },
+      },
+    },
+  });
+  expect(screen.queryByTestId('warning')).not.toBeInTheDocument();
+});

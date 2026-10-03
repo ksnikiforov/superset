@@ -25,7 +25,7 @@ const baseTransitionConfig = {
 };
 
 describe('pivot/expansion/stateTransitions layout changes', () => {
-  it('reports unchanged row and column layouts', () => {
+  test('reports unchanged row and column layouts', () => {
     expect(resolveLayoutTransition(baseTransitionConfig)).toEqual({
       row: {
         changed: false,
@@ -40,7 +40,7 @@ describe('pivot/expansion/stateTransitions layout changes', () => {
     });
   });
 
-  it('reports trailing row appends as expansion-compatible changes', () => {
+  test('reports trailing row appends as expansion-compatible changes', () => {
     expect(
       resolveLayoutTransition({
         ...baseTransitionConfig,
@@ -60,7 +60,7 @@ describe('pivot/expansion/stateTransitions layout changes', () => {
     });
   });
 
-  it('reports trailing row trims without treating them as expansion appends', () => {
+  test('reports trailing row trims without treating them as expansion appends', () => {
     expect(
       resolveLayoutTransition({
         ...baseTransitionConfig,
@@ -76,7 +76,7 @@ describe('pivot/expansion/stateTransitions layout changes', () => {
     });
   });
 
-  it('uses the same stable-prefix policy for columns', () => {
+  test('uses the same stable-prefix policy for columns', () => {
     expect(
       resolveLayoutTransition({
         previousLayout: { rows: [], cols: ['year', 'quarter'] },

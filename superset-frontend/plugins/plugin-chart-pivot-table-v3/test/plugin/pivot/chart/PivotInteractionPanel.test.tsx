@@ -114,7 +114,7 @@ const LeafOrderHarness = ({
 };
 
 describe('PivotInteractionPanel', () => {
-  it('commits metrics order when the measures popover closes', () => {
+  test('commits metrics order when the measures popover closes', () => {
     const onChange = jest.fn();
     render(
       <PivotInteractionPanel
@@ -137,7 +137,7 @@ describe('PivotInteractionPanel', () => {
     ]);
   });
 
-  it('uses metric labels in the measures selector', () => {
+  test('uses metric labels in the measures selector', () => {
     render(
       <PivotInteractionPanel
         dimensions={['country']}
@@ -155,7 +155,7 @@ describe('PivotInteractionPanel', () => {
     ).toBeInTheDocument();
   });
 
-  it('uses dimension labels from the label map', () => {
+  test('uses dimension labels from the label map', () => {
     render(
       <PivotInteractionPanel
         dimensions={['shipMode']}
@@ -169,7 +169,7 @@ describe('PivotInteractionPanel', () => {
     expect(screen.getByText('Delivery Type')).toBeInTheDocument();
   });
 
-  it('respects the order that measures are selected', () => {
+  test('respects the order that measures are selected', () => {
     const onChange = jest.fn();
     render(
       <PivotInteractionPanel
@@ -193,7 +193,7 @@ describe('PivotInteractionPanel', () => {
     ]);
   });
 
-  it('shows order numbers for row selections and clears them when deselected', () => {
+  test('shows order numbers for row selections and clears them when deselected', () => {
     render(
       <InteractionHarness
         dimensions={['country', 'state']}
@@ -224,7 +224,7 @@ describe('PivotInteractionPanel', () => {
     expect(rowButtonsAfterClear[0]).toHaveTextContent('');
   });
 
-  it('keeps row/column selections mutually exclusive', () => {
+  test('keeps row/column selections mutually exclusive', () => {
     render(
       <InteractionHarness dimensions={['country']} metrics={['sum__sales']} />,
     );
@@ -243,7 +243,7 @@ describe('PivotInteractionPanel', () => {
     expect(colButtonAfter).toHaveTextContent('1');
   });
 
-  it('shows order numbers for column selections', () => {
+  test('shows order numbers for column selections', () => {
     render(
       <InteractionHarness
         dimensions={['country', 'state']}
@@ -260,7 +260,7 @@ describe('PivotInteractionPanel', () => {
     expect(colButtonsAfter[1]).toHaveTextContent('2');
   });
 
-  it('inserts new column dimensions at the end when value is in the middle', () => {
+  test('inserts new column dimensions at the end when value is in the middle', () => {
     const onChange = jest.fn();
     const layout: PivotRuntimeLayout = {
       ...baseLayout,
@@ -287,7 +287,7 @@ describe('PivotInteractionPanel', () => {
     });
   });
 
-  it('keeps value placement stable when re-adding a column dimension', () => {
+  test('keeps value placement stable when re-adding a column dimension', () => {
     render(
       <LayoutHarness
         dimensions={['col1', 'col2', 'col3']}
@@ -311,7 +311,7 @@ describe('PivotInteractionPanel', () => {
     expect(screen.getByTestId('layout-value')).toHaveTextContent('col:1');
   });
 
-  it('inserts before value when value is last on the target axis', () => {
+  test('inserts before value when value is last on the target axis', () => {
     const onChange = jest.fn();
     const layout: PivotRuntimeLayout = {
       ...baseLayout,
@@ -338,7 +338,7 @@ describe('PivotInteractionPanel', () => {
     });
   });
 
-  it('inserts before value when value is the only chip on the target axis', () => {
+  test('inserts before value when value is the only chip on the target axis', () => {
     const onChange = jest.fn();
     const layout: PivotRuntimeLayout = {
       ...baseLayout,
@@ -365,7 +365,7 @@ describe('PivotInteractionPanel', () => {
     });
   });
 
-  it('moves a dimension to the column axis when the column checkbox is clicked', () => {
+  test('moves a dimension to the column axis when the column checkbox is clicked', () => {
     const onChange = jest.fn();
     const layout: PivotRuntimeLayout = {
       ...baseLayout,
@@ -387,7 +387,7 @@ describe('PivotInteractionPanel', () => {
     expect(onChange.mock.calls[0][0].cols).toEqual(['country']);
   });
 
-  it('shows leaf chips only when non-value leaves exist', () => {
+  test('shows leaf chips only when non-value leaves exist', () => {
     const onChange = jest.fn();
     const { rerender } = render(
       <PivotInteractionPanel
@@ -421,7 +421,7 @@ describe('PivotInteractionPanel', () => {
     expect(screen.getByText('IX 1YA')).toBeInTheDocument();
   });
 
-  it('keeps leaf order in user selection order across value deselect/reselect', () => {
+  test('keeps leaf order in user selection order across value deselect/reselect', () => {
     const valueLeaf = buildValueLeaf();
     const ixLeaf = buildBuiltInLeaf('ix', {
       n: 1,
@@ -463,7 +463,7 @@ describe('PivotInteractionPanel', () => {
     );
   });
 
-  it('clears all filters from the header control', () => {
+  test('clears all filters from the header control', () => {
     const onChange = jest.fn();
     const onClearFilters = jest.fn();
     render(
@@ -481,7 +481,7 @@ describe('PivotInteractionPanel', () => {
     expect(onClearFilters).toHaveBeenCalledTimes(1);
   });
 
-  it('closes filter popover and discards pending values when clearing all filters', async () => {
+  test('closes filter popover and discards pending values when clearing all filters', async () => {
     const onChange = jest.fn();
     const onClearFilters = jest.fn();
     const onFilterChange = jest.fn();
@@ -509,7 +509,7 @@ describe('PivotInteractionPanel', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
-  it('shows formatted selected filter labels instead of encoded values', async () => {
+  test('shows formatted selected filter labels instead of encoded values', async () => {
     const onChange = jest.fn();
     render(
       <PivotInteractionPanel
@@ -530,7 +530,7 @@ describe('PivotInteractionPanel', () => {
     expect(screen.queryByText('str:US')).not.toBeInTheDocument();
   });
 
-  it('emits a debounced search callback for filter values', async () => {
+  test('emits a debounced search callback for filter values', async () => {
     jest.useFakeTimers();
     try {
       const onChange = jest.fn();
@@ -563,7 +563,7 @@ describe('PivotInteractionPanel', () => {
     }
   });
 
-  it('renders an apply button when enabled', () => {
+  test('renders an apply button when enabled', () => {
     const onChange = jest.fn();
     const onApply = jest.fn();
     render(

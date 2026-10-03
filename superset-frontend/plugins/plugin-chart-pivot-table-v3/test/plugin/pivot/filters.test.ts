@@ -52,7 +52,7 @@ const testProgram = ({
   });
 
 describe('buildCellFilters', () => {
-  it('builds filters for all row/col levels excluding metric tokens on columns', () => {
+  test('builds filters for all row/col levels excluding metric tokens on columns', () => {
     const rowNode = {
       path: ['US', 'CA'],
     } as PivotTreeNode;
@@ -79,7 +79,7 @@ describe('buildCellFilters', () => {
     ]);
   });
 
-  it('builds filters for all row/col levels excluding metric tokens on rows', () => {
+  test('builds filters for all row/col levels excluding metric tokens on rows', () => {
     const rowNode = {
       path: [encodeMetricKey('metric2'), 'US', 'CA'],
     } as PivotTreeNode;
@@ -105,7 +105,7 @@ describe('buildCellFilters', () => {
     ]);
   });
 
-  it('ignores subtotal tokens when building filters', () => {
+  test('ignores subtotal tokens when building filters', () => {
     const rowNode = {
       path: ['US', SUBTOTAL_TOKEN],
     } as PivotTreeNode;
@@ -132,7 +132,7 @@ describe('buildCellFilters', () => {
 });
 
 describe('selected filter state helpers', () => {
-  it('detects and selects the first populated filter source', () => {
+  test('detects and selects the first populated filter source', () => {
     const selected = { country: ['France'] };
 
     expect(hasSelectedFilters({})).toBe(false);
@@ -143,7 +143,7 @@ describe('selected filter state helpers', () => {
     expect(firstSelectedFilters({}, {})).toEqual({});
   });
 
-  it('normalizes persisted filters to canonical dimension keys', () => {
+  test('normalizes persisted filters to canonical dimension keys', () => {
     expect(
       normalizePivotSelectedFilters({
         filters: {
@@ -167,7 +167,7 @@ describe('selected filter state helpers', () => {
     ).toEqual({});
   });
 
-  it('resolves runtime selection sync precedence for user-controlled charts', () => {
+  test('resolves runtime selection sync precedence for user-controlled charts', () => {
     expect(
       buildRuntimeSelectionSyncState({
         dimensions: [
@@ -186,7 +186,7 @@ describe('selected filter state helpers', () => {
     });
   });
 
-  it('uses committed filters before prop filters when persisted filters are empty', () => {
+  test('uses committed filters before prop filters when persisted filters are empty', () => {
     expect(
       buildRuntimeSelectionSyncState({
         dimensions: ['Country'],
@@ -202,7 +202,7 @@ describe('selected filter state helpers', () => {
     });
   });
 
-  it('collects tree filter values by canonical dimension keys', () => {
+  test('collects tree filter values by canonical dimension keys', () => {
     const rows = {
       countryFrance: {
         key: 'countryFrance',
@@ -242,7 +242,7 @@ describe('selected filter state helpers', () => {
     });
   });
 
-  it('updates dimension filter selections and stale restore suppression', () => {
+  test('updates dimension filter selections and stale restore suppression', () => {
     expect(
       applyDimensionFilterSelectionChange({
         selection: {},
@@ -277,7 +277,7 @@ describe('selected filter state helpers', () => {
     });
   });
 
-  it('builds clear-all filter updates only when filters exist', () => {
+  test('builds clear-all filter updates only when filters exist', () => {
     expect(buildClearSelectedFiltersUpdate({})).toBeNull();
     expect(buildClearSelectedFiltersUpdate({ country: ['France'] })).toEqual({
       selection: {},

@@ -151,9 +151,7 @@ describe('buildInitialQuerySpecs (contracts)', () => {
 
     const specs = buildInitialQuerySpecs(formData);
 
-    expect(specs.every(spec => !spec.columns.includes('age_group'))).toBe(
-      true,
-    );
+    expect(specs.every(spec => !spec.columns.includes('age_group'))).toBe(true);
     expect(
       specs.every(spec => spec.meta.factSelector.coverage.rowDepth <= 1),
     ).toBe(true);

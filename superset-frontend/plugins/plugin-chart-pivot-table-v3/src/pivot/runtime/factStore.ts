@@ -36,6 +36,7 @@ export type PivotFact = {
 
 export type PivotFactSelector = {
   coverage: PivotFactCoverage;
+  complete?: boolean;
   scope: PivotFactStoreBatchScope;
   valueKeys: string[];
   queryContextKey?: string;
@@ -125,6 +126,11 @@ export const buildPivotFactQueryContextKey = (
   formData: PivotTableQueryFormData,
 ) =>
   stableStringify({
+    datasource: formData.datasource ?? null,
+    row_limit: formData.row_limit ?? null,
+    metricDefinitions: (formData.metrics ?? [])
+      .filter(metric => typeof metric !== 'string')
+      .sort((a, b) => stableStringify(a).localeCompare(stableStringify(b))),
     adhoc_filters: (formData.adhoc_filters ?? []).filter(
       filter => !isNoopTemporalRangeFilter(filter),
     ),
@@ -144,14 +150,6 @@ export const assignMissingPivotFactQueryContextKey = (
   queryContextKey: string,
 ): PivotFactStoreBatch =>
   batch.queryContextKey === undefined ? { ...batch, queryContextKey } : batch;
-
-export const bindPivotFactBatchToQueryContext = (
-  batch: PivotFactStoreBatch,
-  queryContextKey: string,
-): PivotFactStoreBatch => ({
-  ...batch,
-  queryContextKey,
-});
 
 export const buildFactValueKeys = ({
   metricKeys,
@@ -235,7 +233,10 @@ export const createPivotFactStore = (): PivotFactStore => {
 
   return {
     upsertBatch,
-    getCoverageSelectors: selectors,
+    getCoverageSelectors: queryContextKey =>
+      selectors(queryContextKey).filter(
+        selector => selector.complete !== false,
+      ),
     getFactBatches: queryContextKey =>
       selectors(queryContextKey).map(selector => ({
         ...selector,

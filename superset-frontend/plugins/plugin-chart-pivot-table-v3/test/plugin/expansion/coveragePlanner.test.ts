@@ -76,7 +76,7 @@ const factSelectorsFromFetchedColumnDepths = (
   );
 
 describe('expansionPlanner', () => {
-  it('builds axis targets even when loaded coverage may satisfy them', () => {
+  test('builds axis targets even when loaded coverage may satisfy them', () => {
     const keyA = serializePath(['A']);
     const nodes: Record<string, PivotTreeNode> = {
       [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
@@ -95,7 +95,7 @@ describe('expansionPlanner', () => {
     expect(sortFetchPathKeys(plan)).toEqual([keyA]);
   });
 
-  it('leaves semantic coverage satisfaction to the manifest diff', () => {
+  test('leaves semantic coverage satisfaction to the manifest diff', () => {
     const keyA = serializePath(['A']);
     const nodes: Record<string, PivotTreeNode> = {
       [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
@@ -114,7 +114,7 @@ describe('expansionPlanner', () => {
     expect(sortFetchPathKeys(plan)).toEqual([keyA]);
   });
 
-  it('requires a fetch when the required depth increases', () => {
+  test('requires a fetch when the required depth increases', () => {
     const keyA = serializePath(['A']);
     const nodes: Record<string, PivotTreeNode> = {
       [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
@@ -133,7 +133,7 @@ describe('expansionPlanner', () => {
     expect(sortFetchPathKeys(plan)).toEqual([keyA]);
   });
 
-  it('treats nodes as pending when children are not loaded at depth zero', () => {
+  test('treats nodes as pending when children are not loaded at depth zero', () => {
     const keyA = serializePath(['A']);
     const nodes: Record<string, PivotTreeNode> = {
       [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
@@ -152,7 +152,7 @@ describe('expansionPlanner', () => {
     expect(sortFetchPathKeys(plan)).toEqual([keyA]);
   });
 
-  it('fetches missing keys when the nearest ancestor is satisfied', () => {
+  test('fetches missing keys when the nearest ancestor is satisfied', () => {
     const keyA = serializePath(['A']);
     const keyAB = serializePath(['A', 'B']);
     const nodes: Record<string, PivotTreeNode> = {
@@ -172,7 +172,7 @@ describe('expansionPlanner', () => {
     expect(sortFetchPathKeys(plan)).toEqual([keyA, keyAB]);
   });
 
-  it('fetches the ancestor when a missing key needs deeper data', () => {
+  test('fetches the ancestor when a missing key needs deeper data', () => {
     const keyA = serializePath(['A']);
     const keyAB = serializePath(['A', 'B']);
     const nodes: Record<string, PivotTreeNode> = {
@@ -192,7 +192,7 @@ describe('expansionPlanner', () => {
     expect(sortFetchPathKeys(plan)).toEqual([keyA, keyAB]);
   });
 
-  it('updates planned fetches as expansion and depth evolve', () => {
+  test('updates planned fetches as expansion and depth evolve', () => {
     const keyA = serializePath(['A']);
     const keyAB = serializePath(['A', 'B']);
     const baseNodes: Record<string, PivotTreeNode> = {

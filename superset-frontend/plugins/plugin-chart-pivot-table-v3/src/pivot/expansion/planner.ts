@@ -77,6 +77,7 @@ export const targetAxisScope = (
 ): PivotFactStoreBatchScope => {
   const scope =
     target.axis === 'row' ? target.need.rowScope : target.need.columnScope;
+  if (scope.kind === 'root') return { kind: 'root' };
   return scope.kind === 'scopedFull'
     ? {
         kind: 'scopedFull',
@@ -515,12 +516,14 @@ const depthForExpansionKeys = ({
 export const planHydrationIteration = ({
   desired,
   axisCoverageNeeds = [],
+  rootCoverageNeeds = [],
   factSelectors,
   program,
   queryContextKey = '',
 }: {
   desired: Record<PivotAxis, Set<string>>;
   axisCoverageNeeds?: PivotAxisCoverageNeed[];
+  rootCoverageNeeds?: PivotCoverageNeed[];
   factSelectors: PivotFactSelector[];
   program: PivotProgram;
   queryContextKey?: string;
@@ -543,13 +546,20 @@ export const planHydrationIteration = ({
     ]),
   ) as Record<PivotAxis, string[]>;
   const directCoverageTargets = selectMissingCoverageTargets({
-    targets: axisCoverageNeeds.map(need =>
-      buildAxisCoverageNeedTarget({
+    targets: [
+      ...rootCoverageNeeds.map(need => ({
+        axis: (program.rowDimensions.length > 0 ? 'row' : 'col') as PivotAxis,
+        pathKey: rootKey,
         need,
-        program,
-        ...coverageDepths,
-      }),
-    ),
+      })),
+      ...axisCoverageNeeds.map(need =>
+        buildAxisCoverageNeedTarget({
+          need,
+          program,
+          ...coverageDepths,
+        }),
+      ),
+    ],
     factSelectors,
     queryContextKey,
   });

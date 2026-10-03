@@ -175,7 +175,7 @@ describe('Global Async Queries (HTTP 202) support', () => {
     window.featureFlags[FeatureFlag.GlobalAsyncQueries] = false;
   });
 
-  it('waits for async chart data in fetchBranch()', async () => {
+  test('waits for async chart data in fetchBranch()', async () => {
     (SupersetClient.post as jest.Mock).mockResolvedValue({
       response: new Response(null, { status: 202 }),
       json: { result: { job_id: 'job-1' } },
@@ -198,7 +198,7 @@ describe('Global Async Queries (HTTP 202) support', () => {
     expect(result).toEqual({ didFetch: true });
   });
 
-  it('waits for async chart data in fetchBatch()', async () => {
+  test('waits for async chart data in fetchBatch()', async () => {
     (SupersetClient.post as jest.Mock).mockResolvedValue({
       response: new Response(null, { status: 202 }),
       json: { result: { job_id: 'job-2' } },

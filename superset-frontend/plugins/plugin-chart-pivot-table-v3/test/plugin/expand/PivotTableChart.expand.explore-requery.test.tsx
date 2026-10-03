@@ -46,7 +46,7 @@ describe('PivotTableChart expand resilience to explore data refresh', () => {
     fetchPivotBranchMock.mockClear();
   });
 
-  it('keeps expanded rows visible when explore refreshes base data', async () => {
+  test('keeps expanded rows visible when explore refreshes base data', async () => {
     const records = [
       { orderPriority: '5-LOW', revenueBand: 'REV-A', grossRevenue: 10 },
       { orderPriority: '5-LOW', revenueBand: 'REV-B', grossRevenue: 20 },

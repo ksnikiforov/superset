@@ -131,7 +131,7 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
     },
   };
 
-  it('still fetches branch when only metric-tier children are present', async () => {
+  test('still fetches branch when only metric-tier children are present', async () => {
     const { getAllByLabelText, queryAllByText } = render(
       <PivotTableChart
         data={treeWithMetricChildOnly}
@@ -174,7 +174,7 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
     });
   });
 
-  it('renders metric-first rows without duplicating base nodes and expands loaded metric tier locally', async () => {
+  test('renders metric-first rows without duplicating base nodes and expands loaded metric tier locally', async () => {
     const metricFirstTree: PivotTreeData = {
       rows: {
         '': {
@@ -300,7 +300,7 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
     expect(fetchPivotBranchMock).not.toHaveBeenCalled();
   });
 
-  it('keeps metric-first return flag values after expanding a child level', async () => {
+  test('keeps metric-first return flag values after expanding a child level', async () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = ['returnFlag', 'orderPriority'];
     const colGroupby = ['shipMode'];
@@ -446,7 +446,7 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
     });
   });
 
-  it('keeps metric-first return flag values after deeper expansion', async () => {
+  test('keeps metric-first return flag values after deeper expansion', async () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = ['returnFlag', 'orderPriority', 'orderStatus'];
     const colGroupby = ['shipMode'];

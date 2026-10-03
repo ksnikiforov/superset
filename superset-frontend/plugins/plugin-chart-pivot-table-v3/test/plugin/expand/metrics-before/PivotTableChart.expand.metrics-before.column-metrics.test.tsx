@@ -178,7 +178,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     },
   );
 
-  it('fetches row branch after expanding/collapsing metric-first columns', async () => {
+  test('fetches row branch after expanding/collapsing metric-first columns', async () => {
     fetchPivotBranchMock.mockImplementation(
       resolveMockBranchFetchResult({ data: undefined }),
     );
@@ -257,7 +257,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     expect(getByText('USA')).toBeInTheDocument();
   });
 
-  it('shows fetched metric values after collapsing metric-first columns and expanding a row', async () => {
+  test('shows fetched metric values after collapsing metric-first columns and expanding a row', async () => {
     const baseTreeRaw = buildTreeFromRecords(
       [{ nation: 'USA', segment: 'AUTO', countCustomers: 10 }],
       ['countCustomers'],
@@ -418,7 +418,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     expect(within(priorityRow).getByText('7')).toBeInTheDocument();
   });
 
-  it('keeps values when expanding multiple rows after collapsing columns twice', async () => {
+  test('keeps values when expanding multiple rows after collapsing columns twice', async () => {
     const baseTreeRaw = buildTreeFromRecords(
       [
         {
@@ -646,7 +646,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     expect(within(canChildRow).getByText('20')).toBeInTheDocument();
   });
 
-  it('shows metric headers without a grand total when metrics are first on columns', () => {
+  test('shows metric headers without a grand total when metrics are first on columns', () => {
     const metrics = ['measure1', 'measure2'];
     const rowGroupby = ['orderPriority', 'discountBand', 'customerSegment'];
     const colGroupby = ['revenueBand'];
@@ -719,7 +719,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     ).toBeInTheDocument();
   });
 
-  it('suppresses the grand total when a single metric is first on columns', () => {
+  test('suppresses the grand total when a single metric is first on columns', () => {
     const metrics = ['measure1'];
     const rowGroupby = ['orderPriority', 'discountBand', 'customerSegment'];
     const colGroupby = ['revenueBand'];
@@ -792,7 +792,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     expect(headerLabels).not.toContain('Grand total');
   });
 
-  it('expands a metric column to the next level when metrics are first', async () => {
+  test('expands a metric column to the next level when metrics are first', async () => {
     const metrics = ['measure1', 'measure2'];
     const rowGroupby = ['orderPriority', 'discountBand', 'customerSegment'];
     const colGroupby = ['revenueBand'];
@@ -895,7 +895,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     expect(await findByText('REV-A')).toBeInTheDocument();
   });
 
-  it('keeps column layout stable when collapsing one expanded metric', async () => {
+  test('keeps column layout stable when collapsing one expanded metric', async () => {
     const metrics = ['measure1', 'measure2', 'measure3', 'measure4'];
     const rowGroupby = ['orderPriority', 'discountBand', 'customerSegment'];
     const colGroupby = ['col2'];
@@ -1060,7 +1060,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     expect(firstBodyRow.querySelectorAll('td').length).toBe(5);
   });
 
-  it('keeps metric-first headers consistent after collapsing one expanded metric with totals', async () => {
+  test('keeps metric-first headers consistent after collapsing one expanded metric with totals', async () => {
     const metrics = ['measure1', 'measure2', 'measure3', 'measure4'];
     const rowGroupby = ['orderPriority', 'discountBand', 'customerSegment'];
     const colGroupby = ['col2'];
@@ -1235,7 +1235,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     expect(firstBodyRow.querySelectorAll('td').length).toBe(6);
   });
 
-  it('labels metric-first column totals as "Total" and hides metric toggles after expansion', async () => {
+  test('labels metric-first column totals as "Total" and hides metric toggles after expansion', async () => {
     const metrics = ['metric1', 'metric2'];
     const records = [{ col1: 'A', metric1: 10, metric2: 20 }];
 
@@ -1337,7 +1337,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     ).not.toBeInTheDocument();
   });
 
-  it('treats metric-first column totals as bold totals without duplicate headers', async () => {
+  test('treats metric-first column totals as bold totals without duplicate headers', async () => {
     const metrics = ['metric1'];
     const records = [{ col1: 'A', col2: 'B', metric1: 10 }];
 

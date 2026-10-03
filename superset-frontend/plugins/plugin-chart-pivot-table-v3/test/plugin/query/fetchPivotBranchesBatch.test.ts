@@ -158,7 +158,7 @@ describe('fetchBatch', () => {
     mockPost.mockReset();
   });
 
-  it('builds IN filters for sibling batches', async () => {
+  test('builds IN filters for sibling batches', async () => {
     mockPost.mockImplementation(({ jsonPayload }) =>
       Promise.resolve({
         response: new Response(),
@@ -210,7 +210,7 @@ describe('fetchBatch', () => {
     );
   });
 
-  it('uses IS NULL when batching null siblings', async () => {
+  test('uses IS NULL when batching null siblings', async () => {
     mockPost.mockImplementation(({ jsonPayload }) =>
       Promise.resolve({
         response: new Response(),
@@ -254,7 +254,7 @@ describe('fetchBatch', () => {
     );
   });
 
-  it('propagates time offsets into batch queries', async () => {
+  test('propagates time offsets into batch queries', async () => {
     mockPost.mockImplementation(({ jsonPayload }) =>
       Promise.resolve({
         response: new Response(),
@@ -293,7 +293,7 @@ describe('fetchBatch', () => {
     expect(payload.queries[0].time_offsets).toEqual(['1 year ago']);
   });
 
-  it('materializes from an exact fact-store hit without fetching', async () => {
+  test('materializes from an exact fact-store hit without fetching', async () => {
     const formData = buildFormData({
       groupbyRows: ['country', 'state', 'city'],
       groupbyColumns: [],
@@ -367,7 +367,7 @@ describe('fetchBatch', () => {
     );
   });
 
-  it('fetches only missing specs when batch support coverage is partially loaded', async () => {
+  test('fetches only missing specs when batch support coverage is partially loaded', async () => {
     mockPost.mockImplementation(({ jsonPayload }) =>
       Promise.resolve({
         response: new Response(),
@@ -440,7 +440,7 @@ describe('fetchBatch', () => {
     expect(payload.queries.length).toBeLessThan(specs.length);
   });
 
-  it('does not fetch or mark coverage when grouped expansion only reveals Values', async () => {
+  test('does not fetch or mark coverage when grouped expansion only reveals Values', async () => {
     const formData = buildFormData({
       groupbyRows: ['country', METRICS_PLACEHOLDER, 'state'],
       groupbyColumns: [],

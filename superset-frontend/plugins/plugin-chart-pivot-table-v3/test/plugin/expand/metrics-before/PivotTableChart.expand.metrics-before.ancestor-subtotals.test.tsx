@@ -80,7 +80,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     fetchPivotBranchMock.mockImplementation(resolveExpansionData());
   });
 
-  it('keeps ancestor row values when expanding columns under a deeper row', async () => {
+  test('keeps ancestor row values when expanding columns under a deeper row', async () => {
     const baseTreeRaw = buildTreeFromRecords(
       [{ nation: 'USA', segment: 'AUTO', countCustomers: 10 }],
       ['countCustomers'],
@@ -239,7 +239,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     expect(within(usaRowEl).getByText('10')).toBeInTheDocument();
   });
 
-  it('fills ancestor column cells when expanding rows after a column branch expand', async () => {
+  test('fills ancestor column cells when expanding rows after a column branch expand', async () => {
     const baseTreeRaw = buildTreeFromRecords(
       [
         { nation: 'USA', segment: 'AUTO', countCustomers: 10 },
@@ -410,7 +410,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     expect(within(highRow).getByText('7')).toBeInTheDocument();
   });
 
-  it('keeps row-level ancestor column values when expanding a different column after deeper rows', async () => {
+  test('keeps row-level ancestor column values when expanding a different column after deeper rows', async () => {
     const baseTreeRaw = buildTreeFromRecords(
       [
         { nation: 'USA', segment: 'AUTO', countCustomers: 100 },
@@ -719,7 +719,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     });
   });
 
-  it('does not render a row subtotal after expanding a column then a row with row subtotals disabled', async () => {
+  test('does not render a row subtotal after expanding a column then a row with row subtotals disabled', async () => {
     const metrics = ['quantitySold'];
     const groupbyRows = ['orderStatus', 'returnFlag'];
     const groupbyColumns = ['revenueBand', 'orderPriority'];
@@ -939,7 +939,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     expect(rowHeaders).not.toContain('Subtotal');
   });
 
-  it('fills column subtotal cells for expanded rows after expanding columns first', async () => {
+  test('fills column subtotal cells for expanded rows after expanding columns first', async () => {
     const metrics = ['quantitySold'];
     const groupbyRows = ['orderStatus', 'returnFlag'];
     const groupbyColumns = ['revenueBand', 'orderPriority'];
@@ -1138,7 +1138,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     expect(within(childRowEl).getAllByText('30').length).toBeGreaterThan(0);
   });
 
-  it('fills ancestor column values for all visible rows when expanding another column after deep row expansion', async () => {
+  test('fills ancestor column values for all visible rows when expanding another column after deep row expansion', async () => {
     const actualFetchModule = jest.requireActual(
       '../../../../src/pivot/expansion/fetchPivotExpansion',
     );
@@ -1380,7 +1380,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     }
   });
 
-  it('hides synthesized row subtotal nodes when row subtotals are disabled across multi-level expand', () => {
+  test('hides synthesized row subtotal nodes when row subtotals are disabled across multi-level expand', () => {
     const metrics = ['quantitySold'];
     const groupbyRows = ['orderStatus', 'returnFlag'];
     const groupbyColumns = ['revenueBand', 'orderPriority'];

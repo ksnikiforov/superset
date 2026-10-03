@@ -41,6 +41,7 @@ export default function Option({
   datasourceWarningMessage,
   canDelete = true,
   multiValueWarningMessage,
+  rightNode,
 }: OptionProps) {
   const theme = useTheme();
   const onClickClose = useCallback(
@@ -90,6 +91,19 @@ export default function Option({
               `)
           }
         />
+      )}
+      {rightNode && (
+        <div
+          css={{
+            display: 'flex',
+            alignItems: 'center',
+            marginLeft: theme.sizeUnit,
+          }}
+          onClick={event => event.stopPropagation()}
+          onMouseDown={event => event.stopPropagation()}
+        >
+          {rightNode}
+        </div>
       )}
       {withCaret && (
         <CaretContainer>

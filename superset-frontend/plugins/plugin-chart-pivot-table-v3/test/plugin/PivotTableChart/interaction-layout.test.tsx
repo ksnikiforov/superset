@@ -1830,7 +1830,7 @@ describe('PivotTableChart interaction layout', () => {
     const fetchSpy = jest
       .spyOn(supersetChartDataClient, 'fetch')
       .mockImplementation(({ requestGroupId, specs }) => {
-        if (requestGroupId !== 'pivot-v3-seamless') {
+        if (!requestGroupId?.startsWith('pivot-v3-seamless-')) {
           return Promise.resolve(specs.map(() => ({ data: [] })));
         }
         seamlessSpecsLength = specs.length;
@@ -1864,7 +1864,9 @@ describe('PivotTableChart interaction layout', () => {
     fireEvent.click(screen.getAllByLabelText('Toggle row dimension')[1]);
     await waitFor(() =>
       expect(fetchSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ requestGroupId: 'pivot-v3-seamless' }),
+        expect.objectContaining({
+          requestGroupId: expect.stringMatching(/^pivot-v3-seamless-/),
+        }),
       ),
     );
 
@@ -1942,7 +1944,7 @@ describe('PivotTableChart interaction layout', () => {
     const fetchSpy = jest
       .spyOn(supersetChartDataClient, 'fetch')
       .mockImplementation(async ({ requestGroupId, specs }) =>
-        requestGroupId === 'pivot-v3-seamless'
+        requestGroupId?.startsWith('pivot-v3-seamless-')
           ? specs.map(() => ({ data: recoveredRecords }))
           : specs.map(() => ({ data: staleRecords })),
       );
@@ -1971,7 +1973,7 @@ describe('PivotTableChart interaction layout', () => {
     await waitFor(() =>
       expect(fetchSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          requestGroupId: 'pivot-v3-seamless',
+          requestGroupId: expect.stringMatching(/^pivot-v3-seamless-/),
         }),
       ),
     );
@@ -2046,7 +2048,7 @@ describe('PivotTableChart interaction layout', () => {
     const fetchSpy = jest
       .spyOn(supersetChartDataClient, 'fetch')
       .mockImplementation(async ({ requestGroupId, specs }) =>
-        requestGroupId === 'pivot-v3-seamless'
+        requestGroupId?.startsWith('pivot-v3-seamless-')
           ? specs.map(() => ({ data: recoveredRecords }))
           : specs.map(() => ({ data: staleRecords })),
       );
@@ -2080,7 +2082,7 @@ describe('PivotTableChart interaction layout', () => {
     await waitFor(() =>
       expect(fetchSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          requestGroupId: 'pivot-v3-seamless',
+          requestGroupId: expect.stringMatching(/^pivot-v3-seamless-/),
         }),
       ),
     );
@@ -2288,7 +2290,7 @@ describe('PivotTableChart interaction layout', () => {
     const fetchSpy = jest
       .spyOn(supersetChartDataClient, 'fetch')
       .mockImplementation(async ({ requestGroupId, specs }) =>
-        requestGroupId === 'pivot-v3-seamless'
+        requestGroupId?.startsWith('pivot-v3-seamless-')
           ? specs.map(() => ({ data: recoveredRecords }))
           : specs.map(() => ({ data: staleRecords })),
       );
@@ -2317,7 +2319,7 @@ describe('PivotTableChart interaction layout', () => {
     await waitFor(() =>
       expect(fetchSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          requestGroupId: 'pivot-v3-seamless',
+          requestGroupId: expect.stringMatching(/^pivot-v3-seamless-/),
         }),
       ),
     );
@@ -2387,7 +2389,7 @@ describe('PivotTableChart interaction layout', () => {
     const fetchSpy = jest
       .spyOn(supersetChartDataClient, 'fetch')
       .mockImplementation(async ({ requestGroupId, specs }) =>
-        requestGroupId === 'pivot-v3-seamless'
+        requestGroupId?.startsWith('pivot-v3-seamless-')
           ? specs.map(() => ({ data: recoveredRecords }))
           : specs.map(() => ({ data: staleRecords })),
       );
@@ -2416,7 +2418,7 @@ describe('PivotTableChart interaction layout', () => {
     await waitFor(() =>
       expect(fetchSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          requestGroupId: 'pivot-v3-seamless',
+          requestGroupId: expect.stringMatching(/^pivot-v3-seamless-/),
         }),
       ),
     );
@@ -2492,7 +2494,7 @@ describe('PivotTableChart interaction layout', () => {
     const fetchSpy = jest
       .spyOn(supersetChartDataClient, 'fetch')
       .mockImplementation(async ({ requestGroupId, specs }) =>
-        requestGroupId === 'pivot-v3-seamless'
+        requestGroupId?.startsWith('pivot-v3-seamless-')
           ? specs.map(() => ({ data: recoveredRecords }))
           : specs.map(() => ({ data: staleRecords })),
       );
@@ -2521,7 +2523,7 @@ describe('PivotTableChart interaction layout', () => {
     await waitFor(() =>
       expect(fetchSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          requestGroupId: 'pivot-v3-seamless',
+          requestGroupId: expect.stringMatching(/^pivot-v3-seamless-/),
         }),
       ),
     );

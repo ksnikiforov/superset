@@ -36,7 +36,7 @@ const baseLayout = (overrides: Partial<PivotRuntimeLayout> = {}) =>
   }) as PivotRuntimeLayout;
 
 describe('interaction drag layout helpers', () => {
-  it('appends a new dimension by default without moving the value chip', () => {
+  test('appends a new dimension by default without moving the value chip', () => {
     const layout = baseLayout({
       rows: ['a', 'b'],
       valuePlacement: { axis: 'row', index: 1 },
@@ -50,7 +50,7 @@ describe('interaction drag layout helpers', () => {
     expect(next.valuePlacement).toEqual({ axis: 'row', index: 1 });
   });
 
-  it('allows dropping a dimension after the last chip when value is first', () => {
+  test('allows dropping a dimension after the last chip when value is first', () => {
     const layout = baseLayout({
       cols: ['c1'],
       valuePlacement: { axis: 'col', index: 0 },
@@ -65,7 +65,7 @@ describe('interaction drag layout helpers', () => {
     expect(next.valuePlacement).toEqual({ axis: 'col', index: 0 });
   });
 
-  it('inserts before the value chip when dropped on it', () => {
+  test('inserts before the value chip when dropped on it', () => {
     const layout = baseLayout({
       rows: ['a', 'b'],
       valuePlacement: { axis: 'row', index: 1 },
@@ -81,7 +81,7 @@ describe('interaction drag layout helpers', () => {
     expect(next.valuePlacement).toEqual({ axis: 'row', index: 2 });
   });
 
-  it('keeps value last when inserting by default at the end', () => {
+  test('keeps value last when inserting by default at the end', () => {
     const layout = baseLayout({
       rows: ['a'],
       valuePlacement: { axis: 'row', index: 1 },
@@ -95,7 +95,7 @@ describe('interaction drag layout helpers', () => {
     expect(next.valuePlacement).toEqual({ axis: 'row', index: 2 });
   });
 
-  it('keeps value last on default cross-axis move', () => {
+  test('keeps value last on default cross-axis move', () => {
     const layout = baseLayout({
       rows: ['r1'],
       cols: ['c1'],
@@ -111,7 +111,7 @@ describe('interaction drag layout helpers', () => {
     expect(next.valuePlacement).toEqual({ axis: 'row', index: 2 });
   });
 
-  it('allows explicitly dropping a dimension after value', () => {
+  test('allows explicitly dropping a dimension after value', () => {
     const layout = baseLayout({
       rows: ['a', 'b'],
       valuePlacement: { axis: 'row', index: 2 },
@@ -128,7 +128,7 @@ describe('interaction drag layout helpers', () => {
     expect(next.valuePlacement).toEqual({ axis: 'row', index: 1 });
   });
 
-  it('moves value placement across axes at the requested index', () => {
+  test('moves value placement across axes at the requested index', () => {
     const layout = baseLayout({
       rows: ['a'],
       cols: ['b'],
@@ -144,7 +144,7 @@ describe('interaction drag layout helpers', () => {
     expect(next.valuePlacement).toEqual({ axis: 'row', index: 0 });
   });
 
-  it('builds interaction chips with value placement inserted on the active axis', () => {
+  test('builds interaction chips with value placement inserted on the active axis', () => {
     const layout = baseLayout({
       rows: ['country', 'city'],
       cols: ['month'],
@@ -178,7 +178,7 @@ describe('interaction drag layout helpers', () => {
     ).toEqual([{ id: 'month', label: 'Month', kind: 'dimension' }]);
   });
 
-  it('removes dimensions from layout and keeps value placement aligned', () => {
+  test('removes dimensions from layout and keeps value placement aligned', () => {
     const layout = baseLayout({
       rows: ['country', 'city'],
       cols: ['month'],

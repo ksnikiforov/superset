@@ -53,7 +53,7 @@ const getControlNames = () =>
     .map(controlItem => controlItem.name);
 
 describe('pivot table v3 control panel', () => {
-  it('does not expose time grain control in pivot v3', () => {
+  test('does not expose time grain control in pivot v3', () => {
     expect(getControlNames()).not.toContain('time_grain_sqla');
     const interactionModeControl = getControl('interactionMode');
     expect(interactionModeControl.config.rerender).not.toContain(
@@ -61,7 +61,7 @@ describe('pivot table v3 control panel', () => {
     );
   });
 
-  it('exposes auto-expand level controls with blank defaults', () => {
+  test('exposes auto-expand level controls with blank defaults', () => {
     const expandRowsLevelControl = getControl('expandRowsLevel');
     const expandColumnsLevelControl = getControl('expandColumnsLevel');
 
@@ -75,7 +75,7 @@ describe('pivot table v3 control panel', () => {
     expect(expandColumnsLevelControl.config.mapStateToProps).toBeUndefined();
   });
 
-  it('keeps user-controlled runtime layout writes from marking Explore stale', () => {
+  test('keeps user-controlled runtime layout writes from marking Explore stale', () => {
     const runtimeLayoutControl = getControl('pivotRuntimeLayout');
     const selectedFiltersControl = getControl('pivotSelectedFilters');
     const expansionStateControl = getControl('pivotExpansionState');
@@ -86,7 +86,7 @@ describe('pivot table v3 control panel', () => {
     expect(expansionStateControl.config.dontRefreshOnChange).toBe(true);
   });
 
-  it('builds column subtotal options based on column depth and clamps selections', () => {
+  test('builds column subtotal options based on column depth and clamps selections', () => {
     const colSubtotalControl = getControl('colSubtotalLevels');
     const { mapStateToProps } = colSubtotalControl.config;
     if (!mapStateToProps) {
@@ -122,7 +122,7 @@ describe('pivot table v3 control panel', () => {
     expect(result.value).toEqual([1]);
   });
 
-  it('returns empty options when there are no column levels', () => {
+  test('returns empty options when there are no column levels', () => {
     const colSubtotalControl = getControl('colSubtotalLevels');
     const { mapStateToProps } = colSubtotalControl.config;
     if (!mapStateToProps) {
@@ -158,7 +158,7 @@ describe('pivot table v3 control panel', () => {
     expect(result.value).toEqual([]);
   });
 
-  it('keeps column subtotal levels empty when no levels are selected', () => {
+  test('keeps column subtotal levels empty when no levels are selected', () => {
     const colSubtotalControl = getControl('colSubtotalLevels');
     const { mapStateToProps } = colSubtotalControl.config;
     if (!mapStateToProps) {

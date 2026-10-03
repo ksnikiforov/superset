@@ -16,35 +16,42 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { type ComponentProps, ReactNode } from 'react';
 import { Metric } from '@superset-ui/core';
-import { Datasource } from 'src/explore/types';
-import { ISaveableDatasource } from 'src/SqlLab/components/SaveDatasetModal';
-import AdhocMetricOption from './AdhocMetricOption';
 import AdhocMetric from './AdhocMetric';
-import { savedMetricType as SavedMetricTypeDef } from './types';
+import { type savedMetricType } from './types';
+import AdhocMetricOption from './AdhocMetricOption';
 
-interface MetricDefinitionValueProps {
-  option: AdhocMetric | SavedMetricTypeDef | string;
+type SavedMetric = savedMetricType & { error_text?: string };
+type MetricOption = Metric | AdhocMetric | string;
+type AdhocMetricOptionProps = ComponentProps<typeof AdhocMetricOption>;
+
+export type MetricDefinitionValueProps = {
+  option: MetricOption;
   index: number;
-  onMetricEdit?: (newMetric: Metric, oldMetric: Metric) => void;
+  onMetricEdit?: (
+    changedMetric: Metric | AdhocMetric,
+    oldMetric: Metric | AdhocMetric,
+  ) => void;
   onRemoveMetric?: (index: number) => void;
   onMoveLabel?: (dragIndex: number, hoverIndex: number) => void;
   onDropLabel?: () => void;
-  columns?: { column_name: string; type: string }[];
-  savedMetrics?: SavedMetricTypeDef[];
-  savedMetricsOptions?: SavedMetricTypeDef[];
+  columns?: AdhocMetricOptionProps['columns'];
+  savedMetrics?: SavedMetric[];
+  savedMetricsOptions?: savedMetricType[];
   multi?: boolean;
-  datasource?: Datasource & ISaveableDatasource;
+  datasource?: AdhocMetricOptionProps['datasource'];
   datasourceWarningMessage?: string;
   type?: string;
-}
+  rightNode?: ReactNode;
+};
 
 export default function MetricDefinitionValue({
   option,
   onMetricEdit,
   onRemoveMetric,
   columns,
-  savedMetrics,
+  savedMetrics = [],
   savedMetricsOptions,
   datasource,
   onMoveLabel,
@@ -53,39 +60,40 @@ export default function MetricDefinitionValue({
   type,
   multi,
   datasourceWarningMessage,
+  rightNode,
 }: MetricDefinitionValueProps) {
   const getSavedMetricByName = (metricName: string) =>
-    savedMetrics?.find(metric => metric.metric_name === metricName);
+    savedMetrics.find(metric => metric.metric_name === metricName);
 
-  let savedMetric;
+  let savedMetric: SavedMetric | undefined;
   if (typeof option === 'string') {
     savedMetric = getSavedMetricByName(option);
-  } else if ((option as SavedMetricTypeDef).metric_name) {
-    savedMetric = option;
+  } else if (option && typeof option === 'object' && 'metric_name' in option) {
+    savedMetric = option as SavedMetric;
   }
 
   if (option instanceof AdhocMetric || savedMetric) {
     const adhocMetric =
       option instanceof AdhocMetric ? option : new AdhocMetric({});
 
-    const metricOptionProps = {
-      onMetricEdit,
-      onRemoveMetric,
-      columns,
-      savedMetricsOptions,
-      datasource,
-      adhocMetric,
-      onMoveLabel,
-      onDropLabel,
-      index,
-      savedMetric: savedMetric ?? {},
-      type,
-      multi,
-      datasourceWarningMessage,
-    };
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return <AdhocMetricOption {...(metricOptionProps as any)} />;
+    return (
+      <AdhocMetricOption
+        onMetricEdit={onMetricEdit}
+        onRemoveMetric={onRemoveMetric}
+        columns={columns}
+        savedMetricsOptions={savedMetricsOptions}
+        datasource={datasource}
+        adhocMetric={adhocMetric}
+        onMoveLabel={onMoveLabel}
+        onDropLabel={onDropLabel}
+        index={index}
+        savedMetric={savedMetric ?? {}}
+        type={type}
+        multi={multi}
+        datasourceWarningMessage={datasourceWarningMessage}
+        rightNode={rightNode}
+      />
+    );
   }
   return null;
 }

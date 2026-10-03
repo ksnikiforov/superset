@@ -182,7 +182,7 @@ describe('PivotTableChart column subtotal placement during expansion', () => {
     fetchPivotBranchMock.mockImplementation(resolveMockBranchFetchResult());
   });
 
-  it('keeps column subtotals adjacent to their col2 groups after expanding col1 then col2 (5 levels)', async () => {
+  test('keeps column subtotals adjacent to their col2 groups after expanding col1 then col2 (5 levels)', async () => {
     const baseTree = buildMetricTree(
       buildTreeFromRecords(
         records,
@@ -294,7 +294,7 @@ describe('PivotTableChart column subtotal placement during expansion', () => {
     expect(labelsBetween).toEqual(expect.arrayContaining(metricSubtotalLabels));
   });
 
-  it('keeps grand totals at the end after expanding col1 then col2', async () => {
+  test('keeps grand totals at the end after expanding col1 then col2', async () => {
     const baseTree = buildMetricTree(
       buildTreeFromRecords(
         records,

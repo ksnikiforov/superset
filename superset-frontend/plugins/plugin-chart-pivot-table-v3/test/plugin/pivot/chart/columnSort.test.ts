@@ -81,7 +81,7 @@ const layout: PivotColumnSortLayout = {
 };
 
 describe('column sort helpers', () => {
-  it('resolves measure group headers to the default value leaf metric', () => {
+  test('resolves measure group headers to the default value leaf metric', () => {
     expect(
       resolvePivotColumnSortMetric({
         node: node('group', ['2025', metricToken]),
@@ -90,7 +90,7 @@ describe('column sort helpers', () => {
     ).toBe('sales');
   });
 
-  it('resolves clicked measure leaves to their output metric keys', () => {
+  test('resolves clicked measure leaves to their output metric keys', () => {
     expect(
       resolvePivotColumnSortMetric({
         node: node('delta', ['2025', metricToken, deltaLeafToken]),
@@ -99,7 +99,7 @@ describe('column sort helpers', () => {
     ).toBe(deltaOutputKey);
   });
 
-  it('uses a matching descendant leaf as the data column for group headers', () => {
+  test('uses a matching descendant leaf as the data column for group headers', () => {
     const groupNode = node('group', ['2025', metricToken]);
     const valueNode = node('value', ['2025', metricToken, valueLeafToken]);
     const deltaNode = node('delta', ['2025', metricToken, deltaLeafToken]);
@@ -118,7 +118,7 @@ describe('column sort helpers', () => {
     ).toBe(deltaNode.key);
   });
 
-  it('cycles click state from ascending to descending to cleared', () => {
+  test('cycles click state from ascending to descending to cleared', () => {
     const groupNode = node('group', ['2025', metricToken]);
     const valueNode = node('value', ['2025', metricToken, valueLeafToken]);
     const columns = {
@@ -162,7 +162,7 @@ describe('column sort helpers', () => {
     ).toBeNull();
   });
 
-  it('reconciles active group sorting to the current descendant data key', () => {
+  test('reconciles active group sorting to the current descendant data key', () => {
     const groupNode = node('group', ['2025', metricToken]);
     const valueNode = node('value-new', ['2025', metricToken, valueLeafToken]);
     const current = {
@@ -187,7 +187,7 @@ describe('column sort helpers', () => {
     });
   });
 
-  it('ignores clicks on non-metric column headers', () => {
+  test('ignores clicks on non-metric column headers', () => {
     const rowValueAxisLayout: PivotColumnSortLayout = {
       ...layout,
       layout: {

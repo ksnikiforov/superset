@@ -37,7 +37,7 @@ import {
 import { buildFormData } from '../../fixtures/pivotFormData';
 
 describe('resolveInteractionFormData', () => {
-  it('normalizes persisted runtime layout against available dimensions and metrics', () => {
+  test('normalizes persisted runtime layout against available dimensions and metrics', () => {
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,
       rows: ['country', 'missing-row'],
@@ -61,7 +61,7 @@ describe('resolveInteractionFormData', () => {
     });
   });
 
-  it('uses runtime layout for rows/cols, metrics order, and value placement', () => {
+  test('uses runtime layout for rows/cols, metrics order, and value placement', () => {
     const formData: PivotTableQueryFormData = buildFormData({
       interactionMode: 'user_controlled',
       dimensions: ['country', 'state'],
@@ -89,7 +89,7 @@ describe('resolveInteractionFormData', () => {
     expect(getMetricKeys(resolved.metrics)).toEqual(['sum__profit']);
   });
 
-  it('filters measure leaves by selection and respects selection order', () => {
+  test('filters measure leaves by selection and respects selection order', () => {
     const leafIx = buildBuiltInLeaf('ix', {
       n: 1,
       unit: 'year',
@@ -122,7 +122,7 @@ describe('resolveInteractionFormData', () => {
     expect(leaves.map(leaf => leaf.id)).toEqual([leafIx.id, valueLeaf.id]);
   });
 
-  it('allows removing the value leaf to disable metrics', () => {
+  test('allows removing the value leaf to disable metrics', () => {
     const valueLeaf = buildValueLeaf();
     const formData: PivotTableQueryFormData = buildFormData({
       interactionMode: 'user_controlled',
@@ -153,7 +153,7 @@ describe('resolveInteractionFormData', () => {
 });
 
 describe('resolveAppliedInteractionLayout', () => {
-  it('builds runtime layout from prop-driven row and column groupings', () => {
+  test('builds runtime layout from prop-driven row and column groupings', () => {
     const formData: PivotTableQueryFormData = buildFormData({
       interactionMode: 'standard',
       metrics: ['sum__sales'],
@@ -171,7 +171,7 @@ describe('resolveAppliedInteractionLayout', () => {
     });
   });
 
-  it('preserves committed runtime metrics that are available in the source form', () => {
+  test('preserves committed runtime metrics that are available in the source form', () => {
     const formData: PivotTableQueryFormData = buildFormData({
       interactionMode: 'user_controlled',
       dimensions: ['country', 'state'],

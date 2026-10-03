@@ -90,7 +90,7 @@ describe('PivotTableChart stale in-flight expansion results', () => {
     fetchPivotBranchMock.mockResolvedValue({});
   });
 
-  it('does not apply an in-flight expansion after the base data changes', async () => {
+  test('does not apply an in-flight expansion after the base data changes', async () => {
     const recordsV1 = [
       { r1: 'A', r2: 'X', m1: 10 },
       { r1: 'B', r2: 'Z', m1: 12 },

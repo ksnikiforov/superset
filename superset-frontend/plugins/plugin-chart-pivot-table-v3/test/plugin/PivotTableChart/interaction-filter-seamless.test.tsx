@@ -167,7 +167,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         specs,
         formData: requestFormData,
       }: FetchArgs) => {
-        if (requestGroupId !== 'pivot-v3-seamless') {
+        if (!requestGroupId?.startsWith('pivot-v3-seamless-')) {
           return specs.map(() => ({ data: records }));
         }
         const selectionFilters =
@@ -361,7 +361,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
       specs: Array<{ columns?: string[] }>;
     };
     fetchMock.mockImplementation(({ requestGroupId, specs }: FetchArgs) => {
-      if (requestGroupId !== 'pivot-v3-seamless') {
+      if (!requestGroupId?.startsWith('pivot-v3-seamless-')) {
         return Promise.resolve(specs.map(() => ({ data: records })));
       }
       return Promise.resolve(
@@ -455,7 +455,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         specs,
         formData: requestFormData,
       }: FetchArgs) => {
-        if (requestGroupId !== 'pivot-v3-seamless') {
+        if (!requestGroupId?.startsWith('pivot-v3-seamless-')) {
           return specs.map(() => ({ data: allRecords }));
         }
         const dashboardFilters =
@@ -515,7 +515,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(fetchMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        requestGroupId: 'pivot-v3-seamless',
+        requestGroupId: expect.stringMatching(/^pivot-v3-seamless-/),
         formData: expect.objectContaining({
           extra_form_data: expect.objectContaining({
             filters: expect.arrayContaining([
@@ -588,7 +588,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         requestGroupId?: string;
         specs: [];
       }) =>
-        requestGroupId === 'pivot-v3-seamless'
+        requestGroupId?.startsWith('pivot-v3-seamless-')
           ? specs.map(() => ({ data: filteredRecords }))
           : specs.map(() => ({ data: allRecords })),
     );
@@ -613,7 +613,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          requestGroupId: 'pivot-v3-seamless',
+          requestGroupId: expect.stringMatching(/^pivot-v3-seamless-/),
         }),
       ),
     );
@@ -702,7 +702,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         requestGroupId?: string;
         specs: [];
       }) =>
-        requestGroupId === 'pivot-v3-seamless'
+        requestGroupId?.startsWith('pivot-v3-seamless-')
           ? specs.map(() => ({ data: filteredRecords }))
           : specs.map(() => ({ data: allRecords })),
     );
@@ -728,7 +728,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          requestGroupId: 'pivot-v3-seamless',
+          requestGroupId: expect.stringMatching(/^pivot-v3-seamless-/),
         }),
       ),
     );
@@ -806,7 +806,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         requestGroupId?: string;
         specs: unknown[];
       }) =>
-        requestGroupId === 'pivot-v3-seamless'
+        requestGroupId?.startsWith('pivot-v3-seamless-')
           ? specs.map(() => ({ data: [] }))
           : specs.map(() => ({ data: staleRecords })),
     );
@@ -830,7 +830,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
     await waitFor(() => expect(screen.getByText('A')).toBeInTheDocument());
     expect(fetchMock).not.toHaveBeenCalledWith(
       expect.objectContaining({
-        requestGroupId: 'pivot-v3-seamless',
+        requestGroupId: expect.stringMatching(/^pivot-v3-seamless-/),
       }),
     );
     expect(screen.queryByText('ColorA')).not.toBeInTheDocument();

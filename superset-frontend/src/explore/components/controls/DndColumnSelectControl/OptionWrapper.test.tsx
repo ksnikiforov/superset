@@ -61,3 +61,37 @@ test('triggers onShiftOptions on drop', async () => {
   fireEvent.drop(await screen.findByText('Option 2'));
   expect(onShiftOptions).toHaveBeenCalled();
 });
+
+test('cross-list dragging records the target without reordering that list', async () => {
+  const onShiftOptions = jest.fn();
+  const onHoverIndex = jest.fn();
+  const onHoverListId = jest.fn();
+  render(
+    <>
+      <OptionWrapper
+        index={0}
+        listId="rows"
+        clickClose={jest.fn()}
+        type={DndItemType.Column}
+        onShiftOptions={onShiftOptions}
+        label="Row dimension"
+      />
+      <OptionWrapper
+        index={1}
+        listId="cols"
+        clickClose={jest.fn()}
+        type={DndItemType.Column}
+        onShiftOptions={onShiftOptions}
+        onHoverIndex={onHoverIndex}
+        onHoverListId={onHoverListId}
+        label="Column dimension"
+      />
+    </>,
+    { useDnd: true },
+  );
+  fireEvent.dragStart(await screen.findByText('Row dimension'));
+  fireEvent.drop(await screen.findByText('Column dimension'));
+  expect(onHoverIndex).toHaveBeenCalledWith(1);
+  expect(onHoverListId).toHaveBeenCalledWith('cols');
+  expect(onShiftOptions).not.toHaveBeenCalled();
+});

@@ -58,6 +58,7 @@ import {
   getMockExpansionRequestAxis,
   getMockExpansionRequestPath,
   resolveMockBranchFetchResult,
+  buildMockBranchFactBatches,
 } from '../fixtures/factBatches';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import {
@@ -2485,7 +2486,7 @@ describe('PivotTableChart expansion state persistence', () => {
     expect(fetchedPaths).not.toContain(JSON.stringify(['A', 'X']));
   });
 
-  test('keeps baseline totals when expansion hydrates with a newer query context', async () => {
+  test('fetches fresh totals instead of rebinding facts from an older query context', async () => {
     const staleQueryContextKey = buildPivotFactQueryContextKey(
       buildFormData({}),
     );
@@ -2506,7 +2507,36 @@ describe('PivotTableChart expansion state persistence', () => {
       queryContextKey: staleQueryContextKey,
     });
     branchExpansionMock.mockImplementation(
-      resolveMockBranchFetchResult({ data: buildTree(2) }),
+      (params: FetchPivotExpansionRequest) => {
+        const freshRootTree = applyMetricAxis(
+          buildTreeFromRecords([{ m1: 51 }], metrics, rowGroupby, [], 0, 0),
+          metrics,
+          MetricsLayoutEnum.COLUMNS,
+          rowGroupby,
+          [],
+        );
+        const factBatches = params.targets.flatMap(target =>
+          buildMockBranchFactBatches({
+            ...params,
+            targets: [target],
+            data:
+              target.need.rowDepth === 0 && target.need.columnDepth === 0
+                ? freshRootTree
+                : buildTree(2),
+          }),
+        );
+        factBatches.forEach(batch => {
+          if (
+            batch.coverage.rowDepth === 0 &&
+            batch.coverage.columnDepth === 0
+          ) {
+            batch.facts = [
+              { rowPath: [], columnPath: [], valueKey: 'm1', value: 51 },
+            ];
+          }
+        });
+        return resolveMockBranchFetchResult({ factBatches })(params);
+      },
     );
 
     render(
@@ -2524,7 +2554,8 @@ describe('PivotTableChart expansion state persistence', () => {
 
     await waitFor(() => expect(screen.getByText('X')).toBeInTheDocument());
     expect(screen.getByText('Grand total')).toBeInTheDocument();
-    expect(screen.getByText('37')).toBeInTheDocument();
+    expect(screen.queryByText('37')).not.toBeInTheDocument();
+    expect(screen.getByText('51')).toBeInTheDocument();
   });
 
   test('does not fetch persisted subtotal expansions', async () => {
@@ -2620,7 +2651,10 @@ describe('PivotTableChart expansion state persistence', () => {
     );
 
     await waitFor(() => expect(branchExpansionMock).toHaveBeenCalled());
-    const firstCall = branchExpansionMock.mock.calls[0][0];
-    expect(getMockExpansionRequestPath(firstCall)).toEqual([metricLikeValue]);
+    const branchCall = branchExpansionMock.mock.calls.find(
+      ([args]) => getMockExpansionRequestPath(args)[0] === metricLikeValue,
+    )?.[0];
+    expect(branchCall).toBeDefined();
+    expect(getMockExpansionRequestPath(branchCall)).toEqual([metricLikeValue]);
   });
 });

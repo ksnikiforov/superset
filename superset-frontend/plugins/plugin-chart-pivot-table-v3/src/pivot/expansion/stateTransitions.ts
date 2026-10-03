@@ -321,181 +321,65 @@ export const resolveExpandedByAxisForTree = ({
     ]),
   ) as AxisSetMap;
 
-type ExpansionReinitAxis = {
-  axis: PivotAxis;
-  axisCoverageNeeds: PivotAxisCoverageNeed[];
-  keys: string[];
-  collapsed: string[];
-  nodes: Record<string, PivotTreeNode>;
-  stablePrefix: number;
-  reset: boolean;
-  changed: boolean;
-  includeMetricDepth: boolean;
+/** Reconciles manual intent against stable dimension prefixes, then derives visible expansion. */
+export const reconcileExpansionState = ({
+  tree,
+  previousLayout,
+  currentLayout,
+  state,
+  axisCoverageNeeds,
+  program,
+  reset = false,
+  isLeafTierVisible = false,
+}: {
   tree: PivotTreeData;
-  program: PivotProgram;
-  hasNewData: boolean;
-};
-
-const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
-  const { metricLabelSet, countDimDepth } = createMetricNodePolicy(
-    config.program,
-  );
-  const shouldPrune = config.reset || config.changed;
-  const pruneExpanded = (expanded: Set<string>) =>
-    pruneExpandedToStablePrefix({
-      expanded,
-      nodes: config.nodes,
-      stablePrefix: config.stablePrefix,
-      metricLabelSet,
-      includeMetricDepth: config.includeMetricDepth,
-    });
-  const prunedManualKeys = shouldPrune
-    ? Array.from(
-        pruneExpanded(new Set<string>([rootKey, ...config.keys])),
-      ).filter(key => key !== rootKey)
-    : config.keys.filter(key => key !== rootKey);
-  const prunedCollapsedKeys = config.collapsed.filter(key => {
-    if (key === rootKey) {
-      return false;
-    }
-    if (!shouldPrune) {
-      return true;
-    }
-    const path = config.nodes[key]?.path ?? parsePath(key);
-    const depth =
-      countDimDepth(path) +
-      (config.includeMetricDepth &&
-      path.some(value => isMetricTokenForKeys(value, metricLabelSet))
-        ? 1
-        : 0);
-    return depth <= config.stablePrefix;
-  });
-  const desiredExpanded = buildDesiredExpandedKeys({
-    axis: config.axis,
-    nodes: config.nodes,
-    baseExpanded: buildExpandedKeysForCoverageNeeds({
-      axis: config.axis,
-      tree: config.tree,
-      axisCoverageNeeds: config.axisCoverageNeeds,
-      program: config.program,
-    }),
-    program: config.program,
-    manualExpanded: new Set(prunedManualKeys),
-    manualCollapsed: new Set(prunedCollapsedKeys),
-  });
-  const expandedKeys =
-    config.reset || (config.changed && !config.hasNewData)
-      ? pruneExpanded(desiredExpanded)
-      : desiredExpanded;
-  return {
-    prunedManualKeys,
-    prunedCollapsedKeys,
-    expandedKeys,
-  };
-};
-
-export const resolveExpansionReinitializationPlan = (params: {
-  previousSemanticSignature: string | null;
-  nextSemanticSignature: string;
-  previousQueryContextKey: string;
-  nextQueryContextKey: string;
-  previousData: PivotTreeData | null;
-  data: PivotTreeData;
-  currentTree: PivotTreeData;
   previousLayout: PivotLayoutKeyState;
   currentLayout: PivotLayoutKeyState;
-  sessionState: PivotExpansionStateKeys;
+  state: PivotExpansionStateKeys;
   axisCoverageNeeds: PivotAxisCoverageNeed[];
   program: PivotProgram;
+  reset?: boolean;
   isLeafTierVisible?: boolean;
 }) => {
-  const hasNewData = params.previousData !== params.data;
-  const tree = hasNewData ? params.data : params.currentTree;
-  const layoutTransition = resolveLayoutTransition({
-    previousLayout: params.previousLayout,
-    currentLayout: params.currentLayout,
-  });
-  const layoutChanged = PIVOT_AXES.some(axis => layoutTransition[axis].changed);
-  const isInitialMount = params.previousSemanticSignature === null;
-  const semanticSignatureChanged =
-    params.previousSemanticSignature !== params.nextSemanticSignature;
-  const queryContextChanged =
-    params.previousQueryContextKey !== params.nextQueryContextKey;
-  if (
-    !isInitialMount &&
-    !semanticSignatureChanged &&
-    !queryContextChanged &&
-    !layoutChanged &&
-    !hasNewData
-  ) {
-    return undefined;
-  }
-  const resetExpanded = Object.fromEntries(
-    PIVOT_AXES.map(axis => [
-      axis,
-      semanticSignatureChanged ||
-        (layoutTransition[axis].changed &&
-          !layoutTransition[axis].shouldExpand),
-    ]),
-  ) as Record<PivotAxis, boolean>;
-  const includeMetricDepth = (axis: PivotAxis) => {
-    const metricIndex = getValuesLevelIndex(params.program, axis);
-    const dimensionCount = getAxisDimensionCount(params.program, axis);
-    return metricIndex !== undefined && metricIndex < dimensionCount;
-  };
-  const { sessionState } = params;
-  const axisState = Object.fromEntries(
-    PIVOT_AXES.map(axis => [
-      axis,
-      resolveExpansionCacheAxis({
-        axis,
-        keys:
-          axis === 'row'
-            ? (sessionState.rows ?? [])
-            : (sessionState.cols ?? []),
-        collapsed:
-          axis === 'row'
-            ? (sessionState.collapsedRows ?? [])
-            : (sessionState.collapsedCols ?? []),
+  const transition = resolveLayoutTransition({ previousLayout, currentLayout });
+  const { metricLabelSet } = createMetricNodePolicy(program);
+  const prune = (axis: PivotAxis, keys: string[]) => {
+    if (!reset && !transition[axis].changed)
+      return keys.filter(key => key !== rootKey);
+    const metricIndex = getValuesLevelIndex(program, axis);
+    return [
+      ...pruneExpandedToStablePrefix({
+        expanded: new Set(keys),
         nodes: axis === 'row' ? tree.rows : tree.cols,
-        stablePrefix: layoutTransition[axis].stablePrefix,
-        reset: resetExpanded[axis],
-        changed: layoutTransition[axis].changed,
-        axisCoverageNeeds: params.axisCoverageNeeds,
-        tree,
-        program: params.program,
-        hasNewData,
-        includeMetricDepth: includeMetricDepth(axis),
+        stablePrefix: transition[axis].stablePrefix,
+        metricLabelSet,
+        includeMetricDepth:
+          metricIndex !== undefined &&
+          metricIndex < getAxisDimensionCount(program, axis),
       }),
-    ]),
-  ) as Record<PivotAxis, ReturnType<typeof resolveExpansionCacheAxis>>;
+    ].filter(key => key !== rootKey);
+  };
   const persistedState = {
-    rows: axisState.row.prunedManualKeys,
-    cols: axisState.col.prunedManualKeys,
-    collapsedRows: axisState.row.prunedCollapsedKeys,
-    collapsedCols: axisState.col.prunedCollapsedKeys,
+    rows: prune('row', state.rows),
+    cols: prune('col', state.cols),
+    collapsedRows: prune('row', state.collapsedRows),
+    collapsedCols: prune('col', state.collapsedCols),
   };
   return {
-    tree,
     persistedState,
-    expanded: Object.fromEntries(
-      PIVOT_AXES.map(axis => [
-        axis,
-        resolveExpandedForMetrics({
-          axis,
-          expanded: axisState[axis].expandedKeys,
-          tree,
-          collapsed: new Set(
-            axis === 'row'
-              ? persistedState.collapsedRows
-              : persistedState.collapsedCols,
-          ),
-          program: params.program,
-          isLeafTierVisible: params.isLeafTierVisible,
-        }),
-      ]),
-    ) as AxisSetMap,
-    shouldPersistReset:
-      !isInitialMount && PIVOT_AXES.some(axis => resetExpanded[axis]),
+    expanded: resolveExpandedByAxisForTree({
+      tree,
+      axisCoverageNeeds,
+      manualExpanded: {
+        row: new Set(persistedState.rows),
+        col: new Set(persistedState.cols),
+      },
+      manualCollapsed: {
+        row: new Set(persistedState.collapsedRows),
+        col: new Set(persistedState.collapsedCols),
+      },
+      program,
+      isLeafTierVisible,
+    }),
   };
 };

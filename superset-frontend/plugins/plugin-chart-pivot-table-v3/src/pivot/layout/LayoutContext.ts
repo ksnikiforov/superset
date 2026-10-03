@@ -41,9 +41,12 @@ import {
 import { compilePivotProgram } from '../runtime/compilePivotProgram';
 import {
   buildInitialAxisCoverageNeeds,
+  buildInitialRootCoverageNeeds,
+  type PivotCoverageNeed,
   resolveInitialVisibleAxisDepth,
   type PivotAxisCoverageNeed,
 } from '../runtime/coverage';
+import { buildFactValueKeys } from '../runtime/factStore';
 import type { PivotProgram } from '../runtime/types';
 
 export type PivotLayoutSpec = Pick<
@@ -91,6 +94,7 @@ export type LayoutContext = {
   rowSubtotalPosition: TotalPosition;
   colSubtotalPosition: TotalPosition;
   axisCoverageNeeds: PivotAxisCoverageNeed[];
+  rootCoverageNeeds: PivotCoverageNeed[];
 };
 
 const normalizeTotalPosition = (value: unknown): TotalPosition => {
@@ -191,7 +195,7 @@ export const buildLayoutContext = (
   const rowExpandDepth = resolveInitialVisibleAxisDepth({
     configuredDepth: hasExpansionState
       ? 0
-      : layoutSpec.expandRowsLevel ?? undefined,
+      : (layoutSpec.expandRowsLevel ?? undefined),
     dimensionCount: rowDimensions.length,
     startCollapsed,
     initialDepth,
@@ -199,10 +203,28 @@ export const buildLayoutContext = (
   const colExpandDepth = resolveInitialVisibleAxisDepth({
     configuredDepth: hasExpansionState
       ? 0
-      : layoutSpec.expandColumnsLevel ?? undefined,
+      : (layoutSpec.expandColumnsLevel ?? undefined),
     dimensionCount: columnDimensions.length,
     startCollapsed,
     initialDepth,
+  });
+
+  const axisCoverageNeeds = buildInitialAxisCoverageNeeds({
+    rowDepth: rowExpandDepth,
+    columnDepth: colExpandDepth,
+  });
+  const rootCoverageNeeds = buildInitialRootCoverageNeeds({
+    program: pivotProgram,
+    axisCoverageNeeds,
+    needsTotals:
+      rowTotals ||
+      colTotals ||
+      rowSubtotalLevels.length > 0 ||
+      colSubtotalLevelsForQuery.length > 0,
+    valueKeys: buildFactValueKeys({
+      metricKeys: pivotProgram.metricKeys,
+      requiredTimeOffsets,
+    }),
   });
 
   return {
@@ -221,9 +243,7 @@ export const buildLayoutContext = (
     colTotalPosition: normalizeTotalPosition(layoutSpec.colTotalPosition),
     rowSubtotalPosition: normalizeTotalPosition(layoutSpec.rowSubtotalPosition),
     colSubtotalPosition: normalizeTotalPosition(layoutSpec.colSubtotalPosition),
-    axisCoverageNeeds: buildInitialAxisCoverageNeeds({
-      rowDepth: rowExpandDepth,
-      columnDepth: colExpandDepth,
-    }),
+    axisCoverageNeeds,
+    rootCoverageNeeds,
   };
 };
