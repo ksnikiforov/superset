@@ -77,21 +77,9 @@ import {
   isPivotExcelFormula,
   normalizePivotExcelFormula,
 } from '../../pivot/formatting/excelFormulaReferences';
+import { normalizeEditorMetric, disallowsAdhocMetrics } from '../metricInput';
+import { SettingsPopover } from '../SettingsPopover';
 import { validateExcelFormula } from '../../pivot/formatting/excelFormula';
-
-const MetricFormattingButton = styled(Button)`
-  height: ${({ theme }) => theme.sizeUnit * 5}px;
-  min-height: ${({ theme }) => theme.sizeUnit * 5}px;
-  min-width: ${({ theme }) => theme.sizeUnit * 5}px;
-  width: ${({ theme }) => theme.sizeUnit * 5}px;
-  padding: 0;
-`;
-
-const MetricFormattingButtonWrap = styled.div`
-  display: flex;
-  align-items: center;
-  padding-right: ${({ theme }) => theme.sizeUnit}px;
-`;
 
 const MeasureLeafButton = styled(Button)`
   height: ${({ theme }) => theme.sizeUnit * 5}px;
@@ -112,9 +100,6 @@ type AdhocMetricInput = ConstructorParameters<typeof AdhocMetric>[0];
 const toAdhocMetricInput = (
   metric: Exclude<QueryFormMetric, string>,
 ): AdhocMetricInput => metric as AdhocMetricInput;
-
-const normalizeAdhocExpressionType = (metric: AdhocMetric): 'SIMPLE' | 'SQL' =>
-  metric.expressionType === 'SQL' ? 'SQL' : 'SIMPLE';
 
 const rgbToHex = (color: ColorValue): string => {
   const { r, g, b, a = 1 } = color.toRgb();
@@ -349,55 +334,9 @@ const normalizeFormattingMetric = (
   if (isPivotExcelFormula(metric)) {
     return metric;
   }
-  if (isRecord(metric) && 'metric_name' in metric) {
-    const metricName = metric.metric_name;
-    if (typeof metricName === 'string' && metricName.length > 0) {
-      return metricName;
-    }
-  }
-  if (metric instanceof AdhocMetric) {
-    const normalized: QueryFormMetric = {
-      expressionType: normalizeAdhocExpressionType(metric),
-      column: metric.column,
-      aggregate: metric.aggregate,
-      sqlExpression: metric.sqlExpression,
-      label: metric.label,
-      hasCustomLabel: metric.hasCustomLabel,
-      optionName: metric.optionName,
-    } as QueryFormMetric;
-    return normalized;
-  }
-  if (
-    isRecord(metric) &&
-    !isMetricSelectValue(metric) &&
-    'expressionType' in metric
-  ) {
-    const adhocMetricValue = metric as Exclude<QueryFormMetric, string>;
-    const adhocMetric = new AdhocMetric(toAdhocMetricInput(adhocMetricValue));
-    const rawLabel =
-      typeof adhocMetricValue.label === 'string'
-        ? adhocMetricValue.label
-        : undefined;
-    const rawHasCustomLabel =
-      typeof adhocMetricValue.hasCustomLabel === 'boolean'
-        ? adhocMetricValue.hasCustomLabel
-        : undefined;
-    const rawOptionName =
-      typeof adhocMetricValue.optionName === 'string'
-        ? adhocMetricValue.optionName
-        : undefined;
-    const normalized: QueryFormMetric = {
-      expressionType: normalizeAdhocExpressionType(adhocMetric),
-      column: adhocMetric.column,
-      aggregate: adhocMetric.aggregate,
-      sqlExpression: adhocMetric.sqlExpression,
-      label: rawLabel || adhocMetric.label,
-      hasCustomLabel: rawHasCustomLabel ?? adhocMetric.hasCustomLabel,
-      optionName: rawOptionName,
-    } as QueryFormMetric;
-    return normalized;
-  }
-  return metric as QueryFormMetric;
+  return normalizeEditorMetric(
+    metric as Metric | AdhocMetric | QueryFormMetric,
+  );
 };
 
 const FORMAT_SELECTOR_CONFIG: Array<{
@@ -546,36 +485,14 @@ export const MetricFormatSelector = (props: MetricFormatSelectorProps) => {
   }, [mergedMetricLabelMap, value]);
   const datasourceForPopover = datasource;
   const savedMetricForPopover = useMemo(() => {
-    if (typeof value === 'string') {
-      const savedMetric = savedMetrics.find(
-        metric => metric.metric_name === value,
-      );
-      if (savedMetric) {
-        return {
-          metric_name: savedMetric.metric_name,
-          verbose_name: savedMetric.verbose_name,
-          expression: savedMetric.expression ?? '',
-        };
-      }
-    }
-    if (
-      isRecord(value) &&
-      'metric_name' in value &&
-      typeof value.metric_name === 'string'
-    ) {
-      const savedMetric = savedMetrics.find(
-        metric => metric.metric_name === value.metric_name,
-      );
-      if (savedMetric) {
-        return {
-          metric_name: savedMetric.metric_name,
-          verbose_name: savedMetric.verbose_name,
-          expression: savedMetric.expression ?? '',
-        };
-      }
-    }
-    return undefined;
-  }, [savedMetrics, value]);
+    const key =
+      typeof value === 'string'
+        ? value
+        : isRecord(value) && 'metric_name' in value
+          ? value.metric_name
+          : undefined;
+    return savedMetricsForPopover.find(metric => metric.metric_name === key);
+  }, [savedMetricsForPopover, value]);
   const savedMetricOptions = useMemo(
     () =>
       savedMetricsForPopover
@@ -627,29 +544,7 @@ export const MetricFormatSelector = (props: MetricFormatSelectorProps) => {
     return new AdhocMetric({});
   }, [enableExcel, savedMetricForPopover, value]);
 
-  const disallowAdhocMetrics = useMemo(() => {
-    const rawExtra = datasource?.extra;
-    if (!rawExtra) {
-      return false;
-    }
-    if (typeof rawExtra === 'string') {
-      try {
-        const parsed = JSON.parse(rawExtra) as {
-          disallow_adhoc_metrics?: boolean;
-        };
-        return Boolean(parsed.disallow_adhoc_metrics);
-      } catch {
-        return false;
-      }
-    }
-    if (typeof rawExtra === 'object') {
-      const parsed = rawExtra as {
-        disallow_adhoc_metrics?: boolean;
-      };
-      return Boolean(parsed.disallow_adhoc_metrics);
-    }
-    return false;
-  }, [datasource?.extra]);
+  const disallowAdhocMetrics = disallowsAdhocMetrics(datasource?.extra);
 
   const addMetricButton = (
     <Tooltip title={t('Add metric')}>
@@ -1176,30 +1071,27 @@ export const MetricFormattingControl = ({
                 savedMetrics={savedMetrics}
                 datasource={datasource}
               />
-              <Space direction="vertical" size={4}>
-                <Typography.Text>{t('Positive color')}</Typography.Text>
-                <ColorPicker
-                  presets={[{ label: t('Theme colors'), colors: presetColors }]}
-                  value={databar.positiveColor ?? defaultPositiveColor}
-                  disabled={colorMode === 'byMetric'}
-                  onChangeComplete={color =>
-                    onDatabarChange('positiveColor', rgbToHex(color))
-                  }
-                  showText
-                />
-              </Space>
-              <Space direction="vertical" size={4}>
-                <Typography.Text>{t('Negative color')}</Typography.Text>
-                <ColorPicker
-                  presets={[{ label: t('Theme colors'), colors: presetColors }]}
-                  value={databar.negativeColor ?? defaultNegativeColor}
-                  disabled={colorMode === 'byMetric'}
-                  onChangeComplete={color =>
-                    onDatabarChange('negativeColor', rgbToHex(color))
-                  }
-                  showText
-                />
-              </Space>
+              {(
+                [
+                  ['positiveColor', t('Positive color'), defaultPositiveColor],
+                  ['negativeColor', t('Negative color'), defaultNegativeColor],
+                ] as const
+              ).map(([field, label, fallback]) => (
+                <Space key={field} direction="vertical" size={4}>
+                  <Typography.Text>{label}</Typography.Text>
+                  <ColorPicker
+                    presets={[
+                      { label: t('Theme colors'), colors: presetColors },
+                    ]}
+                    value={databar[field] ?? fallback}
+                    disabled={colorMode === 'byMetric'}
+                    onChangeComplete={color =>
+                      onDatabarChange(field, rgbToHex(color))
+                    }
+                    showText
+                  />
+                </Space>
+              ))}
             </>
           )}
         </Space>
@@ -1208,25 +1100,14 @@ export const MetricFormattingControl = ({
   );
 
   return (
-    <Popover
+    <SettingsPopover
       content={formattingPopoverContent}
-      overlayStyle={{ width: 'fit-content' }}
-      trigger="click"
-      placement="right"
-      getPopupContainer={() => document.body}
-    >
-      <Tooltip title={t('Add conditional formatting')}>
-        <MetricFormattingButtonWrap data-ignore-control-popover>
-          <MetricFormattingButton
-            aria-label={ariaLabel}
-            data-test="pivot-metric-formatting-button"
-            icon={<Icons.FormatPainterOutlined iconSize="s" />}
-            size="small"
-            buttonStyle={hasFormatting ? 'primary' : 'tertiary'}
-          />
-        </MetricFormattingButtonWrap>
-      </Tooltip>
-    </Popover>
+      title={t('Add conditional formatting')}
+      ariaLabel={ariaLabel}
+      testId="pivot-metric-formatting-button"
+      icon={<Icons.FormatPainterOutlined iconSize="s" />}
+      active={hasFormatting}
+    />
   );
 };
 

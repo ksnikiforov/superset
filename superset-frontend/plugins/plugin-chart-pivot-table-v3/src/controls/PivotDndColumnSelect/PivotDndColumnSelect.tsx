@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useAcknowledgedValue } from '../useAcknowledgedValue';
+import { useControlMap } from '../useControlMap';
 import { t, tn } from '@apache-superset/core/translation';
-import { styled } from '@apache-superset/core/theme';
+import { SettingsPopover } from '../SettingsPopover';
 import {
   type ComponentProps,
   ReactNode,
@@ -38,14 +38,7 @@ import {
   QueryFormMetric,
   isAdhocColumn,
 } from '@superset-ui/core';
-import {
-  Button,
-  Popover,
-  Radio,
-  Space,
-  Tooltip,
-  Typography,
-} from '@superset-ui/core/components';
+import { Radio, Space, Typography } from '@superset-ui/core/components';
 import { Icons } from '@superset-ui/core/components/Icons';
 import { ColumnMeta, isColumnMeta } from '@superset-ui/chart-controls';
 import { isEmpty, isEqual } from 'lodash';
@@ -116,34 +109,6 @@ const DIMENSION_FORMAT_SELECTOR_CONFIG: Array<{
     ),
   },
 ];
-
-const DimensionFormattingButton = styled(Button)`
-  height: ${({ theme }) => theme.sizeUnit * 5}px;
-  min-height: ${({ theme }) => theme.sizeUnit * 5}px;
-  min-width: ${({ theme }) => theme.sizeUnit * 5}px;
-  width: ${({ theme }) => theme.sizeUnit * 5}px;
-  padding: 0;
-`;
-
-const DimensionFormattingButtonWrap = styled.div`
-  display: flex;
-  align-items: center;
-  padding-right: ${({ theme }) => theme.sizeUnit}px;
-`;
-
-const DimensionSortingButton = styled(Button)`
-  height: ${({ theme }) => theme.sizeUnit * 5}px;
-  min-height: ${({ theme }) => theme.sizeUnit * 5}px;
-  min-width: ${({ theme }) => theme.sizeUnit * 5}px;
-  width: ${({ theme }) => theme.sizeUnit * 5}px;
-  padding: 0;
-`;
-
-const DimensionSortingButtonWrap = styled.div`
-  display: flex;
-  align-items: center;
-  padding-right: ${({ theme }) => theme.sizeUnit}px;
-`;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -256,10 +221,19 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       ensureIsArray<QueryFormColumn>(value),
     );
   }, [formData, sortingControlName, value]);
-  const [localFormatting, setLocalFormatting, readFormatting] =
-    useAcknowledgedValue(dimensionFormatting);
-  const [localSorting, setLocalSorting, readSorting] =
-    useAcknowledgedValue(dimensionSorting);
+  const formattingControl = useControlMap(
+    formattingControlName,
+    dimensionFormatting,
+    setControlValue,
+  );
+  const sortingControl = useControlMap(
+    sortingControlName,
+    dimensionSorting,
+    setControlValue,
+  );
+  const { value: localFormatting, update: updateFormattingEntry } =
+    formattingControl;
+  const { value: localSorting, update: updateSorting } = sortingControl;
 
   const toArray = useCallback(
     (val: QueryFormColumn[] | QueryFormColumn | null | undefined) =>
@@ -516,105 +490,52 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       field: DimensionFormattingField | 'applyTo',
       value?: PivotDimensionFormattingValue | DimensionFormattingScope,
     ) => {
-      if (!dimensionKey || !setControlValue) {
-        return;
-      }
-      const baseFormatting = readFormatting() || {};
-      const nextFormatting: PivotDimensionFormattingMap = { ...baseFormatting };
-      const nextEntry: PivotDimensionFormatting = {
-        ...baseFormatting[dimensionKey],
-      };
-
-      if (field === 'applyTo') {
-        nextEntry.applyTo =
-          (value as DimensionFormattingScope) ??
-          DEFAULT_DIMENSION_FORMATTING_SCOPE;
-      } else if (value) {
-        nextEntry[field] = value as PivotDimensionFormattingValue;
-      } else {
-        delete nextEntry[field];
-      }
-
-      const hasMetricFormatting = DIMENSION_FORMAT_SELECTOR_CONFIG.some(
-        selector => nextEntry[selector.field],
-      );
-      if (hasMetricFormatting) {
-        nextEntry.applyTo =
-          nextEntry.applyTo ?? DEFAULT_DIMENSION_FORMATTING_SCOPE;
-        nextFormatting[dimensionKey] = nextEntry;
-      } else {
-        delete nextFormatting[dimensionKey];
-      }
-
-      setLocalFormatting(nextFormatting);
-
-      setControlValue(formattingControlName, nextFormatting);
+      updateFormattingEntry(dimensionKey, current => {
+        const next: PivotDimensionFormatting = { ...current };
+        if (field === 'applyTo')
+          next.applyTo =
+            (value as DimensionFormattingScope) ??
+            DEFAULT_DIMENSION_FORMATTING_SCOPE;
+        else if (value) next[field] = value as PivotDimensionFormattingValue;
+        else delete next[field];
+        if (
+          !DIMENSION_FORMAT_SELECTOR_CONFIG.some(
+            selector => next[selector.field],
+          )
+        )
+          return undefined;
+        next.applyTo ??= DEFAULT_DIMENSION_FORMATTING_SCOPE;
+        return next;
+      });
     },
-    [
-      formattingControlName,
-      setControlValue,
-      readFormatting,
-      setLocalFormatting,
-    ],
+    [updateFormattingEntry],
   );
-
   const updateSortingMetric = useCallback(
     (dimensionKey: string, metric?: QueryFormMetric) => {
-      if (!dimensionKey || !setControlValue) {
-        return;
-      }
-      const baseSorting = readSorting() || {};
-      const nextSorting: PivotDimensionSortingMap = { ...baseSorting };
-      if (!metric) {
-        const existing = baseSorting[dimensionKey];
-        if (existing) {
-          const rest = { ...existing };
-          delete rest.metric;
-          if (Object.keys(rest).length === 0) {
-            delete nextSorting[dimensionKey];
-          } else {
-            nextSorting[dimensionKey] = rest;
-          }
-        } else {
-          delete nextSorting[dimensionKey];
-        }
-      } else {
-        const existing = baseSorting[dimensionKey] || {};
-        const nextEntry: PivotDimensionSorting = {
-          ...existing,
-          metric,
-          order: existing.order ?? DEFAULT_DIMENSION_SORT_ORDER,
-          mode: existing.mode ?? DEFAULT_DIMENSION_SORT_MODE,
-        };
-        nextSorting[dimensionKey] = nextEntry;
-      }
-      setLocalSorting(nextSorting);
-
-      setControlValue(sortingControlName, nextSorting);
+      updateSorting(dimensionKey, current => {
+        const next: PivotDimensionSorting = { ...current };
+        if (metric)
+          return {
+            ...next,
+            metric,
+            order: next.order ?? DEFAULT_DIMENSION_SORT_ORDER,
+            mode: next.mode ?? DEFAULT_DIMENSION_SORT_MODE,
+          };
+        delete next.metric;
+        return Object.keys(next).length ? next : undefined;
+      });
     },
-    [setControlValue, sortingControlName, readSorting, setLocalSorting],
+    [updateSorting],
   );
-
   const updateSortingOrder = useCallback(
     (dimensionKey: string, order: PivotSortOrder) => {
-      if (!dimensionKey || !setControlValue) {
-        return;
-      }
-      const baseSorting = readSorting() || {};
-      const existing = baseSorting[dimensionKey];
-      const nextSorting: PivotDimensionSortingMap = {
-        ...baseSorting,
-        [dimensionKey]: {
-          ...existing,
-          order,
-          mode: existing?.mode ?? DEFAULT_DIMENSION_SORT_MODE,
-        },
-      };
-      setLocalSorting(nextSorting);
-
-      setControlValue(sortingControlName, nextSorting);
+      updateSorting(dimensionKey, current => ({
+        ...current,
+        order,
+        mode: current?.mode ?? DEFAULT_DIMENSION_SORT_MODE,
+      }));
     },
-    [setControlValue, sortingControlName, readSorting, setLocalSorting],
+    [updateSorting],
   );
 
   const getDimensionKey = useCallback(
@@ -793,68 +714,37 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
           ) : null;
         const sortingControl =
           dimensionKey && dimensionLabel ? (
-            <Popover
+            <SettingsPopover
               content={sortingPopoverContent}
-              overlayStyle={{ width: 'fit-content' }}
-              trigger="click"
-              placement="right"
-              getPopupContainer={() => document.body}
-            >
-              <Tooltip title={t('Add sorting')}>
-                <DimensionSortingButtonWrap
-                  data-ignore-control-popover
-                  onClick={event => event.stopPropagation()}
-                  onMouseDown={event => event.stopPropagation()}
-                >
-                  <DimensionSortingButton
-                    aria-label={t('Add sorting for %s', dimensionLabel)}
-                    data-test="pivot-dimension-sorting-button"
-                    icon={
-                      hasSorting ? (
-                        sortingOrder === 'desc' ? (
-                          <Icons.DownOutlined iconSize="s" />
-                        ) : (
-                          <Icons.UpOutlined iconSize="s" />
-                        )
-                      ) : (
-                        <Icons.SortAscendingOutlined iconSize="s" />
-                      )
-                    }
-                    size="small"
-                    buttonStyle={hasSorting ? 'primary' : 'tertiary'}
-                  />
-                </DimensionSortingButtonWrap>
-              </Tooltip>
-            </Popover>
+              title={t('Add sorting')}
+              ariaLabel={t('Add sorting for %s', dimensionLabel)}
+              testId="pivot-dimension-sorting-button"
+              icon={
+                hasSorting ? (
+                  sortingOrder === 'desc' ? (
+                    <Icons.DownOutlined iconSize="s" />
+                  ) : (
+                    <Icons.UpOutlined iconSize="s" />
+                  )
+                ) : (
+                  <Icons.SortAscendingOutlined iconSize="s" />
+                )
+              }
+              active={hasSorting}
+              isolateEvents
+            />
           ) : undefined;
         const formattingControl =
           dimensionKey && dimensionLabel ? (
-            <Popover
+            <SettingsPopover
               content={formattingPopoverContent}
-              overlayStyle={{ width: 'fit-content' }}
-              trigger="click"
-              placement="right"
-              getPopupContainer={() => document.body}
-            >
-              <Tooltip title={t('Add conditional formatting')}>
-                <DimensionFormattingButtonWrap
-                  data-ignore-control-popover
-                  onClick={event => event.stopPropagation()}
-                  onMouseDown={event => event.stopPropagation()}
-                >
-                  <DimensionFormattingButton
-                    aria-label={t(
-                      'Add conditional formatting for %s',
-                      dimensionLabel,
-                    )}
-                    data-test="pivot-dimension-formatting-button"
-                    icon={<Icons.FormatPainterOutlined iconSize="s" />}
-                    size="small"
-                    buttonStyle={hasFormatting ? 'primary' : 'tertiary'}
-                  />
-                </DimensionFormattingButtonWrap>
-              </Tooltip>
-            </Popover>
+              title={t('Add conditional formatting')}
+              ariaLabel={t('Add conditional formatting for %s', dimensionLabel)}
+              testId="pivot-dimension-formatting-button"
+              icon={<Icons.FormatPainterOutlined iconSize="s" />}
+              active={hasFormatting}
+              isolateEvents
+            />
           ) : undefined;
         const controlButtons =
           sortingControl || formattingControl ? (

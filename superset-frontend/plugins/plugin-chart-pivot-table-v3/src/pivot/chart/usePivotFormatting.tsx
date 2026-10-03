@@ -36,6 +36,7 @@ import {
   type DimensionFormattingScope,
   DIMENSION_FORMATTING_FIELDS,
   type MetricFormattingField,
+  type DimensionFormattingField,
   type PivotMetricFormattingValue,
   type MetricFormattingScope,
   METRIC_FORMATTING_FIELDS,
@@ -68,10 +69,7 @@ import {
 import { createMetricNodePolicy } from '../metricsTotals';
 import { type RenderModel } from '../render/renderModel';
 import { type PivotLayoutResult } from './usePivotLayout';
-import {
-  compileExcelFormula,
-  type CompiledExcelFormula,
-} from '../formatting/excelFormula';
+import { compileExcelFormula } from '../formatting/excelFormula';
 import { isPivotExcelFormula } from '../formatting/excelFormulaReferences';
 import {
   buildDatabarRuntimeModel,
@@ -315,12 +313,17 @@ const normalizeD3Format = (rawValue: DataRecordValue) => {
   return value.length > 0 ? value : undefined;
 };
 
-type CompiledFormatting<Field extends string> = Partial<
-  Record<Field, CompiledExcelFormula>
->;
-type ExcelFormattingMap<Field extends string> = Record<
+type FormattingValues = Record<string, DataRecordValue | undefined>;
+type FormattingRule = (
+  values: FormattingValues | undefined,
+  currentValue: DataRecordValue | undefined,
+) => unknown;
+type FormattingRules<Field extends string> = Record<
   string,
-  CompiledFormatting<Field>
+  {
+    fields: Partial<Record<Field, FormattingRule>>;
+    applyTo: DimensionFormattingScope;
+  }
 >;
 
 export type PivotFormattingResult = {
@@ -378,7 +381,7 @@ const shouldApplyMetricFormatting = (
       ? !isGrandTotal
       : true;
 
-/** Compiles query-backed and Excel formatting fields once per formatting configuration. */
+/** Compiles every formatting source to the same field resolver. */
 const buildFormattingRuntimeMap = <Field extends string>(
   formatting: Record<
     string,
@@ -386,32 +389,28 @@ const buildFormattingRuntimeMap = <Field extends string>(
       applyTo?: DimensionFormattingScope;
     }
   >,
-  fields: readonly Field[],
-) => {
-  const keyMap: Record<
-    string,
-    Partial<Record<Field, string>> & { applyTo: DimensionFormattingScope }
-  > = {};
-  const excelMap: ExcelFormattingMap<Field> = {};
-  Object.entries(formatting).forEach(([key, value]) => {
-    if (!key) return;
-    const queryKeys: Partial<Record<Field, string>> = {};
-    const compiled: CompiledFormatting<Field> = {};
-    fields.forEach(field => {
-      const metric = value[field];
-      if (!metric) return;
-      if (isPivotExcelFormula(metric))
-        compiled[field] = compileExcelFormula(metric.formula);
-      else {
-        const queryKey = getMetricKey(metric);
-        if (queryKey) queryKeys[field] = queryKey;
+  fieldNames: readonly Field[],
+): FormattingRules<Field> =>
+  Object.fromEntries(
+    Object.entries(formatting).map(([key, config]) => {
+      const fields: Partial<Record<Field, FormattingRule>> = {};
+      for (const field of fieldNames) {
+        const metric = config[field];
+        if (!metric) continue;
+        if (isPivotExcelFormula(metric)) {
+          const formula = compileExcelFormula(metric.formula);
+          fields[field] = (values, currentValue) =>
+            !values && formula.metricReferences.length
+              ? undefined
+              : formula.evaluate(values ?? {}, currentValue);
+        } else {
+          const queryKey = getMetricKey(metric);
+          if (queryKey) fields[field] = values => values?.[queryKey];
+        }
       }
-    });
-    keyMap[key] = { ...queryKeys, applyTo: value.applyTo ?? 'all' };
-    excelMap[key] = compiled;
-  });
-  return { keyMap, excelMap };
-};
+      return [key, { fields, applyTo: config.applyTo ?? 'all' }];
+    }),
+  );
 
 export const usePivotFormatting = ({
   tree,
@@ -521,49 +520,23 @@ export const usePivotFormatting = ({
     [currencyFormats, derivedFormatOverrides.currencyOverrides],
   );
 
-  const metricFormattingRuntimeMap = useMemo(
+  const metricFormattingRules = useMemo(
     () => buildFormattingRuntimeMap(metricFormatting, METRIC_FORMATTING_FIELDS),
     [metricFormatting],
   );
-  const { keyMap: formattingKeyMap, excelMap: excelMetricFormattingMap } =
-    metricFormattingRuntimeMap;
-
-  const evaluateExcelMetricFormatting = useCallback(
-    (
-      metricKey: string,
-      field: MetricFormattingField,
-      values: Record<string, DataRecordValue | undefined>,
-      currentValue: DataRecordValue | undefined,
-    ) => {
-      const compiled = excelMetricFormattingMap[metricKey]?.[field];
-      if (!compiled) {
-        return undefined;
-      }
-      return compiled.evaluate(values, currentValue);
-    },
-    [excelMetricFormattingMap],
-  );
-
   const resolveMetricD3Format = useCallback(
     (
       metricKey: string,
       cell: PivotResultCell,
       currentValue: DataRecordValue | undefined,
-    ) => {
-      const d3FormatKey = formattingKeyMap[metricKey]?.d3Format;
-      return (
-        normalizeD3Format(
-          evaluateExcelMetricFormatting(
-            metricKey,
-            'd3Format',
-            cell.values,
-            currentValue,
-          ) as DataRecordValue,
-        ) ??
-        (d3FormatKey ? normalizeD3Format(cell.values[d3FormatKey]) : undefined)
-      );
-    },
-    [evaluateExcelMetricFormatting, formattingKeyMap],
+    ) =>
+      normalizeD3Format(
+        metricFormattingRules[metricKey]?.fields.d3Format?.(
+          cell.values,
+          currentValue,
+        ) as DataRecordValue,
+      ),
+    [metricFormattingRules],
   );
 
   const resolveMetricCellFormatting = useCallback(
@@ -574,34 +547,20 @@ export const usePivotFormatting = ({
       isGrandTotal: boolean,
     ) => {
       const currentValue = cell.values[metricKey];
-      const formattingKeys = formattingKeyMap[metricKey];
+      const rules = metricFormattingRules[metricKey];
       const applyColorFormatting = shouldApplyMetricFormatting(
         metricFormattingScope,
         isSubtotal,
         isGrandTotal,
       );
-      const resolveColor = (
-        field: MetricFormattingField,
-        formattingKey?: string,
-      ) =>
+      const resolveColor = (field: MetricFormattingField) =>
         applyColorFormatting
-          ? (normalizeMetricCssColor(
-              evaluateExcelMetricFormatting(
-                metricKey,
-                field,
-                cell.values,
-                currentValue,
-              ),
-            ) ??
-            (formattingKey
-              ? normalizeMetricCssColor(cell.values[formattingKey])
-              : undefined))
+          ? normalizeMetricCssColor(
+              rules?.fields[field]?.(cell.values, currentValue),
+            )
           : undefined;
-      const backgroundColor = resolveColor(
-        'backgroundColor',
-        formattingKeys?.backgroundColor,
-      );
-      const color = resolveColor('textColor', formattingKeys?.textColor);
+      const backgroundColor = resolveColor('backgroundColor');
+      const color = resolveColor('textColor');
       const d3FormatOverride = resolveMetricD3Format(
         metricKey,
         cell,
@@ -613,12 +572,7 @@ export const usePivotFormatting = ({
         ...(d3FormatOverride ? { d3FormatOverride } : {}),
       };
     },
-    [
-      evaluateExcelMetricFormatting,
-      formattingKeyMap,
-      metricFormattingScope,
-      resolveMetricD3Format,
-    ],
+    [metricFormattingRules, metricFormattingScope, resolveMetricD3Format],
   );
 
   const rowFormattingRuntimeMap = useMemo(
@@ -644,21 +598,13 @@ export const usePivotFormatting = ({
         return undefined;
       }
       const dimensionKey = metricNodePolicy.getDimensionKeyForNode(node, axis);
-      const formattingMaps =
-        axis === 'row' ? rowFormattingRuntimeMap : colFormattingRuntimeMap;
       const formatting = dimensionKey
-        ? formattingMaps.keyMap[dimensionKey]
+        ? (axis === 'row' ? rowFormattingRuntimeMap : colFormattingRuntimeMap)[
+            dimensionKey
+          ]
         : undefined;
-      const excelFormatting = dimensionKey
-        ? formattingMaps.excelMap[dimensionKey]
-        : undefined;
-      if (!formatting && !excelFormatting) {
+      if (!formatting || (target === 'cell' && formatting.applyTo !== 'all'))
         return undefined;
-      }
-      const applyTo = formatting?.applyTo ?? 'all';
-      if (target === 'cell' && applyTo !== 'all') {
-        return undefined;
-      }
       const nonMetricParts = metricNodePolicy.getNonMetricPathParts(node.path);
       const nonMetricKey = serializePath(nonMetricParts);
       const dimensionValue =
@@ -669,29 +615,14 @@ export const usePivotFormatting = ({
         axis === 'row'
           ? rowValuesMap.get(nonMetricKey)
           : colValuesMap.get(nonMetricKey);
-      const resolveExcelValue = (formula: CompiledExcelFormula | undefined) => {
-        if (!formula) {
-          return undefined;
-        }
-        if (!values && formula.metricReferences.length > 0) {
-          return undefined;
-        }
-        const resolvedValues = values ?? {};
-        const result = formula.evaluate(resolvedValues, dimensionValue);
+      const resolveColor = (field: DimensionFormattingField) => {
+        const result = formatting.fields[field]?.(values, dimensionValue);
         return typeof result === 'string'
           ? normalizeCssColor(result)
           : undefined;
       };
-      const backgroundColor =
-        resolveExcelValue(excelFormatting?.backgroundColor) ??
-        (formatting?.backgroundColor && values
-          ? normalizeCssColor(values[formatting.backgroundColor])
-          : undefined);
-      const textColor =
-        resolveExcelValue(excelFormatting?.textColor) ??
-        (formatting?.textColor && values
-          ? normalizeCssColor(values[formatting.textColor])
-          : undefined);
+      const backgroundColor = resolveColor('backgroundColor');
+      const textColor = resolveColor('textColor');
       if (!backgroundColor && !textColor) {
         return undefined;
       }
