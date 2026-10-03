@@ -18,8 +18,11 @@
  */
 
 import { createRef } from 'react';
-import { render, screen } from '../../testUtils';
-import { PivotTableView } from '../../../src/pivot/render/PivotTableView';
+import { fireEvent, render, screen } from '../../testUtils';
+import {
+  PivotTableView,
+  type PivotTableViewProps,
+} from '../../../src/pivot/render/PivotTableView';
 import { type RenderModel } from '../../../src/pivot/render/renderModel';
 import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
 import { serializePath } from '../../../src/pivot/core/path';
@@ -54,13 +57,17 @@ const baseFormatting: PivotFormattingResult = {
   resolveDimensionStyle: () => undefined,
   resolveMetricCellFormatting: () => ({}),
   deriveMetricKey: () => '',
+  formatExportCell: () => '',
   renderCellContent: () => null,
   renderDatabarContent: () => null,
   formatLabel: node => node.label,
   getTotalBackground: () => undefined,
 };
 
-const renderView = (showGlobalLoader: boolean) =>
+const renderView = (
+  showGlobalLoader: boolean,
+  overrides: Partial<PivotTableViewProps> = {},
+) =>
   render(
     <PivotTableView
       height={300}
@@ -87,17 +94,18 @@ const renderView = (showGlobalLoader: boolean) =>
       handleCellClick={jest.fn()}
       handleCellKeyDown={jest.fn()}
       handleCellContextMenu={jest.fn()}
+      {...overrides}
     />,
   );
 
 describe('PivotTableView', () => {
-  it('marks exportable table with pivot-v3 selector class', () => {
+  test('marks exportable table with pivot-v3 selector class', () => {
     const { container } = renderView(false);
     const table = container.querySelector('table');
     expect(table).toHaveClass('pivot-v3-table');
   });
 
-  it('registers worksheet export data for the chart id', () => {
+  test('registers worksheet export data for the chart id', () => {
     render(
       <PivotTableView
         height={300}
@@ -133,7 +141,7 @@ describe('PivotTableView', () => {
     ]);
   });
 
-  it('registers export data from the containing chart id as a fallback', () => {
+  test('registers export data from the containing chart id as a fallback', () => {
     render(
       <div id="chart-id-372">
         <PivotTableView
@@ -170,17 +178,17 @@ describe('PivotTableView', () => {
     ]);
   });
 
-  it('renders the rows header when not loading', () => {
+  test('renders the rows header when not loading', () => {
     renderView(false);
     expect(screen.getByText('Rows')).toBeInTheDocument();
   });
 
-  it('hides the table when loading', () => {
+  test('hides the table when loading', () => {
     renderView(true);
     expect(screen.queryByText('Rows')).not.toBeInTheDocument();
   });
 
-  it('marks actual null labels as muted', () => {
+  test('marks actual null labels as muted', () => {
     const nullRow: PivotTreeNode = {
       axis: 'row',
       key: serializePath([null]),
@@ -229,7 +237,7 @@ describe('PivotTableView', () => {
     expect(nullLabel).toHaveClass('pivot-null-label');
   });
 
-  it('preallocates row toggle slot even when a row has no toggle', () => {
+  test('preallocates row toggle slot even when a row has no toggle', () => {
     const rowNode: PivotTreeNode = {
       axis: 'row',
       key: serializePath(['A']),
@@ -290,7 +298,7 @@ describe('PivotTableView', () => {
     expect(slot?.querySelector('button')).toBeNull();
   });
 
-  it('uses compact indentation for nested row labels', () => {
+  test('uses compact indentation for nested row labels', () => {
     const rowNode: PivotTreeNode = {
       axis: 'row',
       key: serializePath(['A']),
@@ -350,7 +358,7 @@ describe('PivotTableView', () => {
     expect(headerCell).toHaveStyle('padding-left: 14px');
   });
 
-  it('uses 3px icon-label gap for both row and column headers', () => {
+  test('uses 3px icon-label gap for both row and column headers', () => {
     const rowNode: PivotTreeNode = {
       axis: 'row',
       key: serializePath(['row-a']),
@@ -410,7 +418,7 @@ describe('PivotTableView', () => {
     expect(colHeaderCell).toHaveStyle('gap: 3px');
   });
 
-  it('emits the visible row depth count for export', () => {
+  test('emits the visible row depth count for export', () => {
     const grandTotal: PivotTreeNode = {
       axis: 'row',
       key: serializePath(['grand']),
@@ -484,4 +492,38 @@ describe('PivotTableView', () => {
       ['West', 'SF'],
     ]);
   });
+});
+
+test('sortable headers support keyboard sorting and contextual expansion labels', () => {
+  const col: PivotTreeNode = {
+    axis: 'col',
+    key: 'North',
+    path: ['North'],
+    label: 'North',
+    formattedLabel: 'North',
+    level: 1,
+    hasChildren: true,
+  };
+  const sort = jest.fn();
+  renderView(false, {
+    renderModel: {
+      ...baseRenderModel,
+      visibleCols: [col],
+      columnHeaderRows: [[{ node: col, colSpan: 1, rowSpan: 1 }]],
+    },
+    isColumnSortable: () => true,
+    onSortColumn: sort,
+    shouldShowToggle: () => true,
+  });
+  const toggle = screen.getByRole('button', { name: 'Expand North' });
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  const header = toggle.closest('th');
+  expect(header).toHaveAttribute('tabindex', '0');
+  expect(header).toHaveAttribute('aria-sort', 'none');
+  if (!header) throw new Error('Missing sortable column header');
+  fireEvent.keyDown(header, { key: 'Enter' });
+  fireEvent.keyDown(header, { key: ' ' });
+  expect(sort).toHaveBeenCalledTimes(2);
+  fireEvent.keyDown(toggle, { key: 'Enter' });
+  expect(sort).toHaveBeenCalledTimes(2);
 });

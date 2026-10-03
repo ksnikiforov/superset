@@ -351,6 +351,10 @@ export type PivotFormattingResult = {
     isGrandTotal: boolean,
   ) => CSSProperties & { d3FormatOverride?: string };
   deriveMetricKey: (rowNode: PivotTreeNode, colNode: PivotTreeNode) => string;
+  formatExportCell: (
+    rowNode: PivotTreeNode,
+    colNode: PivotTreeNode,
+  ) => string | number;
   renderCellContent: (
     rowNode: PivotTreeNode,
     colNode: PivotTreeNode,
@@ -891,6 +895,39 @@ export const usePivotFormatting = ({
     ],
   );
 
+  const getCellValue = useCallback(
+    (rowNode: PivotTreeNode, colNode: PivotTreeNode, metricKey: string) =>
+      shouldHideRowValues(rowNode)
+        ? undefined
+        : tree.cells[serializeCellKey(rowNode.key, colNode.key)]?.values[
+            metricKey
+          ],
+    [shouldHideRowValues, tree.cells],
+  );
+  const formatExportCell = useCallback(
+    (rowNode: PivotTreeNode, colNode: PivotTreeNode) => {
+      const metricKey = deriveMetricKey(rowNode, colNode);
+      const value = getCellValue(rowNode, colNode, metricKey);
+      if (value === undefined) return '';
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      const cell = tree.cells[serializeCellKey(rowNode.key, colNode.key)];
+      const override = cell
+        ? resolveMetricD3Format(metricKey, cell, value)
+        : undefined;
+      const formatted = renderValue(metricKey, value, override);
+      return typeof formatted === 'string' || typeof formatted === 'number'
+        ? formatted
+        : '';
+    },
+    [
+      deriveMetricKey,
+      getCellValue,
+      renderValue,
+      resolveMetricD3Format,
+      tree.cells,
+    ],
+  );
+
   const renderCellContent = useCallback(
     (
       rowNode: PivotTreeNode,
@@ -898,24 +935,15 @@ export const usePivotFormatting = ({
       metricKey: string,
       d3FormatOverride?: string,
     ) => {
-      if (shouldHideRowValues(rowNode)) {
-        return '';
-      }
-      const cell = tree.cells[serializeCellKey(rowNode.key, colNode.key)];
-      if (!cell) {
-        return '';
-      }
-      const value = renderValue(
-        metricKey,
-        cell.values[metricKey],
-        d3FormatOverride,
-      );
+      const rawValue = getCellValue(rowNode, colNode, metricKey);
+      if (rawValue === undefined) return '';
+      const value = renderValue(metricKey, rawValue, d3FormatOverride);
       if (allowRenderHtml && typeof value === 'string' && value.includes('<')) {
         return safeHtmlSpan(value);
       }
       return value;
     },
-    [allowRenderHtml, renderValue, shouldHideRowValues, tree.cells],
+    [allowRenderHtml, renderValue, getCellValue],
   );
 
   const renderDatabarContent = useCallback(
@@ -926,6 +954,7 @@ export const usePivotFormatting = ({
       metricKey: string,
       d3FormatOverride?: string,
     ) => {
+      if (shouldHideRowValues(rowNode)) return '';
       const labelNode = cell
         ? renderCellContent(rowNode, colNode, metricKey, d3FormatOverride)
         : '';
@@ -1161,6 +1190,7 @@ export const usePivotFormatting = ({
       );
     },
     [
+      shouldHideRowValues,
       databarLabelSpaces,
       databarPaddingX,
       databarScales,
@@ -1196,6 +1226,7 @@ export const usePivotFormatting = ({
     resolveDimensionStyle,
     resolveMetricCellFormatting,
     deriveMetricKey,
+    formatExportCell,
     renderCellContent,
     renderDatabarContent,
     formatLabel,

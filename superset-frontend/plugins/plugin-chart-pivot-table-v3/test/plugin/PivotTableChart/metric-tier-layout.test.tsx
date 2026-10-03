@@ -66,7 +66,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
     verboseMap: {},
   };
 
-  it('indents metric rows deeper than shipMode when metrics are last on rows', () => {
+  test('indents metric rows deeper than shipMode when metrics are last on rows', () => {
     metricsVariants.forEach(metrics => {
       const treeRaw = buildTreeFromRecords(
         [
@@ -129,7 +129,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
     });
   });
 
-  it('does not show toggles on leaf rows when metrics are on columns', () => {
+  test('does not show toggles on leaf rows when metrics are on columns', () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = ['quantityBand'];
     const colGroupby = ['discountBand', 'shipMode'];
@@ -209,7 +209,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
     );
   });
 
-  it('hides column toggles when Values are pre-expanded at the column end', () => {
+  test('hides column toggles when Values are pre-expanded at the column end', () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = ['discountBand'];
     const colGroupby = ['quantityBand'];
@@ -285,7 +285,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
     expect(result.current.shouldShowToggle('col', colNode)).toBe(false);
   });
 
-  it('hides row toggles when Values are pre-expanded under a single metric', () => {
+  test('hides row toggles when Values are pre-expanded under a single metric', () => {
     const metricKey = 'averageOrderValue';
     const valueLeaf = buildValueLeaf();
     const ixLeaf = buildBuiltInLeaf('ix', {
@@ -375,7 +375,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
     );
   });
 
-  it('does not render expand toggles on metric rows when metrics are last on rows', () => {
+  test('does not render expand toggles on metric rows when metrics are last on rows', () => {
     metricsVariants.forEach(metrics => {
       const treeRaw = buildTreeFromRecords(
         [
@@ -433,7 +433,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
     });
   });
 
-  it('suppresses orderPriority toggle when metrics are between dimensions', () => {
+  test('suppresses orderPriority toggle when metrics are between dimensions', () => {
     metricsVariants.forEach(metrics => {
       const treeRaw = buildTreeFromRecords(
         [
@@ -502,7 +502,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
     });
   });
 
-  it('suppresses column toggles on parent dimensions when metrics are between dimensions', () => {
+  test('suppresses column toggles on parent dimensions when metrics are between dimensions', () => {
     metricsVariants.forEach(metrics => {
       const treeRaw = buildTreeFromRecords(
         [
@@ -571,7 +571,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
     });
   });
 
-  it('pre-expands the metric tier and hides parent toggles when a single metric sits between column dimensions', () => {
+  test('pre-expands the metric tier and hides parent toggles when a single metric sits between column dimensions', () => {
     const metrics = ['averageOrderValue'];
     const treeRaw = buildTreeFromRecords(
       [

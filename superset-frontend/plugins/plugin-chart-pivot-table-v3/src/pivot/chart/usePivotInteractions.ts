@@ -16,7 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { type KeyboardEvent, type MouseEvent, useCallback } from 'react';
+import {
+  type KeyboardEvent,
+  type MouseEvent,
+  useCallback,
+  useRef,
+} from 'react';
 import {
   type ContextMenuFilters,
   type DataRecordValue,
@@ -24,6 +29,7 @@ import {
   type QueryObjectFilterClause,
   getColumnLabel,
 } from '@superset-ui/core';
+import { isEqual } from 'lodash';
 import { type PivotTableProps, type PivotTreeNode } from '../../types';
 import { buildCellFilters, buildContextMenuFilters } from '../filters';
 import { type PivotLayoutResult } from './usePivotLayout';
@@ -60,6 +66,7 @@ const buildFilterStateValues = (filters: QueryObjectFilterClause[]) =>
 
 export const usePivotInteractions = ({
   emitCrossFilters,
+  selectedFilters = {},
   setDataMask,
   mergeOwnState,
   treeDataSignature,
@@ -70,6 +77,7 @@ export const usePivotInteractions = ({
   timeGrainSqla,
 }: {
   emitCrossFilters?: PivotTableProps['emitCrossFilters'];
+  selectedFilters?: PivotTableProps['selectedFilters'];
   setDataMask: PivotTableProps['setDataMask'];
   mergeOwnState: (partial: JsonObject) => JsonObject;
   treeDataSignature: string;
@@ -80,17 +88,40 @@ export const usePivotInteractions = ({
   timeGrainSqla?: PivotTableProps['formData']['timeGrainSqla'];
 }): PivotInteractionsResult => {
   const { pivotProgram } = layout.layout;
+  const selectionRef = useRef({
+    incoming: selectedFilters,
+    selected: selectedFilters,
+  });
+  if (!isEqual(selectionRef.current.incoming, selectedFilters)) {
+    selectionRef.current = {
+      incoming: selectedFilters,
+      selected: selectedFilters,
+    };
+  }
+  const resolveSelection = useCallback((filters: QueryObjectFilterClause[]) => {
+    const selected = buildSelectedFilters(filters);
+    const isSelected = isEqual(selectionRef.current.selected, selected);
+    return {
+      isSelected,
+      filters: isSelected ? [] : filters,
+      selected: isSelected ? {} : selected,
+    };
+  }, []);
 
   const handleCellClick = useCallback(
     (rowNode: PivotTreeNode, colNode: PivotTreeNode) => {
       if (!emitCrossFilters) {
         return;
       }
-      const filters = buildCellFilters({
-        rowNode,
-        colNode,
-        program: pivotProgram,
-      });
+      const selection = resolveSelection(
+        buildCellFilters({
+          rowNode,
+          colNode,
+          program: pivotProgram,
+        }),
+      );
+      selectionRef.current.selected = selection.selected;
+      const { filters } = selection;
       setDataMask({
         extraFormData: {
           filters,
@@ -108,6 +139,7 @@ export const usePivotInteractions = ({
     },
     [
       emitCrossFilters,
+      resolveSelection,
       mergeOwnState,
       pivotProgram,
       setDataMask,
@@ -148,22 +180,23 @@ export const usePivotInteractions = ({
         timeGrainSqla,
       });
 
+      const selection = resolveSelection(contextFilters);
       const contextMenuPayload: ContextMenuFilters = {
         drillToDetail: contextFilters,
         crossFilter: emitCrossFilters
           ? {
               dataMask: {
-                extraFormData: { filters: contextFilters },
+                extraFormData: { filters: selection.filters },
                 filterState: {
-                  value: buildFilterStateValues(contextFilters),
-                  selectedFilters: buildSelectedFilters(contextFilters),
+                  value: buildFilterStateValues(selection.filters),
+                  selectedFilters: selection.selected,
                 },
                 ownState: {
-                  ...(ownState ?? {}),
+                  ...ownState,
                   treeDataSignature,
                 },
               },
-              isCurrentValueSelected: false,
+              isCurrentValueSelected: selection.isSelected,
             }
           : undefined,
       };
@@ -172,6 +205,7 @@ export const usePivotInteractions = ({
     },
     [
       dateFormatters,
+      resolveSelection,
       emitCrossFilters,
       onContextMenu,
       ownState,

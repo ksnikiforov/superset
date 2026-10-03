@@ -23,19 +23,21 @@ import {
 } from '../../../src/pivot/core/path';
 
 describe('path serialization (contracts)', () => {
-  it('round-trips divider-containing strings', () => {
+  test('round-trips divider-containing strings', () => {
     const dividerValue = `A${PATH_DIVIDER}B`;
     const key = serializePath([dividerValue]);
-    expect(key).toBe(`A${PATH_DIVIDER}${PATH_DIVIDER}B`);
+    expect(parsePath(`A${PATH_DIVIDER}${PATH_DIVIDER}B`)).toEqual([
+      dividerValue,
+    ]);
     expect(parsePath(key)).toEqual([dividerValue]);
   });
 
-  it('round-trips null and undefined values', () => {
+  test('round-trips null and undefined values', () => {
     expect(parsePath(serializePath([null]))).toEqual([null]);
     expect(parsePath(serializePath([undefined]))).toEqual([undefined]);
   });
 
-  it('treats empty keys as the root path', () => {
+  test('treats empty keys as the root path', () => {
     expect(parsePath('')).toEqual([]);
   });
 });

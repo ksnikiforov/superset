@@ -65,7 +65,7 @@ const fetchTarget = ({
 };
 
 describe('temporal branch query specs contract', () => {
-  it('buildExpansionQuerySpecs keeps temporal equality filters backend-safe', () => {
+  test('buildExpansionQuerySpecs keeps temporal equality filters backend-safe', () => {
     const formData = buildFormData({
       groupbyRows: ['orderYear', 'orderMonth'],
       groupbyColumns: [],
@@ -123,7 +123,7 @@ describe('temporal branch query specs contract', () => {
     });
   });
 
-  it('buildExpansionQuerySpecs keeps temporal sibling filters backend-safe', () => {
+  test('buildExpansionQuerySpecs keeps temporal sibling filters backend-safe', () => {
     const formData = buildFormData({
       groupbyRows: ['orderYear', 'orderMonth'],
       groupbyColumns: [],

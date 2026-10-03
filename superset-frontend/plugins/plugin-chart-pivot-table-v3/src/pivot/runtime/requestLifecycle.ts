@@ -128,3 +128,34 @@ export const yieldToMainThread = (): Promise<void> =>
     : new Promise(resolve => {
         setTimeout(resolve, 0);
       });
+
+/** Bounds asynchronous work; its owner remains responsible for cancellation. */
+export const withRequestDeadline = async <T>(
+  operation: Promise<T>,
+  timeoutMs = 30000,
+  signal?: AbortSignal,
+): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let abort: (() => void) | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_resolve, reject) => {
+        abort = () =>
+          reject(new DOMException('Pivot request canceled', 'AbortError'));
+        if (signal?.aborted) {
+          abort();
+          return;
+        }
+        signal?.addEventListener('abort', abort, { once: true });
+        timer = setTimeout(
+          () => reject(new Error('Pivot request timed out. Please retry.')),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+    if (abort) signal?.removeEventListener('abort', abort);
+  }
+};

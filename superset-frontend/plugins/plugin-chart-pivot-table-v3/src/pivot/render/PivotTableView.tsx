@@ -22,6 +22,7 @@ import {
   type KeyboardEvent,
   type MouseEvent,
   type RefObject,
+  useCallback,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -339,6 +340,7 @@ export const PivotTableView = ({
   expandedCols,
   errorMessage,
   onRetry,
+  warnings = [],
   showGlobalLoader,
   showCornerLoader = false,
   stickyHeaders,
@@ -377,6 +379,7 @@ export const PivotTableView = ({
     deriveMetricKey,
     renderCellContent,
     renderDatabarContent,
+    formatExportCell,
   } = formatting;
   const exportContainerRef = useRef<HTMLDivElement>(null);
   const stickyRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
@@ -460,18 +463,8 @@ export const PivotTableView = ({
     : { fontWeight: 600 };
   const rowTotalLabel = t('Total');
   const rowCornerLabel = t('Rows');
-  const { rowExportDepthCount, rowExportRows } = useMemo(
-    () =>
-      buildPivotV3RowExportModel({
-        visibleRows,
-        rowAxisLabels,
-        rowTotalLabel,
-        getNodeDimDepth,
-        formatLabel,
-        isGrandTotalLikeRow,
-        isRowAggregateBold,
-      }),
-    [
+  const buildExportSheetData = useCallback(() => {
+    const { rowExportDepthCount, rowExportRows } = buildPivotV3RowExportModel({
       visibleRows,
       rowAxisLabels,
       rowTotalLabel,
@@ -479,55 +472,8 @@ export const PivotTableView = ({
       formatLabel,
       isGrandTotalLikeRow,
       isRowAggregateBold,
-    ],
-  );
-  const exportSheetData = useMemo(
-    () =>
-      buildPivotV3ExportSheetModel({
-        rowAxisLabels,
-        rowCornerLabel,
-        rowExportDepthCount,
-        rowExportRows,
-        renderModel,
-        formatLabel,
-        deriveMetricKey,
-        isGrandTotalLikeRow,
-        formatBodyCell: (row, col, cell, metricKey) => {
-          if (!cell) {
-            return '';
-          }
-          const currentValue = cell.values[metricKey];
-          if (
-            typeof currentValue === 'number' &&
-            Number.isFinite(currentValue)
-          ) {
-            return currentValue;
-          }
-          const isSubtotalCell =
-            isRowAggregateBold(row) || isColAggregateBold(col);
-          const isGrandTotalCell =
-            row.path.length === 0 ||
-            col.path.length === 0 ||
-            isMetricGrandTotalNode(row) ||
-            isMetricGrandTotalNode(col);
-          const metricCellFormatting = resolveMetricCellFormatting(
-            metricKey,
-            cell,
-            isSubtotalCell,
-            isGrandTotalCell,
-          );
-          const content = renderCellContent(
-            row,
-            col,
-            metricKey,
-            metricCellFormatting?.d3FormatOverride,
-          );
-          return typeof content === 'string' || typeof content === 'number'
-            ? content
-            : '';
-        },
-      }),
-    [
+    });
+    return buildPivotV3ExportSheetModel({
       rowAxisLabels,
       rowCornerLabel,
       rowExportDepthCount,
@@ -536,13 +482,21 @@ export const PivotTableView = ({
       formatLabel,
       deriveMetricKey,
       isGrandTotalLikeRow,
-      isRowAggregateBold,
-      isColAggregateBold,
-      isMetricGrandTotalNode,
-      resolveMetricCellFormatting,
-      renderCellContent,
-    ],
-  );
+      formatBodyCell: (row, col) => formatExportCell(row, col),
+    });
+  }, [
+    visibleRows,
+    rowAxisLabels,
+    rowTotalLabel,
+    getNodeDimDepth,
+    formatLabel,
+    isGrandTotalLikeRow,
+    isRowAggregateBold,
+    rowCornerLabel,
+    renderModel,
+    deriveMetricKey,
+    formatExportCell,
+  ]);
   useLayoutEffect(() => {
     const containingChart =
       exportContainerRef.current?.closest<HTMLElement>('[id^="chart-id-"]');
@@ -553,15 +507,15 @@ export const PivotTableView = ({
     }
     registerPivotV3ExportSheetDataForChart(
       resolvedExportChartId,
-      exportSheetData,
+      buildExportSheetData,
     );
     return () => {
       unregisterPivotV3ExportSheetDataForChart(
         resolvedExportChartId,
-        exportSheetData,
+        buildExportSheetData,
       );
     };
-  }, [exportChartId, exportSheetData]);
+  }, [exportChartId, buildExportSheetData]);
   const renderCornerHeader = (rowSpan?: number) => (
     <th
       rowSpan={rowSpan}
@@ -579,6 +533,15 @@ export const PivotTableView = ({
       width={width}
       style={containerStyle}
     >
+      {warnings.some(warning => warning.type === 'truncation') && (
+        <Alert
+          type="warning"
+          showIcon
+          message={t(
+            'Pivot results reached the row limit. Increase the limit or narrow the filters.',
+          )}
+        />
+      )}
       {errorMessage ? (
         <ErrorWrapper>
           <ErrorContent>
@@ -620,7 +583,7 @@ export const PivotTableView = ({
                     );
                     const colHeaderStyle = {
                       ...(themeColor ? { backgroundColor: themeColor } : {}),
-                      ...(colHeaderFormatting || {}),
+                      ...colHeaderFormatting,
                       ...(stickyHeaders
                         ? { top: `${headerRowOffsets[rowIdx] ?? 0}px` }
                         : {}),
@@ -639,6 +602,27 @@ export const PivotTableView = ({
                           isSubtotalHeader ? 'subtotal-cell' : undefined
                         }
                         style={colHeaderStyleResolved}
+                        tabIndex={sortable ? 0 : undefined}
+                        aria-sort={
+                          sortable
+                            ? sortOrder === 'asc'
+                              ? 'ascending'
+                              : sortOrder === 'desc'
+                                ? 'descending'
+                                : 'none'
+                            : undefined
+                        }
+                        onKeyDown={event => {
+                          if (
+                            event.target === event.currentTarget &&
+                            sortable &&
+                            onSortColumn &&
+                            (event.key === 'Enter' || event.key === ' ')
+                          ) {
+                            event.preventDefault();
+                            onSortColumn(cell.node);
+                          }
+                        }}
                         onClick={
                           sortable && onSortColumn
                             ? () => onSortColumn(cell.node)
@@ -654,6 +638,18 @@ export const PivotTableView = ({
                                   event.stopPropagation();
                                   onToggleNode('col', cell.node);
                                 }}
+                                aria-label={
+                                  expandedCols.has(cell.node.key)
+                                    ? t(
+                                        'Collapse %s',
+                                        formatLabel(cell.node, 'col'),
+                                      )
+                                    : t(
+                                        'Expand %s',
+                                        formatLabel(cell.node, 'col'),
+                                      )
+                                }
+                                aria-expanded={expandedCols.has(cell.node.key)}
                                 disabled={isColLoading}
                               >
                                 {isColLoading ? (
@@ -732,7 +728,7 @@ export const PivotTableView = ({
               );
               const rowHeaderStyle = {
                 ...(rowTotalBg ? { backgroundColor: rowTotalBg } : {}),
-                ...(rowHeaderFormatting || {}),
+                ...rowHeaderFormatting,
               };
               const rowHeaderStyleResolved =
                 Object.keys(rowHeaderStyle).length > 0
@@ -748,13 +744,10 @@ export const PivotTableView = ({
                   key={row.key}
                   className={rowClassName}
                   style={rowStyle}
-                  ref={
-                    isGrandTotalLike
-                      ? rowElement => {
-                          stickyRowRefs.current[row.key] = rowElement;
-                        }
-                      : undefined
-                  }
+                  ref={rowElement => {
+                    if (isGrandTotalLike)
+                      stickyRowRefs.current[row.key] = rowElement;
+                  }}
                 >
                   <th
                     className={isSubtotalHeader ? 'subtotal-cell' : undefined}
@@ -766,6 +759,12 @@ export const PivotTableView = ({
                           <ToggleButton
                             type="button"
                             onClick={() => onToggleNode('row', row)}
+                            aria-label={
+                              expandedRows.has(row.key)
+                                ? t('Collapse %s', formatLabel(row, 'row'))
+                                : t('Expand %s', formatLabel(row, 'row'))
+                            }
+                            aria-expanded={expandedRows.has(row.key)}
                             disabled={isRowLoading}
                           >
                             {isRowLoading ? (

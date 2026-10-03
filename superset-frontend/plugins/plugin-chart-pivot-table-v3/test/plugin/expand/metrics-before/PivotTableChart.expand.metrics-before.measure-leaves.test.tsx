@@ -106,7 +106,7 @@ describe('PivotTableChart expansion with measure leaves before dimensions', () =
       metricPosition,
     );
 
-  it('keeps sibling measure leaves when expanding a leaf before column dimensions', async () => {
+  test('keeps sibling measure leaves when expanding a leaf before column dimensions', async () => {
     const rowGroupby: string[] = [];
     const colGroupby = ['col1', 'col2'];
     const record = {
@@ -134,7 +134,7 @@ describe('PivotTableChart expansion with measure leaves before dimensions', () =
       record,
     });
 
-    fetchPivotBranchMock.mockImplementationOnce(
+    fetchPivotBranchMock.mockImplementation(
       resolveMockExpansionFetchResult({
         data: branchTree,
       }),
@@ -190,7 +190,9 @@ describe('PivotTableChart expansion with measure leaves before dimensions', () =
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalled();
     });
-    expect(within(thead).getByText('C1')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(within(thead).getByText('C1')).toBeInTheDocument(),
+    );
 
     const headerLabels = within(thead)
       .getAllByRole('columnheader')
@@ -201,7 +203,7 @@ describe('PivotTableChart expansion with measure leaves before dimensions', () =
     );
   });
 
-  it('keeps sibling measure leaves when expanding a leaf before row dimensions', async () => {
+  test('keeps sibling measure leaves when expanding a leaf before row dimensions', async () => {
     const rowGroupby = ['row1', 'row2'];
     const colGroupby: string[] = [];
     const record = {
@@ -229,7 +231,7 @@ describe('PivotTableChart expansion with measure leaves before dimensions', () =
       record,
     });
 
-    fetchPivotBranchMock.mockImplementationOnce(
+    fetchPivotBranchMock.mockImplementation(
       resolveMockExpansionFetchResult({
         data: branchTree,
       }),
@@ -285,7 +287,9 @@ describe('PivotTableChart expansion with measure leaves before dimensions', () =
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalled();
     });
-    expect(within(tbody).getByText('A')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(within(tbody).getByText('A')).toBeInTheDocument(),
+    );
 
     const rowLabels = Array.from(
       tbody.querySelectorAll('th') as NodeListOf<HTMLElement>,

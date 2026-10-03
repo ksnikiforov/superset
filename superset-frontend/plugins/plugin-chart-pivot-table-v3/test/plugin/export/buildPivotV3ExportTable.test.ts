@@ -332,3 +332,16 @@ describe('pivot v3 export worksheet model', () => {
     unregisterPivotV3ExportSheetDataForChart(602, currentRows);
   });
 });
+
+test('defers worksheet projection until export and preserves replacement registration', () => {
+  const first = jest.fn(() => []);
+  const second = jest.fn(() => []);
+  registerPivotV3ExportSheetDataForChart('lazy-export', first);
+  expect(first).not.toHaveBeenCalled();
+  registerPivotV3ExportSheetDataForChart('lazy-export', second);
+  unregisterPivotV3ExportSheetDataForChart('lazy-export', first);
+  expect(getPivotV3ExportSheetDataForChart('lazy-export')).toEqual([]);
+  expect(first).not.toHaveBeenCalled();
+  expect(second).toHaveBeenCalledTimes(1);
+  unregisterPivotV3ExportSheetDataForChart('lazy-export', second);
+});

@@ -48,3 +48,41 @@ export interface ChartDataClient {
   fetch(params: ChartDataFetchParams): Promise<ChartDataQueryResult[]>;
   cancel(requestGroupId: string): void;
 }
+
+/** Preserves server warnings and marks a limit-sized result as incomplete. */
+export const collectChartDataWarnings = (
+  result: {
+    warnings?: ChartDataWarning[];
+    rowcount?: number;
+    query?: unknown;
+    query_name?: unknown;
+  },
+  configuredLimit?: number | string | null,
+): ChartDataWarning[] => {
+  const warnings = result.warnings ?? [];
+  const rowLimit = Number(configuredLimit);
+  if (
+    !Number.isFinite(rowLimit) ||
+    rowLimit <= 0 ||
+    result.rowcount !== rowLimit ||
+    warnings.some(warning => warning.type === 'truncation')
+  )
+    return warnings;
+  return [
+    ...warnings,
+    {
+      type: 'truncation',
+      rowLimit,
+      rowcount: result.rowcount,
+      queryName:
+        typeof result.query === 'object' &&
+        result.query !== null &&
+        'query_name' in result.query &&
+        typeof result.query.query_name === 'string'
+          ? result.query.query_name
+          : typeof result.query_name === 'string'
+            ? result.query_name
+            : undefined,
+    },
+  ];
+};

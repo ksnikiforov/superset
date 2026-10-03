@@ -280,7 +280,7 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
     },
   );
 
-  it('expands product rows from a metric node when metrics sit in the middle', async () => {
+  test('expands product rows from a metric node when metrics sit in the middle', async () => {
     const treeRaw = buildTreeFromRecords(
       [{ group: 'Bikes', product: 'Bike1', m1: 10, m2: 20 }],
       ['m1', 'm2'],
@@ -369,7 +369,7 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
     });
   });
 
-  it('expands ship mode before metrics when metrics sit after return flag', async () => {
+  test('expands ship mode before metrics when metrics sit after return flag', async () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = [
       'shipMode',
@@ -532,7 +532,7 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
     ).not.toBeInTheDocument();
   });
 
-  it('keeps metric values when expanding another ship mode after deep expansion', async () => {
+  test('keeps metric values when expanding another ship mode after deep expansion', async () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = [
       'shipMode',
@@ -698,7 +698,7 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
     ).toBeInTheDocument();
   });
 
-  it('shows dimension rows before metrics when totals data includes metric-only rows', async () => {
+  test('shows dimension rows before metrics when totals data includes metric-only rows', async () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = ['orderPriority', 'shipMode', 'orderStatus'];
     const colGroupby = ['shipInstruction', 'customerSegment', 'returnFlag'];

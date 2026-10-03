@@ -206,7 +206,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     },
   );
 
-  it('recalculates lower levels after expanding orderPriority above Values', async () => {
+  test('recalculates lower levels after expanding orderPriority above Values', async () => {
     const records = [
       {
         orderPriority: '1-URGENT',
@@ -245,26 +245,6 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
         orderColGroupby,
         2,
       );
-
-    const buildCollapsedBranch = (rowDepth: number) => {
-      const collapsedGroupby = ['orderPriority', 'orderStatus'];
-      return applyMetricAxis(
-        buildTreeFromRecords(
-          records,
-          metrics,
-          collapsedGroupby,
-          orderColGroupby,
-          rowDepth,
-          1,
-        ),
-        metrics,
-        MetricsLayoutEnum.ROWS,
-        collapsedGroupby,
-        orderColGroupby,
-        1,
-      );
-    };
-    void buildCollapsedBranch;
 
     const baseTree = buildTreeAtDepth(1);
     const shipModeBranch = buildTreeAtDepth(3);
@@ -362,7 +342,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     expect(statusRow).toBeTruthy();
   });
 
-  it('duplicates metric and shipInstruction expansions when expanding above metrics with multiple prefixes', async () => {
+  test('duplicates metric and shipInstruction expansions when expanding above metrics with multiple prefixes', async () => {
     const rowGroupby = [
       'shipMode',
       'orderStatus',
@@ -583,17 +563,6 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
       expect(within(tbody).getByText(/^F$/)).toBeInTheDocument();
       expect(within(tbody).getByText(/^O$/)).toBeInTheDocument();
     });
-
-    const rows = Array.from(
-      tbody.querySelectorAll<HTMLElement>('tr'),
-    ) as HTMLElement[];
-    const getIndent = (row: HTMLElement) =>
-      Number.parseInt(
-        (row.querySelector('div') as HTMLElement)?.style.paddingLeft || '0',
-        10,
-      );
-    void rows;
-    void getIndent;
     expect(within(tbody).getAllByText('COLLECT COD').length).toBeGreaterThan(0);
 
     const expandedMetricRows = within(tbody)
@@ -606,7 +575,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     expect(expandedMetricRows.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('keeps orderStatus rows under Values after expanding orderPriority', async () => {
+  test('keeps orderStatus rows under Values after expanding orderPriority', async () => {
     const records = [
       {
         orderPriority: '1-URGENT',
@@ -645,26 +614,6 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
         orderColGroupby,
         2,
       );
-
-    const buildCollapsedBranch = (rowDepth: number) => {
-      const collapsedGroupby = ['orderPriority', 'orderStatus'];
-      return applyMetricAxis(
-        buildTreeFromRecords(
-          records,
-          metrics,
-          collapsedGroupby,
-          orderColGroupby,
-          rowDepth,
-          1,
-        ),
-        metrics,
-        MetricsLayoutEnum.ROWS,
-        collapsedGroupby,
-        orderColGroupby,
-        1,
-      );
-    };
-    void buildCollapsedBranch;
 
     const baseTree = buildTreeAtDepth(1);
     const shipModeBranch = buildTreeAtDepth(3);
@@ -746,7 +695,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     expect(within(tbody).getAllByText(/^O$/)).toHaveLength(1);
   });
 
-  it('keeps metrics collapsed after collapsing a partially expanded parent', async () => {
+  test('keeps metrics collapsed after collapsing a partially expanded parent', async () => {
     const rowGroupby = [
       'shipMode',
       'orderStatus',
@@ -971,7 +920,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     expect(within(tbody).queryByText('COLLECT COD')).not.toBeInTheDocument();
   });
 
-  it('keeps returnFlag rows nested under metrics after expanding orderPriority', async () => {
+  test('keeps returnFlag rows nested under metrics after expanding orderPriority', async () => {
     const rowGroupby = [
       'orderPriority',
       'shipMode',
@@ -1015,29 +964,6 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
         colGroupby,
         2,
       );
-    const buildCollapsedBranch = (data: typeof records, rowDepth: number) => {
-      const collapsedGroupby = [
-        'orderPriority',
-        'returnFlag',
-        'shipInstruction',
-      ];
-      return applyMetricAxis(
-        buildTreeFromRecords(
-          data,
-          metrics,
-          collapsedGroupby,
-          colGroupby,
-          rowDepth,
-          1,
-        ),
-        metrics,
-        MetricsLayoutEnum.ROWS,
-        collapsedGroupby,
-        colGroupby,
-        1,
-      );
-    };
-    void buildCollapsedBranch;
 
     const baseTree = buildTreeAtDepth(records, 1);
     const shipModeBranch = buildTreeAtDepth(records, 3);
@@ -1165,7 +1091,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     });
   });
 
-  it('keeps returnFlag rows nested after collapsing and expanding another orderPriority', async () => {
+  test('keeps returnFlag rows nested after collapsing and expanding another orderPriority', async () => {
     const rowGroupby = [
       'orderPriority',
       'shipMode',
@@ -1209,29 +1135,6 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
         colGroupby,
         2,
       );
-    const buildCollapsedBranch = (data: typeof records, rowDepth: number) => {
-      const collapsedGroupby = [
-        'orderPriority',
-        'returnFlag',
-        'shipInstruction',
-      ];
-      return applyMetricAxis(
-        buildTreeFromRecords(
-          data,
-          metrics,
-          collapsedGroupby,
-          colGroupby,
-          rowDepth,
-          1,
-        ),
-        metrics,
-        MetricsLayoutEnum.ROWS,
-        collapsedGroupby,
-        colGroupby,
-        1,
-      );
-    };
-    void buildCollapsedBranch;
 
     const baseTree = buildTreeAtDepth(records, 1);
     const urgentRecords = records.filter(
@@ -1394,7 +1297,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
       });
   });
 
-  it('preserves returnFlag expansion when expanding orderPriority after a metric expand', async () => {
+  test('preserves returnFlag expansion when expanding orderPriority after a metric expand', async () => {
     const rowGroupby = [
       'orderPriority',
       'shipMode',
@@ -1438,29 +1341,6 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
         colGroupby,
         2,
       );
-    const buildCollapsedBranch = (data: typeof records, rowDepth: number) => {
-      const collapsedGroupby = [
-        'orderPriority',
-        'returnFlag',
-        'shipInstruction',
-      ];
-      return applyMetricAxis(
-        buildTreeFromRecords(
-          data,
-          metrics,
-          collapsedGroupby,
-          colGroupby,
-          rowDepth,
-          1,
-        ),
-        metrics,
-        MetricsLayoutEnum.ROWS,
-        collapsedGroupby,
-        colGroupby,
-        1,
-      );
-    };
-    void buildCollapsedBranch;
 
     const baseTree = buildTreeAtDepth(records, 1);
     const shipInstructionBranch = buildTreeAtDepth(records, 4);

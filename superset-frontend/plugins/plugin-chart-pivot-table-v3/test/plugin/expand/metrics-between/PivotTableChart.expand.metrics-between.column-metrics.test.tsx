@@ -114,7 +114,7 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
     );
   };
 
-  it('renders metric headers without prefixed group labels when metrics are between columns', async () => {
+  test('renders metric headers without prefixed group labels when metrics are between columns', async () => {
     const baseTree = buildBaseTree();
 
     const { container } = render(
@@ -173,7 +173,7 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
     expect(headerLabels).not.toContain('REV-A measure1');
   });
 
-  it('expands a metric column to load the next dimension when metrics are between columns', async () => {
+  test('expands a metric column to load the next dimension when metrics are between columns', async () => {
     const baseTree = buildBaseTree();
     const branchTree = buildCollapsedBranch();
 
@@ -243,7 +243,7 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
     ).toBeInTheDocument();
   });
 
-  it('keeps the next column level visible when metric subtotals exist', async () => {
+  test('keeps the next column level visible when metric subtotals exist', async () => {
     const baseTree = buildBaseTree();
     const branchTree = buildCollapsedBranch();
     const metricToken = encodeMetricKey('measure1');
@@ -325,7 +325,7 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
     expect(await findByText('C2-A')).toBeInTheDocument();
   });
 
-  it('refetches the next column level after collapsing a metric expansion', async () => {
+  test('refetches the next column level after collapsing a metric expansion', async () => {
     const expandedMetrics = ['measure1', 'measure2', 'measure3', 'measure4'];
     const expandedRowGroupby = [
       'orderPriority',
@@ -362,24 +362,6 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
       expandedColGroupby,
       2,
     );
-
-    const collapsedColGroupby = ['col1', 'col3', 'col4'];
-    const metricBranch = applyMetricAxis(
-      buildTreeFromRecords(
-        [expandedRecord],
-        expandedMetrics,
-        expandedRowGroupby,
-        collapsedColGroupby,
-        1,
-        2,
-      ),
-      expandedMetrics,
-      MetricsLayoutEnum.COLUMNS,
-      expandedRowGroupby,
-      collapsedColGroupby,
-      1,
-    );
-    void metricBranch;
     const col1Branch = applyMetricAxis(
       buildTreeFromRecords(
         [expandedRecord],
@@ -445,11 +427,6 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
     expect(await findByText('C2-A')).toBeInTheDocument();
-
-    const collapseMetricCell = within(thead)
-      .getByText('measure1')
-      .closest('th') as HTMLElement;
-    void collapseMetricCell;
     expect(await findByText('C2-A')).toBeInTheDocument();
     expect(within(thead).queryByText('C3-A')).not.toBeInTheDocument();
   });

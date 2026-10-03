@@ -99,6 +99,16 @@ Tutorial Dashboard. Finally, select **Save & Go To Dashboard**.
 
 <img src={useBaseUrl("/img/tutorial/save_tutorial_table.png" )} />
 
+### Pivot Table v3
+
+Pivot Table v3 loads database aggregates as you expand row and column branches. The table remains interactive while requests run. If both axes are expanding, their new cells appear together once the required intersections have loaded. Collapsing a branch cancels pending expansions and retains the last completed view.
+
+A row-limit warning means the returned data may be incomplete. Increase the chart's row limit or narrow its filters before retrying. A request that exceeds 30 seconds reports an error; **Retry** repeats the failed expansion or layout/filter change.
+
+Click a selected cell again to clear its cross-filter. Sortable column headers also respond to **Enter** and **Space**. Excel export preserves dimension, metric, and value-tier row labels and keeps hidden parent values blank.
+
+Formatting formulas accept data-dependent arithmetic such as `=1/value`. Formulas are limited to 4096 characters and referenced ranges to 4096 cells.
+
 ### Dashboard Basics
 
 Next, we are going to explore the dashboard interface. If you’ve followed the previous section, you

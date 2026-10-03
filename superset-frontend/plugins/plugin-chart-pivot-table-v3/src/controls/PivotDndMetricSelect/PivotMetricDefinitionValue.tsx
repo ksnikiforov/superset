@@ -114,9 +114,8 @@ const toAdhocMetricInput = (
   metric: Exclude<QueryFormMetric, string>,
 ): AdhocMetricInput => metric as AdhocMetricInput;
 
-const normalizeAdhocExpressionType = (
-  metric: AdhocMetric,
-): 'SIMPLE' | 'SQL' => (metric.expressionType === 'SQL' ? 'SQL' : 'SIMPLE');
+const normalizeAdhocExpressionType = (metric: AdhocMetric): 'SIMPLE' | 'SQL' =>
+  metric.expressionType === 'SQL' ? 'SQL' : 'SIMPLE';
 
 const rgbToHex = (color: ColorValue): string => {
   const { r, g, b, a = 1 } = color.toRgb();

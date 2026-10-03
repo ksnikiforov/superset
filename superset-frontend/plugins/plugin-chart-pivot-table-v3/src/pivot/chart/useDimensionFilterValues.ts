@@ -25,6 +25,7 @@ import {
 } from '@superset-ui/core';
 import { GenericDataType } from '@apache-superset/core/common';
 import { isEqual } from 'lodash';
+import { nanoid } from 'nanoid';
 import { type PivotTableQueryFormData } from '../../types';
 import { getStableColumnKey } from '../../utils';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
@@ -123,7 +124,22 @@ export const useDimensionFilterValues = ({
       }),
     [dimensions, fetchedValues, searchText, treeValues],
   );
+  const requestPrefix = useMemo(
+    () => `${DIMENSION_VALUES_REQUEST_GROUP}-${nanoid()}`,
+    [],
+  );
+  const activeGroups = useRef(new Set<string>());
   const valuesVersion = useRef(0);
+  useEffect(
+    () => () => {
+      valuesVersion.current += 1;
+      activeGroups.current.forEach(group =>
+        supersetChartDataClient.cancel(group),
+      );
+      activeGroups.current.clear();
+    },
+    [],
+  );
   const requestVersion = useRef<Record<string, number>>({});
   const treeValuesRef = useRef(treeValues);
 
@@ -133,6 +149,11 @@ export const useDimensionFilterValues = ({
     }
     treeValuesRef.current = treeValues;
     valuesVersion.current += 1;
+    activeGroups.current.forEach(group =>
+      supersetChartDataClient.cancel(group),
+    );
+    activeGroups.current.clear();
+    setLoading({});
     setFetchedValues({});
     setSearchText({});
   }, [treeValues]);
@@ -154,6 +175,8 @@ export const useDimensionFilterValues = ({
       const nextRequestVersion =
         (requestVersion.current[dimensionKey] ?? 0) + 1;
       requestVersion.current[dimensionKey] = nextRequestVersion;
+      const requestGroupId = `${requestPrefix}-${dimensionKey}`;
+      activeGroups.current.add(requestGroupId);
       try {
         const selection = { ...selectedFilters };
         delete selection[dimensionKey];
@@ -175,7 +198,7 @@ export const useDimensionFilterValues = ({
         const results = await supersetChartDataClient.fetch({
           formData: normalizedFormData,
           specs: [spec],
-          requestGroupId: `${DIMENSION_VALUES_REQUEST_GROUP}-${dimensionKey}`,
+          requestGroupId,
         });
         if (
           valuesVersion.current !== currentValuesVersion ||
@@ -205,7 +228,11 @@ export const useDimensionFilterValues = ({
         }
         // Ignore errors for dimension value lookups; filtering still works.
       } finally {
-        if (requestVersion.current[dimensionKey] === nextRequestVersion) {
+        if (
+          valuesVersion.current === currentValuesVersion &&
+          requestVersion.current[dimensionKey] === nextRequestVersion
+        ) {
+          activeGroups.current.delete(requestGroupId);
           setLoading(current => {
             if (!current[dimensionKey]) {
               return current;
@@ -217,7 +244,7 @@ export const useDimensionFilterValues = ({
         }
       }
     },
-    [colTypeMap, formData, selectedFilters],
+    [colTypeMap, formData, selectedFilters, requestPrefix],
   );
 
   return {

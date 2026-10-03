@@ -159,7 +159,9 @@ describe('PivotTableChart interaction filter search', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(fetchMock).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        requestGroupId: 'pivot-v3-dimension-values-row1',
+        requestGroupId: expect.stringMatching(
+          /^pivot-v3-dimension-values-.+-row1$/,
+        ),
         specs: [
           expect.objectContaining({
             queryName: 'pivot_v3|dimension-values|row1',

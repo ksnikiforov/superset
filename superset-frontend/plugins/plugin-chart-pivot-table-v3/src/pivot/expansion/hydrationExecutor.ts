@@ -69,6 +69,8 @@ export const executeExpansionHydrationForIntent = async ({
   completeBehavior = 'returnTree',
   currentTree,
   expanded,
+  getExpanded = () => expanded,
+  getCommittedExpanded = () => expanded,
   expansionInstanceId,
   factStore,
   fetchFormData,
@@ -83,6 +85,8 @@ export const executeExpansionHydrationForIntent = async ({
   completeBehavior?: 'returnTree' | 'skip';
   currentTree: PivotTreeData;
   expanded: AxisSetMap;
+  getExpanded?: () => AxisSetMap;
+  getCommittedExpanded?: () => AxisSetMap;
   expansionInstanceId: string;
   factStore: PivotFactStore;
   fetchFormData: PivotTableQueryFormData;
@@ -93,12 +97,18 @@ export const executeExpansionHydrationForIntent = async ({
   queryContextKey: string;
   visibleLoadingKeys?: Set<string>;
 }) => {
+  const rootCoverageNeeds =
+    factStore.getFactBatches(queryContextKey).length === 0
+      ? fetchLayout.rootCoverageNeeds
+      : [];
+  const requested = { row: new Set(expanded.row), col: new Set(expanded.col) };
   const plan = planHydrationIteration({
     desired: {
-      row: new Set([rootKey, ...expanded.row]),
-      col: new Set([rootKey, ...expanded.col]),
+      row: new Set([rootKey, ...requested.row]),
+      col: new Set([rootKey, ...requested.col]),
     },
     axisCoverageNeeds,
+    rootCoverageNeeds,
     factSelectors: factStore.getCoverageSelectors(queryContextKey),
     program,
     queryContextKey,
@@ -136,6 +146,35 @@ export const executeExpansionHydrationForIntent = async ({
         shouldContinue: scope.isCurrent,
         yieldToMain: yieldToMainThread,
       });
+      const sameSet = (left: Set<string>, right: Set<string>) =>
+        left.size === right.size && [...left].every(key => right.has(key));
+      const revealableIntent = () => {
+        const desired = getExpanded();
+        const committed = getCommittedExpanded();
+        const bothAxesPending =
+          !sameSet(desired.row, committed.row) &&
+          !sameSet(desired.col, committed.col);
+        const candidate = bothAxesPending
+          ? desired
+          : {
+              row: new Set([...committed.row, ...requested.row]),
+              col: new Set([...committed.col, ...requested.col]),
+            };
+        const ready =
+          planHydrationIteration({
+            desired: {
+              row: new Set([rootKey, ...candidate.row]),
+              col: new Set([rootKey, ...candidate.col]),
+            },
+            axisCoverageNeeds,
+            rootCoverageNeeds,
+            factSelectors: factStore.getCoverageSelectors(queryContextKey),
+            program,
+            queryContextKey,
+          }).kind === 'complete';
+        return ready ? candidate : undefined;
+      };
+      if (!scope.isCurrent() || !revealableIntent()) return {};
       const tree = await materializeLoadedPivotTreeFromFactStoreAsync({
         store: factStore,
         layout: fetchLayout,
@@ -143,7 +182,10 @@ export const executeExpansionHydrationForIntent = async ({
         shouldContinue: scope.isCurrent,
         yieldToMain: yieldToMainThread,
       });
-      return scope.isCurrent() ? { tree, warnings } : {};
+      const revealedExpanded = revealableIntent();
+      return scope.isCurrent() && revealedExpanded
+        ? { tree, warnings, revealedExpanded }
+        : {};
     } finally {
       scope.finish(requestGroupId);
     }

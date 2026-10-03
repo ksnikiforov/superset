@@ -138,7 +138,7 @@ describe('PivotTableChart concurrent expands', () => {
     });
   });
 
-  it('merges branches from overlapping row expansions', async () => {
+  test('merges branches from overlapping row expansions', async () => {
     const baseTree = buildTree(records, 1);
     const branchA = buildTree(
       records.filter(row => row.r1 === 'A'),
@@ -226,7 +226,7 @@ describe('PivotTableChart concurrent expands', () => {
     });
   });
 
-  it('renders same-axis expansions as soon as each branch arrives (does not wait for all in-flight expands)', async () => {
+  test('renders same-axis expansions as soon as each branch arrives (does not wait for all in-flight expands)', async () => {
     const baseTree = buildTree(records, 1);
     const branchA = buildTree(
       records.filter(row => row.r1 === 'A'),

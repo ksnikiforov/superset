@@ -85,7 +85,7 @@ describe('PivotTableChart persisted prefetch merges concurrent results', () => {
     fetchPivotExpansionMock.mockReset();
   });
 
-  it('renders both branches when prefetch fetches resolve out of order', async () => {
+  test('renders both branches when prefetch fetches resolve out of order', async () => {
     const records = [
       { r1: 'A', r2: 'X', m1: 10 },
       { r1: 'A', r2: 'Y', m1: 11 },

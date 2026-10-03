@@ -87,7 +87,7 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
     fetchPivotExpansionMock.mockReset();
   });
 
-  it('keeps the table interactive while persisted nested coverage is hydrated', async () => {
+  test('keeps the table interactive while persisted nested coverage is hydrated', async () => {
     const records = [
       { r1: 'A', r2: 'X', r3: 'P', m1: 10 },
       { r1: 'A', r2: 'X', r3: 'Q', m1: 11 },

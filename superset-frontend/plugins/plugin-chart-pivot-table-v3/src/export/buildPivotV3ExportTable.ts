@@ -47,32 +47,24 @@ type BuildPivotV3RowExportModelParams = {
 
 export const buildPivotV3RowExportModel = ({
   visibleRows,
-  rowAxisLabels,
   rowTotalLabel,
   getNodeDimDepth,
   formatLabel,
   isGrandTotalLikeRow,
   isRowAggregateBold,
 }: BuildPivotV3RowExportModelParams): PivotV3RowExportModel => {
-  if (rowAxisLabels.length === 0) {
-    return {
-      rowExportDepthCount: 0,
-      rowExportRows: new Map(),
-    };
-  }
-
   const depths = visibleRows
     .filter(row => !isGrandTotalLikeRow(row))
-    .map(row => Math.max(getNodeDimDepth(row) - 1, 0));
+    .map(row => Math.max(getNodeDimDepth(row), 1) - 1);
   const effectiveDepths =
     depths.length > 0
       ? depths
-      : visibleRows.map(row => Math.max(getNodeDimDepth(row) - 1, 0));
+      : visibleRows.map(row => Math.max(getNodeDimDepth(row), 1) - 1);
   const maxDepth = effectiveDepths.reduce(
     (max, depth) => (depth > max ? depth : max),
     -1,
   );
-  const rowExportDepthCount = Math.min(rowAxisLabels.length, maxDepth + 1);
+  const rowExportDepthCount = maxDepth + 1;
 
   if (rowExportDepthCount <= 0) {
     return {
@@ -249,9 +241,9 @@ const buildModelHeaderRows = ({
   if (columnHeaderRows.length === 0) {
     return [
       rowExportDepthCount > 0
-        ? rowAxisLabels
-            .slice(0, rowExportDepthCount)
-            .map(label => textCell(label, true))
+        ? Array.from({ length: rowExportDepthCount }, (_, index) =>
+            textCell(rowAxisLabels[index] ?? '', true),
+          )
         : [textCell(rowCornerLabel, true)],
     ];
   }
@@ -380,22 +372,23 @@ export const buildPivotV3ExportSheetModel = ({
 };
 
 const pivotV3ExportRegistryHost = globalThis as typeof globalThis & {
-  __supersetPivotV3ExportSheetDataByChartId?: Map<
-    string,
-    PivotV3ExportSheetCell[][]
-  >;
+  __supersetPivotV3ExportSheetDataByChartId?: Map<string, ExportSheetSource>;
 };
 const pivotV3ExportSheetDataByChartId =
   pivotV3ExportRegistryHost.__supersetPivotV3ExportSheetDataByChartId ??
-  new Map<string, PivotV3ExportSheetCell[][]>();
+  new Map<string, ExportSheetSource>();
 pivotV3ExportRegistryHost.__supersetPivotV3ExportSheetDataByChartId =
   pivotV3ExportSheetDataByChartId;
 
 const normalizeExportChartId = (chartId: string | number) => String(chartId);
 
+type ExportSheetSource =
+  | PivotV3ExportSheetCell[][]
+  | (() => PivotV3ExportSheetCell[][]);
+
 export const registerPivotV3ExportSheetDataForChart = (
   chartId: string | number,
-  sheetData: PivotV3ExportSheetCell[][],
+  sheetData: ExportSheetSource,
 ) => {
   pivotV3ExportSheetDataByChartId.set(
     normalizeExportChartId(chartId),
@@ -405,7 +398,7 @@ export const registerPivotV3ExportSheetDataForChart = (
 
 export const unregisterPivotV3ExportSheetDataForChart = (
   chartId: string | number,
-  sheetData?: PivotV3ExportSheetCell[][],
+  sheetData?: ExportSheetSource,
 ) => {
   const normalizedChartId = normalizeExportChartId(chartId);
   if (
@@ -419,5 +412,9 @@ export const unregisterPivotV3ExportSheetDataForChart = (
 
 export const getPivotV3ExportSheetDataForChart = (
   chartId: string | number,
-): PivotV3ExportSheetCell[][] | undefined =>
-  pivotV3ExportSheetDataByChartId.get(normalizeExportChartId(chartId));
+): PivotV3ExportSheetCell[][] | undefined => {
+  const source = pivotV3ExportSheetDataByChartId.get(
+    normalizeExportChartId(chartId),
+  );
+  return typeof source === 'function' ? source() : source;
+};

@@ -75,8 +75,7 @@ export default function transformProps(
     theme,
     ownState,
   } = chartProps;
-  const chartId = (chartProps as ChartProps & { chartId?: number | string })
-    .chartId;
+  const { chartId } = chartProps as ChartProps & { chartId?: number | string };
   const { setDataMask = () => {}, onContextMenu, setControlValue } = hooks;
   const baseFormData = rawFormDataCamel as PivotTableQueryFormData;
   const rawFormData = rawFormDataBase as PivotTableQueryFormData;
@@ -114,7 +113,7 @@ export default function transformProps(
   );
   const baseMetricLabelOverrides = {
     ...metricLabelMapBase,
-    ...(baseFormData.metricLabelMap ?? {}),
+    ...baseFormData.metricLabelMap,
   };
   const datasourceVerboseMap = datasource?.verboseMap ?? {};
   const columnFormats = datasource?.columnFormats ?? {};
@@ -145,7 +144,7 @@ export default function transformProps(
     ...columnVerboseMap,
     ...rawDatasourceVerboseMap,
     ...datasourceVerboseMap,
-    ...(baseFormData.verboseMap ?? {}),
+    ...baseFormData.verboseMap,
   };
   const metricLabelMap = Object.fromEntries(
     buildResolvedMetricLabelMap({

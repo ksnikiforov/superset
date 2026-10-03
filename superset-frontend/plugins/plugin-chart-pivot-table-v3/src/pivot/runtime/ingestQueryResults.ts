@@ -29,6 +29,7 @@ import { type PlannedQuerySpec } from '../query/specs';
 import {
   type ChartDataQueryResult,
   type ChartDataWarning,
+  collectChartDataWarnings,
 } from '../data/ChartDataClient';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { type PivotFactCoverage } from './types';
@@ -60,6 +61,8 @@ export const collectPlannedQueryWarnings = (
 ): ChartDataWarning[] => results.flatMap(result => result.warnings ?? []);
 
 type QueryResultWithData = {
+  rowcount?: number;
+  warnings?: ChartDataWarning[];
   data?: DataRecord[] | Record<string, unknown>[];
   query?:
     | string
@@ -71,6 +74,7 @@ type QueryResultWithData = {
 
 type IngestedQueryResult = {
   spec: PlannedQuerySpec;
+  complete: boolean;
   facts: PivotFact[];
 };
 
@@ -217,6 +221,9 @@ export const ingestQueryResults = <T extends QueryResultWithData>({
     const result = orderedResults[idx] ?? {};
     return {
       spec,
+      complete: !result.warnings?.some(
+        warning => warning.type === 'truncation',
+      ),
       facts: factsFromRecords({
         result,
         metrics: spec.metrics,
@@ -246,6 +253,9 @@ const ingestQueryResultsAsync = async <T extends QueryResultWithData>({
     const result = orderedResults[idx] ?? {};
     ingested.push({
       spec,
+      complete: !result.warnings?.some(
+        warning => warning.type === 'truncation',
+      ),
       // eslint-disable-next-line no-await-in-loop
       facts: await factsFromRecordsAsync({
         result,
@@ -270,8 +280,10 @@ const ingestQueryResultsAsync = async <T extends QueryResultWithData>({
 const factStoreBatchFromIngested = ({
   spec,
   facts,
-}: Pick<IngestedQueryResult, 'spec' | 'facts'>): PivotFactStoreBatch => ({
+  complete,
+}: IngestedQueryResult): PivotFactStoreBatch => ({
   ...spec.meta.factSelector,
+  complete,
   facts,
 });
 
@@ -368,7 +380,7 @@ export const fetchPlannedQuerySpecs = async ({
       ...missingSpecs.flatMap(spec => spec.meta.requiredTimeOffsets),
     ]),
   );
-  const results = await supersetChartDataClient.fetch({
+  const fetchedResults = await supersetChartDataClient.fetch({
     formData: {
       ...formData,
       ...(timeOffsets.length > 0 ? { time_offsets: timeOffsets } : {}),
@@ -376,6 +388,10 @@ export const fetchPlannedQuerySpecs = async ({
     specs: missingSpecs,
     requestGroupId,
   });
+  const results = fetchedResults.map(result => ({
+    ...result,
+    warnings: collectChartDataWarnings(result, formData.row_limit),
+  }));
   if (factStore) {
     await upsertQueryResultsIntoFactStoreAsync({
       store: factStore,
@@ -385,6 +401,15 @@ export const fetchPlannedQuerySpecs = async ({
       shouldContinue,
       yieldToMain,
     });
+  }
+  if (
+    results.some(result =>
+      result.warnings?.some(warning => warning.type === 'truncation'),
+    )
+  ) {
+    throw new Error(
+      'Pivot query reached the row limit. Increase the row limit or narrow the filters before retrying.',
+    );
   }
   return { results };
 };
@@ -400,9 +425,14 @@ export const buildInitialRuntimeFromSpecResults = ({
   layout: LayoutContext;
   formData: PivotTableQueryFormData;
 }): { tree: PivotTreeData; factBatches: PivotFactStoreBatch[] } => {
-  const factBatches = ingestQueryResults({ specs, results }).map(
-    factStoreBatchFromIngested,
-  );
+  const initialResults = results.map(result => ({
+    ...result,
+    warnings: collectChartDataWarnings(result, formData.row_limit),
+  }));
+  const factBatches = ingestQueryResults({
+    specs,
+    results: initialResults,
+  }).map(factStoreBatchFromIngested);
   const store = createPivotFactStoreFromBatches(factBatches);
   return {
     tree: materializeLoadedPivotTreeFromFactStore({

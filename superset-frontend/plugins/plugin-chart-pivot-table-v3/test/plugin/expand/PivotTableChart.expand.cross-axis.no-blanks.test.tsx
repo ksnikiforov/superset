@@ -141,7 +141,7 @@ describe('PivotTableChart cross-axis expands (no blanks)', () => {
     fetchPivotBranchMock.mockReset();
   });
 
-  it('does not expose deep row+col intersections until required intersection values are available', async () => {
+  test('does not expose deep row+col intersections until required intersection values are available', async () => {
     const baseTree = buildTree(records, 1, 1);
     const fullRowBranch = buildTree(
       records.filter(row => row.r1 === 'A'),

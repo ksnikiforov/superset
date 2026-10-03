@@ -62,7 +62,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
     verboseMap: {},
   };
 
-  it('shows first column level when collapsed with initialDepth=1', () => {
+  test('shows first column level when collapsed with initialDepth=1', () => {
     metricsVariants.forEach(metrics => {
       const treeRaw = buildTreeFromRecords(
         [
@@ -140,7 +140,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
     });
   });
 
-  it('renders top-level column headers for multi-column layout when data is present', () => {
+  test('renders top-level column headers for multi-column layout when data is present', () => {
     const metrics = ['quantitySold'];
     const treeRaw = buildTreeFromRecords(
       [
@@ -232,7 +232,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
 
   // transformProps-driven header regressions now live in transformProps tests.
 
-  it('does not render row grand total when row totals/subtotals are disabled', () => {
+  test('does not render row grand total when row totals/subtotals are disabled', () => {
     metricsVariants.forEach(metrics => {
       const treeRaw = buildTreeFromRecords(
         [
@@ -314,7 +314,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
     });
   });
 
-  it('hides row subtotals when rowSubTotals is disabled', () => {
+  test('hides row subtotals when rowSubTotals is disabled', () => {
     const rootKey = serializePath([]);
     const subtotalRowKey = serializePath([SUBTOTAL_TOKEN]);
     const metrics = ['metric1', 'metric2', 'metric3'];

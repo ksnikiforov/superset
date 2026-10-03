@@ -80,7 +80,7 @@ const filterMissingTargets = ({
 };
 
 describe('expansion fact coverage', () => {
-  it('derives loaded expansion coverage from typed fact selectors', () => {
+  test('derives loaded expansion coverage from typed fact selectors', () => {
     const program = compilePivotProgram({
       groupbyRows: ['country', 'city'],
       groupbyColumns: ['year', 'quarter', 'month', 'day'],
@@ -228,7 +228,7 @@ describe('coverage manifest diff', () => {
     valueKeys: ['sales'],
   });
 
-  it('treats explicit path sets as bounded coverage needs', () => {
+  test('treats explicit path sets as bounded coverage needs', () => {
     const required = [
       need(
         { kind: 'paths', paths: [['Germany'], ['France']] },
@@ -250,7 +250,7 @@ describe('coverage manifest diff', () => {
     ).toEqual([]);
   });
 
-  it('does not treat one explicit branch as covering a sibling path set', () => {
+  test('does not treat one explicit branch as covering a sibling path set', () => {
     const required = [
       need(
         { kind: 'paths', paths: [['Germany'], ['France']] },
@@ -266,7 +266,7 @@ describe('coverage manifest diff', () => {
     ).toEqual(required);
   });
 
-  it('lets exact-depth root coverage satisfy narrower explicit path needs', () => {
+  test('lets exact-depth root coverage satisfy narrower explicit path needs', () => {
     const required = [
       need(
         { kind: 'paths', paths: [['Germany']] },
@@ -282,7 +282,7 @@ describe('coverage manifest diff', () => {
     ).toEqual([]);
   });
 
-  it('does not let shallower root coverage satisfy deeper explicit path needs', () => {
+  test('does not let shallower root coverage satisfy deeper explicit path needs', () => {
     const required = [
       need(
         { kind: 'paths', paths: [['Germany']] },
@@ -298,7 +298,7 @@ describe('coverage manifest diff', () => {
     ).toEqual(required);
   });
 
-  it('treats scoped full expansion as bounded to the concrete ancestor path', () => {
+  test('treats scoped full expansion as bounded to the concrete ancestor path', () => {
     const required = [
       need({ kind: 'scopedFull', ancestorPaths: [['USA']] }, { kind: 'root' }),
     ];
@@ -317,7 +317,7 @@ describe('coverage manifest diff', () => {
     ).toEqual(required);
   });
 
-  it('does not let a narrower descendant branch satisfy scoped full ancestor coverage', () => {
+  test('does not let a narrower descendant branch satisfy scoped full ancestor coverage', () => {
     const required = [
       need({ kind: 'scopedFull', ancestorPaths: [['USA']] }, { kind: 'root' }),
     ];
@@ -330,7 +330,7 @@ describe('coverage manifest diff', () => {
     ).toEqual(required);
   });
 
-  it('lets broader scoped coverage satisfy a narrower scoped full descendant', () => {
+  test('lets broader scoped coverage satisfy a narrower scoped full descendant', () => {
     const required = [
       need(
         { kind: 'scopedFull', ancestorPaths: [['USA', 'California']] },
@@ -346,7 +346,7 @@ describe('coverage manifest diff', () => {
     ).toEqual([]);
   });
 
-  it('lets a batched scoped parent satisfy narrower scoped full descendants', () => {
+  test('lets a batched scoped parent satisfy narrower scoped full descendants', () => {
     const required = [
       need(
         {
@@ -374,7 +374,7 @@ describe('coverage manifest diff', () => {
     ).toEqual([]);
   });
 
-  it('lets separate exact branch batches satisfy a path-set request', () => {
+  test('lets separate exact branch batches satisfy a path-set request', () => {
     const required = [
       need({ kind: 'paths', paths: [['USA'], ['Canada']] }, { kind: 'root' }),
     ];
@@ -390,7 +390,7 @@ describe('coverage manifest diff', () => {
     ).toEqual([]);
   });
 
-  it('does not let deeper aggregate coverage satisfy a shallower scoped request', () => {
+  test('does not let deeper aggregate coverage satisfy a shallower scoped request', () => {
     const required = [
       need({ kind: 'paths', paths: [['USA']] }, { kind: 'root' }),
     ];
@@ -415,7 +415,7 @@ describe('coverage manifest diff', () => {
     ).toEqual(required);
   });
 
-  it('supports consecutive scoped full expansion through the same ancestor scope', () => {
+  test('supports consecutive scoped full expansion through the same ancestor scope', () => {
     const required = [
       {
         ...need(
@@ -449,7 +449,7 @@ describe('coverage manifest diff', () => {
 });
 
 describe('initial coverage manifest', () => {
-  it('normalizes configured visible depths into scoped-full needs', () => {
+  test('normalizes configured visible depths into scoped-full needs', () => {
     expect(
       resolveInitialVisibleAxisDepth({
         configuredDepth: 2.7,
@@ -508,7 +508,7 @@ describe('initial coverage manifest', () => {
 });
 
 describe('branch fact coverage', () => {
-  it('matches rendered metric-first expansion paths to semantic fact coverage', () => {
+  test('matches rendered metric-first expansion paths to semantic fact coverage', () => {
     const program = compilePivotProgram({
       groupbyRows: [METRICS_PLACEHOLDER, 'returnFlag', 'orderPriority'],
       groupbyColumns: ['shipMode'],
@@ -545,7 +545,7 @@ describe('branch fact coverage', () => {
     ).toEqual([]);
   });
 
-  it.each([
+  test.each([
     ['row', MetricsLayoutEnum.ROWS],
     ['col', MetricsLayoutEnum.COLUMNS],
   ] as const)(

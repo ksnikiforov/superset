@@ -86,7 +86,7 @@ const baseTree: PivotTreeData = {
 };
 
 describe('null label formatting', () => {
-  it('labels null row values as (NULL)', () => {
+  test('labels null row values as (NULL)', () => {
     const tree = buildTreeFromRecords(
       [{ state: null, m1: 10 }],
       ['m1'],
@@ -100,7 +100,7 @@ describe('null label formatting', () => {
     expect(tree.rows[nullKey].formattedLabel).toBe('(NULL)');
   });
 
-  it('renders null column headers as (NULL)', () => {
+  test('renders null column headers as (NULL)', () => {
     const nullKey = serializePath([null]);
     const nullNode: PivotTreeNode = {
       axis: 'col',
@@ -117,7 +117,7 @@ describe('null label formatting', () => {
     expect(rows[0][0].node.formattedLabel).toBe('(NULL)');
   });
 
-  it('uses the deepest column path length for header rows', () => {
+  test('uses the deepest column path length for header rows', () => {
     const colKey = serializePath(['A', 'B', 'C']);
     const colNode: PivotTreeNode = {
       axis: 'col',
@@ -135,7 +135,7 @@ describe('null label formatting', () => {
 });
 
 describe('metric label display', () => {
-  it('uses metric display labels in column headers', () => {
+  test('uses metric display labels in column headers', () => {
     const metricKey = 'sum__revenue';
     const metricLabelMap: Record<string, string> = {
       [metricKey]: 'Revenue',
@@ -169,7 +169,7 @@ describe('metric label display', () => {
 });
 
 describe('applyMetricAxis', () => {
-  it('preserves dimension nodes when metrics are inserted at the front of rows', () => {
+  test('preserves dimension nodes when metrics are inserted at the front of rows', () => {
     const result = applyMetricAxis(
       baseTree,
       ['m1'],
@@ -183,7 +183,7 @@ describe('applyMetricAxis', () => {
     expect(result.rows[serializePath([encodeMetricKey('m1')])]).toBeDefined();
   });
 
-  it('preserves dimension nodes when metrics are inserted at the front of columns', () => {
+  test('preserves dimension nodes when metrics are inserted at the front of columns', () => {
     const result = applyMetricAxis(
       baseTree,
       ['m1'],
@@ -197,7 +197,7 @@ describe('applyMetricAxis', () => {
     expect(result.cols[serializePath([encodeMetricKey('m1')])]).toBeDefined();
   });
 
-  it('uses metric display labels when provided', () => {
+  test('uses metric display labels when provided', () => {
     const metricKey = 'sum__revenue';
     const metricLabelMap: Record<string, string> = {
       [metricKey]: 'Revenue',
@@ -216,7 +216,7 @@ describe('applyMetricAxis', () => {
     expect(metricNode.formattedLabel).toBe('Revenue');
   });
 
-  it('surfaces single metric values on the base column when the metric is first', () => {
+  test('surfaces single metric values on the base column when the metric is first', () => {
     const tree = {
       rows: {
         [rootKey]: {
@@ -287,7 +287,7 @@ describe('applyMetricAxis', () => {
     ).toBe(10);
   });
 
-  it('surfaces single metric values at the base row when the metric is not first', () => {
+  test('surfaces single metric values at the base row when the metric is not first', () => {
     const tree = {
       rows: {
         [rootKey]: {
@@ -365,7 +365,7 @@ describe('applyMetricAxis', () => {
 });
 
 describe('parseThemeColors', () => {
-  it('accepts common CSS color formats', () => {
+  test('accepts common CSS color formats', () => {
     expect(
       parseThemeColors(
         ' #abc, rgb(10,20,30), rgba(10, 20, 30, 0.5), hsl(120, 30%, 40%), blue, nope(1) ',
@@ -381,7 +381,7 @@ describe('parseThemeColors', () => {
 });
 
 describe('transferDimensionSettingsAcrossAxes', () => {
-  it('keeps only canonical dimension keys for formatting and sorting', () => {
+  test('keeps only canonical dimension keys for formatting and sorting', () => {
     const columns = [
       {
         expressionType: 'SQL' as const,
@@ -432,7 +432,7 @@ describe('transferDimensionSettingsAcrossAxes', () => {
     });
   });
 
-  it('moves formatting and sorting settings when axes change', () => {
+  test('moves formatting and sorting settings when axes change', () => {
     const result = transferDimensionSettingsAcrossAxes(
       ['country'],
       ['state'],
@@ -469,7 +469,7 @@ describe('transferDimensionSettingsAcrossAxes', () => {
     });
   });
 
-  it('keeps settings when axes stay the same', () => {
+  test('keeps settings when axes stay the same', () => {
     const result = transferDimensionSettingsAcrossAxes(
       ['country'],
       ['state'],
@@ -508,7 +508,7 @@ describe('transferDimensionSettingsAcrossAxes', () => {
 });
 
 describe('applyMetricAxis + buildTreeFromRecords integration', () => {
-  it('populates metric cells when metrics are on columns with no column groupby', () => {
+  test('populates metric cells when metrics are on columns with no column groupby', () => {
     const tree = buildTreeFromRecords(
       [{ priority: '1-URGENT', weightedDiscount: 0.05 }],
       ['weightedDiscount'],
@@ -535,7 +535,7 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
     ).toBe(0.05);
   });
 
-  it('merges branch data for metrics on columns when expanding column dimension', () => {
+  test('merges branch data for metrics on columns when expanding column dimension', () => {
     const baseTreeRaw = buildTreeFromRecords(
       [{ priority: '1-URGENT', weightedDiscount: 0.05 }],
       ['weightedDiscount'],
@@ -587,7 +587,7 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
     ).toBe(0.05);
   });
 
-  it('populates collapsed column cells when there is a single metric', () => {
+  test('populates collapsed column cells when there is a single metric', () => {
     const tree = buildTreeFromRecords(
       [{ priority: '1-URGENT', category: 'AUTO', metric1: 10 }],
       ['metric1'],
@@ -611,7 +611,7 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
     ).toBe(10);
   });
 
-  it('populates collapsed column cells when a single metric sits between columns', () => {
+  test('populates collapsed column cells when a single metric sits between columns', () => {
     const tree = buildTreeFromRecords(
       [
         {
@@ -642,7 +642,7 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
     ).toBe(10);
   });
 
-  it('populates collapsed row cells when there is a single metric', () => {
+  test('populates collapsed row cells when there is a single metric', () => {
     const tree = buildTreeFromRecords(
       [{ priority: '1-URGENT', sub: 'SUB1', metric1: 20 }],
       ['metric1'],
@@ -666,7 +666,7 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
     ).toBe(20);
   });
 
-  it('sets grand total labels and intersection from grand-total queries', () => {
+  test('sets grand total labels and intersection from grand-total queries', () => {
     const rootKey = serializePath([]);
     const tree = buildTreeFromRecords(
       [{ metric1: 99 }],
@@ -683,7 +683,7 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
     );
   });
 
-  it('preserves grand total cell when merging deeper branches', () => {
+  test('preserves grand total cell when merging deeper branches', () => {
     const rootKey = serializePath([]);
     const totals = buildTreeFromRecords(
       [{ metric1: 1500000 }],
@@ -710,7 +710,7 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
     ).toBe(1500000);
   });
 
-  it('preserves row totals when merging detail rows with column groupbys', () => {
+  test('preserves row totals when merging detail rows with column groupbys', () => {
     const totals = buildTreeFromRecords(
       [
         { country: 'US', metric1: 30 },
@@ -742,13 +742,13 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
 });
 
 describe('normalizeSubtotalLevels', () => {
-  it('applies legacy totals/subtotals flags', () => {
+  test('applies legacy totals/subtotals flags', () => {
     expect(normalizeSubtotalLevels(undefined, 3, true, true)).toEqual([
       0, 1, 2, 3,
     ]);
   });
 
-  it('filters out-of-range levels and dedupes', () => {
+  test('filters out-of-range levels and dedupes', () => {
     expect(normalizeSubtotalLevels([0, 1, 5, 1], 2, false, false)).toEqual([
       0, 1,
     ]);
@@ -756,7 +756,7 @@ describe('normalizeSubtotalLevels', () => {
 });
 
 describe('labelRowSubtotalLeaves', () => {
-  it('uses "<Group> Total" when there is a single metric', () => {
+  test('uses "<Group> Total" when there is a single metric', () => {
     const rootKey = serializePath([]);
     const subtotalKey = serializePath([
       'Bikes',
@@ -806,7 +806,7 @@ describe('labelRowSubtotalLeaves', () => {
     expect(labeled.rows[subtotalKey]?.formattedLabel).toBe('Bikes Total');
   });
 
-  it('uses "<Group> <Metric>" when the subtotal token follows a metric', () => {
+  test('uses "<Group> <Metric>" when the subtotal token follows a metric', () => {
     const rootKey = serializePath([]);
     const subtotalKey = serializePath([
       'Bikes',

@@ -118,7 +118,7 @@ describe('PivotTableChart coverage prefetch on persisted restore', () => {
     fetchPivotExpansionMock.mockReset();
   });
 
-  it('submits sibling expansions as one coverage request', async () => {
+  test('submits sibling expansions as one coverage request', async () => {
     const records = [
       { r1: 'A', r2: 'X', m1: 10 },
       { r1: 'A', r2: 'Y', m1: 12 },
@@ -188,7 +188,7 @@ describe('PivotTableChart coverage prefetch on persisted restore', () => {
     );
   });
 
-  it('hydrates row and column persisted targets from one coverage request', async () => {
+  test('hydrates row and column persisted targets from one coverage request', async () => {
     const records = [
       { r1: 'A', r2: 'X', c1: 'CA', c2: 'P', m1: 10 },
       { r1: 'A', r2: 'Y', c1: 'CA', c2: 'Q', m1: 12 },

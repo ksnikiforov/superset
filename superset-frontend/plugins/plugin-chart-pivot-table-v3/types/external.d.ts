@@ -18,7 +18,7 @@
  */
 
 declare module '*.png' {
-  const value: any;
+  const value: string;
   export default value;
 }
 
@@ -67,6 +67,14 @@ declare module 'fast-formula-parser' {
       position?: FormulaPosition,
       allowReturnArray?: boolean,
     ): Promise<unknown>;
+    static DepParser: {
+      new (): {
+        parse(
+          inputText: string,
+          position: FormulaPosition,
+        ): (CellRef | RangeRef)[];
+      };
+    };
     static FormulaError: { new (...args: unknown[]): Error };
   }
 }

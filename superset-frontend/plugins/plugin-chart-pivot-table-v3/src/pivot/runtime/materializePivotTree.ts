@@ -92,9 +92,9 @@ const mergeValues = <T extends { isSubtotal?: boolean }>(
     return existingValues;
   }
   if (incoming.isSubtotal) {
-    return { ...incomingValues, ...(existingValues || {}) };
+    return { ...incomingValues, ...existingValues };
   }
-  return { ...(existingValues || {}), ...incomingValues };
+  return { ...existingValues, ...incomingValues };
 };
 
 const mergeTreeValueMaps = <
@@ -103,7 +103,7 @@ const mergeTreeValueMaps = <
   left?: Record<string, T>,
   right?: Record<string, T>,
 ) => {
-  const result: Record<string, T> = { ...(left || {}) };
+  const result: Record<string, T> = { ...left };
   Object.entries(right || {}).forEach(([key, item]) => {
     const existing = result[key];
     if (!existing) {
@@ -124,7 +124,7 @@ const mergeTreeCells = (
   left?: PivotTreeData['cells'],
   right?: PivotTreeData['cells'],
 ) => {
-  const result: PivotTreeData['cells'] = { ...(left ?? {}) };
+  const result: PivotTreeData['cells'] = { ...left };
   Object.entries(right || {}).forEach(([key, cell]) => {
     const existing = result[key];
     if (!existing) {
@@ -306,7 +306,7 @@ const createFactTreeBuilder = ({
   ) => {
     const nodes = axis === 'row' ? tree.rows : tree.cols;
     const key = serializePath(path);
-    if (nodes[key]) {
+    if (Object.prototype.hasOwnProperty.call(nodes, key)) {
       return;
     }
     const groupby = axis === 'row' ? rowColumns : columnColumns;
@@ -350,13 +350,13 @@ const createFactTreeBuilder = ({
 
     if (colPath.length === 0) {
       tree.rows[rowKey].values = {
-        ...(tree.rows[rowKey].values || {}),
+        ...tree.rows[rowKey].values,
         ...values,
       };
     }
     if (rowPath.length === 0) {
       tree.cols[colKey].values = {
-        ...(tree.cols[colKey].values || {}),
+        ...tree.cols[colKey].values,
         ...values,
       };
     }
@@ -367,7 +367,7 @@ const createFactTreeBuilder = ({
       rowKey,
       colKey,
       values: {
-        ...(existingCell?.values || {}),
+        ...existingCell?.values,
         ...values,
       },
       isSubtotal:
@@ -383,8 +383,8 @@ const createFactTreeBuilder = ({
     ensureNode('row', [], 'Grand total');
     ensureNode('col', [], 'Grand total');
     const mergedRootValues = {
-      ...(tree.rows[rootKey]?.values || {}),
-      ...(tree.cols[rootKey]?.values || {}),
+      ...tree.rows[rootKey]?.values,
+      ...tree.cols[rootKey]?.values,
       ...(Object.keys(grandTotalValues).length > 0 ? grandTotalValues : {}),
     };
     const hasGrandTotalValues = Object.keys(grandTotalValues).length > 0;
@@ -685,7 +685,7 @@ const applyMeasureAxis = ({
   ) => {
     const nodes = axis === 'row' ? result.rows : result.cols;
     const key = serializePath(path);
-    if (nodes[key]) {
+    if (Object.prototype.hasOwnProperty.call(nodes, key)) {
       const existing = nodes[key];
       if (
         promoteExistingNodes &&

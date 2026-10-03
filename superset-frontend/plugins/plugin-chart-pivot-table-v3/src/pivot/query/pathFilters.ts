@@ -101,12 +101,12 @@ export const buildPathFilters = (
     const resolvedValue = coerceValueForColumn(value, column, colTypeMap);
     if (isNullish(value)) {
       return {
-        col: getColumnLabel(groupby[index]),
+        col: column,
         op: 'IS NULL',
       } as UnaryQueryObjectFilterClause;
     }
     return {
-      col: getColumnLabel(groupby[index]),
+      col: column,
       op: '==',
       val: resolvedValue,
     } as BinaryQueryObjectFilterClause;

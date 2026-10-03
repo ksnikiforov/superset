@@ -67,7 +67,7 @@ describe('PivotTableChart basic regression smoke guardrails', () => {
     });
   });
 
-  it('renders totals when rowTotals and colTotals are enabled', async () => {
+  test('renders totals when rowTotals and colTotals are enabled', async () => {
     const metrics = ['m1'];
     const rows = ['r1'];
     const cols = ['c1'];
@@ -131,7 +131,7 @@ describe('PivotTableChart basic regression smoke guardrails', () => {
     ).toBeGreaterThan(0);
   });
 
-  it('expands a collapsed row and shows the next hierarchy level', async () => {
+  test('expands a collapsed row and shows the next hierarchy level', async () => {
     const metrics = ['m1'];
     const rows = ['r1', 'r2'];
     const records = [
@@ -211,7 +211,7 @@ describe('PivotTableChart basic regression smoke guardrails', () => {
     );
   });
 
-  it('keeps visible column headers after adding first column dimension in Values-only layout', async () => {
+  test('keeps visible column headers after adding first column dimension in Values-only layout', async () => {
     const metrics = ['m1', 'm2'];
     const records = [
       { c1: 'A', m1: 10, m2: 20 },
@@ -300,7 +300,7 @@ describe('PivotTableChart basic regression smoke guardrails', () => {
     });
   });
 
-  it('renders column grand total row in interaction mode when colTotals is enabled', async () => {
+  test('renders column grand total row in interaction mode when colTotals is enabled', async () => {
     const metrics = ['m1'];
     const rows = ['r1'];
     const records = [

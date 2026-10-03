@@ -139,9 +139,8 @@ const toAdhocMetricInput = (
   metric: Exclude<QueryFormMetric, string>,
 ): AdhocMetricInput => metric as AdhocMetricInput;
 
-const normalizeAdhocExpressionType = (
-  metric: AdhocMetric,
-): 'SIMPLE' | 'SQL' => (metric.expressionType === 'SQL' ? 'SQL' : 'SIMPLE');
+const normalizeAdhocExpressionType = (metric: AdhocMetric): 'SIMPLE' | 'SQL' =>
+  metric.expressionType === 'SQL' ? 'SQL' : 'SIMPLE';
 
 const isDictionaryForAdhocMetric = (
   value: QueryFormMetric,

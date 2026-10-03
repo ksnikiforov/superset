@@ -113,7 +113,7 @@ describe('cellUtils helpers', () => {
     },
   };
 
-  it('buildFormattingValueMaps collects root axis values for rows and columns', () => {
+  test('buildFormattingValueMaps collects root axis values for rows and columns', () => {
     const { rowValuesMap, colValuesMap } = buildFormattingValueMaps({
       cells: tree.cells,
       rows: tree.rows,
@@ -131,7 +131,7 @@ describe('cellUtils helpers', () => {
     expect(colValuesMap.has(missingColKey)).toBe(false);
   });
 
-  it('buildVisibleCellEntries filters by visibility and existing nodes', () => {
+  test('buildVisibleCellEntries filters by visibility and existing nodes', () => {
     const entries = buildVisibleCellEntries({
       cells: tree.cells,
       rows: tree.rows,
@@ -151,7 +151,7 @@ describe('cellUtils helpers', () => {
     );
   });
 
-  it('derives leaf output keys when leaf tokens live on the other axis', () => {
+  test('derives leaf output keys when leaf tokens live on the other axis', () => {
     const metricKey = 'sales';
     const ixLeaf = buildBuiltInLeaf('ix', {
       n: 1,
@@ -181,7 +181,7 @@ describe('cellUtils helpers', () => {
     expect(result).toBe(buildMeasureLeafOutputKey(metricKey, ixLeaf));
   });
 
-  it('derives selected single-leaf output keys when metric and leaf tokens are hidden', () => {
+  test('derives selected single-leaf output keys when metric and leaf tokens are hidden', () => {
     const metricKey = 'sales';
     const ixLeaf = buildBuiltInLeaf('ix', {
       n: 1,

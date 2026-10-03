@@ -561,7 +561,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       const baseFormatting = formattingRef.current || {};
       const nextFormatting: PivotDimensionFormattingMap = { ...baseFormatting };
       const nextEntry: PivotDimensionFormatting = {
-        ...(baseFormatting[dimensionKey] || {}),
+        ...baseFormatting[dimensionKey],
       };
 
       if (field === 'applyTo') {
@@ -641,7 +641,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       const nextSorting: PivotDimensionSortingMap = {
         ...baseSorting,
         [dimensionKey]: {
-          ...(existing || {}),
+          ...existing,
           order,
           mode: existing?.mode ?? DEFAULT_DIMENSION_SORT_MODE,
         },

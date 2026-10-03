@@ -24,24 +24,29 @@ form data + UI intent
 
 ## Summary
 
-| Metric          | Value           | Note                                   |
-| --------------- | --------------- | -------------------------------------- |
-| Active tasks    | 0                  | Transition tracker items complete      |
-| Completed tasks | 17                 | Crossed out in the progress table      |
-| Plugin tests    | Green              | 89 suites, 701 tests passed            |
-| Next best move  | Validate before push | Run full pre-commit and address repository-wide gates |
+This slice fixes audited runtime correctness and simplifies ownership. `usePivotRuntime` replaces two cooperating hooks; `ExpansionSession` owns intent, checkpoints, deadlines, cancellation, and loading scopes. Shared cell visibility applies to screen and Excel, and worksheet projection runs only on export. NULL-path batching accumulates groups linearly.
 
-## Current Metrics
+Historical Done rows below describe earlier slices. They do not establish completion of the transition or its size targets. The audit reopened fact-context matching, request ownership, truncation, and export correctness; those have dedicated regressions in this slice.
 
-Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`
+| Remaining work | State | Passing criterion |
+| --- | --- | --- |
+| Full source and strict core size targets | Above target | Reduce authority and duplication without relocating them into adapters or fixtures. |
+| Expansion refresh adoption and completion policy | Partial | Session owns incoming snapshot adoption and completion policy behind a smaller React adapter. |
+| Shared total classification across presentation adapters | Partial | Screen and Excel consume one total classification and label policy. |
+| Large-table DOM bounds | Deferred | Establish stable column sizing and browser regressions before enabling row windowing. |
+| Live Superset / SQL smoke tests | Unverified | Exercise expansion, time comparisons, metric edits, and Excel export against a running instance. |
 
-Latest slice delta: measured from `HEAD`, **+130** production `src` lines (`+215` / `-85`). `PivotTableChart.tsx` dropped 63 lines by moving sticky headers, formatting, interactions, export id, table sizing, warnings, and final view props into `usePivotTableViewSurface`; chart now wires runtime hooks and renders the interaction shell.
+## Measured Source Scope
 
-| Scope                         | Baseline Lines | Current Lines |  Delta | Target          |
-| ----------------------------- | -------------: | ------------: | -----: | --------------- |
-| Full production `src`         |         33,510 |        26,630 | -6,880 | <20,000         |
-| Strict core pipeline          |         12,907 |        10,673 | -2,234 | <8,000          |
-| Core pipeline dirs diagnostic |          8,698 |         7,711 |   -987 | Lower over time |
+Audit baseline: `2b4819e0f2`. Count physical lines in `.ts` / `.tsx` files, including headers. Full source is `src`; core dirs are `pivot/runtime`, `pivot/expansion`, `pivot/query`, `pivot/layout`, and `pivot/core`. Strict core also includes `pivot/shared` and `cellUtils`, `metricsTotals`, `viewModel`, `measureLeaves`, `filters`, and `metrics`.
+
+| Scope | Audit baseline | This slice | Target |
+| --- | ---: | ---: | ---: |
+| Full production source | 27,597 | 27,982 | <20,000 |
+| Strict core | 9,823 | 10,157 | <8,000 |
+| Core dirs diagnostic | 8,226 | 8,560 | Lower over time |
+
+The previous tracker used different, undocumented counts. These measurements use a fixed comparison commit and an explicit scope. Correctness safeguards add source even while ownership and caller coordination shrink.
 
 ## Progress Tracker
 
@@ -69,10 +74,10 @@ Latest slice delta: measured from `HEAD`, **+130** production `src` lines (`+215
 
 | Constraint                                             | Tracking State | Current Problem                                                                                                 | Current                     | Target          | Passing Criteria                                                                                                                             |
 | ------------------------------------------------------ | -------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Full production `src` size                             | Above target   | Source is smaller than baseline but still above the transition target.                                          | 26,630 lines                | <20,000 lines   | Final transition state is below target without moving production authority into test fixtures or compatibility adapters.                     |
-| Strict core pipeline size                              | Above target   | Core still contains too much scheduler/materializer/render-policy code.                                         | 10,673 lines                | <8,000 lines    | Runtime, expansion, query, layout/core, domain helper, and support scope total is below target.                                              |
-| Diagnostic core dirs size                              | Watch          | Core pipeline dirs are below baseline but grew in this slice to remove render-side authority.                   | 7,711 lines                 | Lower over time | `pivot/runtime`, `pivot/expansion`, `pivot/query`, `pivot/layout`, and `pivot/core` do not grow without deleting a larger authority surface. |
-| Plugin test suite                                      | Guarded        | Plugin tests pass after export switched to render-model visible cells and parent-linked row headers.           | 89 suites, 701 tests passed | 0 failing tests | `npm test plugins/plugin-chart-pivot-table-v3` passes.                                                                                       |
+| Full production `src` size                             | Above target   | Correctness safeguards increased source above the baseline and transition target.                                          | 27,982 lines                | <20,000 lines   | Final transition state is below target without moving production authority into test fixtures or compatibility adapters.                     |
+| Strict core pipeline size                              | Above target   | Core still contains too much scheduler/materializer/render-policy code.                                         | 10,157 lines                | <8,000 lines    | Runtime, expansion, query, layout/core, domain helper, and support scope total is below target.                                              |
+| Diagnostic core dirs size                              | Watch          | Core pipeline dirs grew in this slice while query and session authority became explicit.                   | 8,560 lines                 | Lower over time | `pivot/runtime`, `pivot/expansion`, `pivot/query`, `pivot/layout`, and `pivot/core` do not grow without deleting a larger authority surface. |
+| Plugin test suite                                      | Passing        | Plugin tests pass after export switched to render-model visible cells and parent-linked row headers.           | 96 suites / 784 tests passed | 0 failing tests | `npm test plugins/plugin-chart-pivot-table-v3` passes.                                                                                       |
 | Hidden/not-expanded layers do not fetch                | Guarded        | Must remain true while scheduler and materializer code are reduced.                                             | Guarded by tests            | Always true     | Adding a hidden trailing dimension or collapsed layer does not create a query need.                                                          |
 | Semantic layout changes are query-backed               | Guarded        | Local projection from old facts must not reappear during cleanup.                                               | Guarded by tests            | Always true     | Semantic layout changes fetch or reuse tested fact-store coverage; they are not projected from stale tree shape.                             |
 | Interactions stay live during requests/materialization | Guarded        | Async fetch/materialization boundaries must survive future deletion.                                            | Guarded by chart tests      | Always true     | Interaction tests pass while expansion/seamless requests and async materialization are in progress.                                          |
@@ -82,7 +87,7 @@ Latest slice delta: measured from `HEAD`, **+130** production `src` lines (`+215
 | Render/export do not repair semantics                  | Guarded        | Render and export consume materialized/render-model projections.                                                | Mostly true                 | Always true     | Render/export traverse materialized semantics and do not invent missing metric/subtotal/header structure.                                    |
 | No compatibility adapters without net deletion         | Review         | Short-term adapters can hide duplicate authority if not constrained.                                            | Manual review               | Always true     | Any adapter added in a slice deletes a larger old surface in the same slice.                                                                 |
 | Source reduction is authority reduction                | Review         | Line-count targets can be gamed by moving code instead of deleting duplicate authority.                         | Manual review               | Always true     | Source reductions delete or centralize authority; they do not relocate it into controllers, adapters, fixtures, or chart-side orchestration. |
-| Pre-push validation                                    | Not run        | Full pre-commit has not been run for this assessment.                                                           | Not run                     | Passing         | Stage changes, run `pre-commit run --all-files`, fix failures, and rerun before pushing.                                                     |
+| Pre-push validation                                    | Passing        | Full repository hooks ran; formatter follow-up clears a concurrent tracker edit.                                                           | Full run + staged rerun              | Passing         | Stage changes, run `pre-commit run --all-files`, fix failures, and rerun before pushing.                                                     |
 
 ## Architecture Rules
 
@@ -116,7 +121,7 @@ Work from the highest-impact authority surface to the lowest-impact cleanup. A c
 
 - Focused unit/contract tests for the touched runtime boundary.
 - Relevant chart interaction tests when behavior crosses the UI surface.
-- ESLint for changed TypeScript files.
+- Oxlint, custom frontend rules, TypeScript, and full repository pre-commit.
 - `git diff --check`.
 - Updated metrics and status in this tracker on every change.
 

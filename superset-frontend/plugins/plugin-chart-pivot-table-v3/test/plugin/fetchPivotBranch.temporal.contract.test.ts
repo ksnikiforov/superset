@@ -147,7 +147,7 @@ describe('fetchBranch temporal payload contract', () => {
     } as Awaited<ReturnType<typeof SupersetClient.post>>);
   });
 
-  it('builds backend-safe temporal filters for row expansion', async () => {
+  test('builds backend-safe temporal filters for row expansion', async () => {
     const currentTree: PivotTreeData = {
       rows: {
         '': makeNode({ axis: 'row', path: [], hasChildren: true }),
@@ -198,7 +198,7 @@ describe('fetchBranch temporal payload contract', () => {
     assertColumnsUseRawSqlOutput(payload);
   });
 
-  it('builds backend-safe temporal filters for column expansion', async () => {
+  test('builds backend-safe temporal filters for column expansion', async () => {
     const currentTree: PivotTreeData = {
       rows: {
         '': makeNode({ axis: 'row', path: [], hasChildren: false }),

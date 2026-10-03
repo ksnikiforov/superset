@@ -58,7 +58,7 @@ describe('PivotTableChart expansion with metrics at the row end', () => {
     });
   };
 
-  it('expands a row dimension to the next level before showing metrics', async () => {
+  test('expands a row dimension to the next level before showing metrics', async () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = ['shipMode', 'quantityBand'];
     const colGroupby = ['discountBand'];

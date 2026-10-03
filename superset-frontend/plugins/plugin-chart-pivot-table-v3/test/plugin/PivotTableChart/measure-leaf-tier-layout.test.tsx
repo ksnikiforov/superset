@@ -77,7 +77,7 @@ describe('PivotTableChart measure leaf tier indentation', () => {
     verboseMap: {},
   };
 
-  it('indents measure leaf rows deeper than metric groups', () => {
+  test('indents measure leaf rows deeper than metric groups', () => {
     const metricKey = 'grossRevenue';
     const valueLeaf = buildValueLeaf();
     const ixLeaf = buildBuiltInLeaf('ix', {
@@ -162,7 +162,7 @@ describe('PivotTableChart measure leaf tier indentation', () => {
     expect(ixIndent).toBeGreaterThan(metricIndent);
   });
 
-  it('does not show toggles on leaf columns when metrics are last', () => {
+  test('does not show toggles on leaf columns when metrics are last', () => {
     const metricKey = 'grossRevenue';
     const secondaryMetric = 'netRevenue';
     const valueLeaf = buildValueLeaf();
@@ -247,7 +247,7 @@ describe('PivotTableChart measure leaf tier indentation', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('does not show toggles on leaf rows when metrics are last', () => {
+  test('does not show toggles on leaf rows when metrics are last', () => {
     const metricKey = 'grossRevenue';
     const secondaryMetric = 'netRevenue';
     const valueLeaf = buildValueLeaf();
@@ -332,7 +332,7 @@ describe('PivotTableChart measure leaf tier indentation', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('does not show toggles on leaf columns when metrics are last and rows exist', () => {
+  test('does not show toggles on leaf columns when metrics are last and rows exist', () => {
     const metricKey = 'grossRevenue';
     const secondaryMetric = 'netRevenue';
     const valueLeaf = buildValueLeaf();
@@ -421,7 +421,7 @@ describe('PivotTableChart measure leaf tier indentation', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('does not show toggles on leaf rows when metrics are last and columns exist', () => {
+  test('does not show toggles on leaf rows when metrics are last and columns exist', () => {
     const metricKey = 'grossRevenue';
     const secondaryMetric = 'netRevenue';
     const valueLeaf = buildValueLeaf();
@@ -510,7 +510,7 @@ describe('PivotTableChart measure leaf tier indentation', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows toggles on leaf columns when metrics sit between column dimensions', () => {
+  test('shows toggles on leaf columns when metrics sit between column dimensions', () => {
     const metricKey = 'grossRevenue';
     const valueLeaf = buildValueLeaf();
     const ixLeaf = buildBuiltInLeaf('ix', {
@@ -589,7 +589,7 @@ describe('PivotTableChart measure leaf tier indentation', () => {
     expect(ixToggle).toBeInTheDocument();
   });
 
-  it('shows leaf headers when a single metric sits at the last column level', () => {
+  test('shows leaf headers when a single metric sits at the last column level', () => {
     const metricKey = 'grossRevenue';
     const valueLeaf = buildValueLeaf();
     const ixLeaf = buildBuiltInLeaf('ix', {
@@ -657,7 +657,7 @@ describe('PivotTableChart measure leaf tier indentation', () => {
     expect(within(thead).getByText('IX 1YA')).toBeInTheDocument();
   });
 
-  it('shows leaf headers with row dimensions when a single metric is last on columns', () => {
+  test('shows leaf headers with row dimensions when a single metric is last on columns', () => {
     const metricKey = 'grossRevenue';
     const valueLeaf = buildValueLeaf();
     const ixLeaf = buildBuiltInLeaf('ix', {
@@ -726,7 +726,7 @@ describe('PivotTableChart measure leaf tier indentation', () => {
     expect(within(thead).getByText('IX 1YA')).toBeInTheDocument();
   });
 
-  it('shows toggles on leaf rows when metrics sit between row dimensions', () => {
+  test('shows toggles on leaf rows when metrics sit between row dimensions', () => {
     const metricKey = 'grossRevenue';
     const valueLeaf = buildValueLeaf();
     const ixLeaf = buildBuiltInLeaf('ix', {
@@ -805,7 +805,7 @@ describe('PivotTableChart measure leaf tier indentation', () => {
     expect(ixToggle).toBeInTheDocument();
   });
 
-  it('does not project total-only leaf columns ahead of required column coverage', () => {
+  test('does not project total-only leaf columns ahead of required column coverage', () => {
     const grossMetric = 'grossRevenue';
     const avgMetric = 'averageOrderValue';
     const valueLeaf = buildValueLeaf();
@@ -883,7 +883,7 @@ describe('PivotTableChart measure leaf tier indentation', () => {
     expect(valueHeaders).toHaveLength(0);
   });
 
-  it('does not treat leaf-tier visibility as subtotal expansion', () => {
+  test('does not treat leaf-tier visibility as subtotal expansion', () => {
     const metricKey = 'grossRevenue';
     const valueLeaf = buildValueLeaf();
     const ixLeaf = buildBuiltInLeaf('ix', {

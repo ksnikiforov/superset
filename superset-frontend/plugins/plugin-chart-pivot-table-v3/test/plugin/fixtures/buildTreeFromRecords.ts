@@ -132,13 +132,13 @@ export const buildTreeFromRecords = (
     const isColTotalRecord = rowPath.length === 0;
     if (isRowTotalRecord) {
       tree.rows[rowKey].values = {
-        ...(tree.rows[rowKey].values || {}),
+        ...tree.rows[rowKey].values,
         ...values,
       };
     }
     if (isColTotalRecord) {
       tree.cols[colKey].values = {
-        ...(tree.cols[colKey].values || {}),
+        ...tree.cols[colKey].values,
         ...values,
       };
     }
@@ -159,8 +159,8 @@ export const buildTreeFromRecords = (
   ensureNode('row', [], 'Grand total');
   ensureNode('col', [], 'Grand total');
   const mergedRootValues = {
-    ...(tree.rows[rootKey]?.values || {}),
-    ...(tree.cols[rootKey]?.values || {}),
+    ...tree.rows[rootKey]?.values,
+    ...tree.cols[rootKey]?.values,
     ...(Object.keys(grandTotalValues).length > 0 ? grandTotalValues : {}),
   };
   const hasGrandTotalValues = Object.keys(grandTotalValues).length > 0;

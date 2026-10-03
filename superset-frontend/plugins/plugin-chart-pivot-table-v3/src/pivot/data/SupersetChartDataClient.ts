@@ -34,6 +34,7 @@ import {
   type ChartDataFetchParams,
   type ChartDataQueryResult,
   type ChartDataWarning,
+  collectChartDataWarnings,
 } from './ChartDataClient';
 
 type JsonRecord = Record<string, unknown>;
@@ -91,43 +92,14 @@ class RequestTooLargeError extends Error {
 }
 
 const isRequestTooLargeError = (error: unknown): boolean =>
-  error instanceof RequestTooLargeError;
-
-const getQueryName = (result: ChartDataQueryResult): string | undefined =>
-  typeof result.query?.query_name === 'string'
-    ? result.query.query_name
-    : typeof result.query_name === 'string'
-      ? result.query_name
-      : undefined;
+  error instanceof RequestTooLargeError ||
+  (isRecord(error) && error.status === 413);
 
 const applyWarnings = (
   result: ChartDataQueryResult,
   warnings: ChartDataWarning[],
 ): ChartDataQueryResult =>
   warnings.length > 0 ? { ...result, warnings } : result;
-
-const collectWarningsForResult = (
-  result: ChartDataQueryResult,
-  rowLimit?: number,
-): ChartDataWarning[] => {
-  if (!rowLimit || !Number.isFinite(rowLimit) || rowLimit <= 0) {
-    return [];
-  }
-  if (typeof result.rowcount !== 'number') {
-    return [];
-  }
-  if (result.rowcount !== rowLimit) {
-    return [];
-  }
-  return [
-    {
-      type: 'truncation',
-      queryName: getQueryName(result),
-      rowcount: result.rowcount,
-      rowLimit,
-    },
-  ];
-};
 
 const splitSpecs = (specs: QuerySpec[]): [QuerySpec[], QuerySpec[]] => {
   const ordered = [...specs].sort((left, right) =>
@@ -202,11 +174,11 @@ export class SupersetChartDataClient implements ChartDataClient {
 
     const resolved = await handleChartDataResponse({ response, json });
     const results = ensureIsArray(resolved) as ChartDataQueryResult[];
-    const rowLimit =
-      typeof formData.row_limit === 'number' ? formData.row_limit : undefined;
-
     return results.map(result =>
-      applyWarnings(result, collectWarningsForResult(result, rowLimit)),
+      applyWarnings(
+        result,
+        collectChartDataWarnings(result, formData.row_limit),
+      ),
     );
   }
 
@@ -255,7 +227,11 @@ export class SupersetChartDataClient implements ChartDataClient {
         signal: resolvedSignal,
       });
     } finally {
-      if (requestGroupId && !signal) {
+      if (
+        requestGroupId &&
+        !signal &&
+        this.controllers.get(requestGroupId)?.signal === resolvedSignal
+      ) {
         this.controllers.delete(requestGroupId);
       }
     }

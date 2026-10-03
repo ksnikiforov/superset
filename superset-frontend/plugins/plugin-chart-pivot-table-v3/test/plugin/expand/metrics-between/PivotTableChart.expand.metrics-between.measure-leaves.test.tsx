@@ -101,7 +101,7 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
       metricPosition,
     );
 
-  it('expands measure leaf columns when the stack is between column dimensions', async () => {
+  test('expands measure leaf columns when the stack is between column dimensions', async () => {
     const rowGroupby: string[] = [];
     const colGroupby = ['col1', 'col2'];
     const record = {
@@ -191,7 +191,7 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
     expect(within(thead).getByText('C2')).toBeInTheDocument();
   });
 
-  it('keeps sibling measure leaves when expanding a leaf between column dimensions', async () => {
+  test('keeps sibling measure leaves when expanding a leaf between column dimensions', async () => {
     const rowGroupby: string[] = [];
     const colGroupby = ['col1', 'col2'];
     const deltaLeaf = buildBuiltInLeaf('delta', {
@@ -301,7 +301,7 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
     );
   });
 
-  it('keeps sibling measure leaves when expanding a leaf between row dimensions', async () => {
+  test('keeps sibling measure leaves when expanding a leaf between row dimensions', async () => {
     const rowGroupby = ['row1', 'row2'];
     const colGroupby: string[] = [];
     const deltaLeaf = buildBuiltInLeaf('delta', {
@@ -410,7 +410,7 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
     );
   });
 
-  it('expands measure leaf rows when the stack is between row dimensions', async () => {
+  test('expands measure leaf rows when the stack is between row dimensions', async () => {
     const rowGroupby = ['row1', 'row2'];
     const colGroupby: string[] = [];
     const record = {

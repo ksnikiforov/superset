@@ -46,7 +46,7 @@ describe('PivotTableChart expand without global loader for same-axis actions', (
     fetchPivotExpansionMock.mockClear();
   });
 
-  it('keeps the table visible while expanding rows when columns are empty', async () => {
+  test('keeps the table visible while expanding rows when columns are empty', async () => {
     const records = [
       { orderPriority: '1-URGENT', revenueBand: 'REV-A', grossRevenue: 10 },
       { orderPriority: '1-URGENT', revenueBand: 'REV-B', grossRevenue: 20 },

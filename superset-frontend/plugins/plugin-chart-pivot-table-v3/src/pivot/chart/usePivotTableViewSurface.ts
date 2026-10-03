@@ -57,6 +57,8 @@ type UsePivotTableViewSurfaceInput = {
   layout: PivotLayoutResult;
   renderModelResult: PivotRenderModelResult;
   emitCrossFilters?: boolean;
+  selectedFilters?: PivotTableProps['selectedFilters'];
+  onSeamlessRetry?: () => void;
   setDataMask: PivotTableProps['setDataMask'];
   mergeOwnState: (partial: JsonObject) => JsonObject;
   treeDataSignature: string;
@@ -90,6 +92,8 @@ export const usePivotTableViewSurface = ({
   layout,
   renderModelResult,
   emitCrossFilters,
+  selectedFilters,
+  onSeamlessRetry,
   setDataMask,
   mergeOwnState,
   treeDataSignature,
@@ -132,6 +136,7 @@ export const usePivotTableViewSurface = ({
 
   const interactions = usePivotInteractions({
     emitCrossFilters,
+    selectedFilters,
     setDataMask,
     mergeOwnState,
     treeDataSignature,
@@ -161,7 +166,7 @@ export const usePivotTableViewSurface = ({
     expandedRows,
     expandedCols,
     errorMessage: activeErrorMessage,
-    onRetry,
+    onRetry: seamlessError && onSeamlessRetry ? onSeamlessRetry : onRetry,
     warnings: combinedWarnings,
     showGlobalLoader: isInitialExpansionHydrating,
     showCornerLoader: seamlessCornerLoading,

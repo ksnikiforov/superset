@@ -30,7 +30,7 @@ import {
 } from '../../../src/pivot/measureLeaves';
 
 describe('layout resolution (contracts)', () => {
-  it('keeps transformProps layout/subtotal normalization consistent with the initial query plan', () => {
+  test('keeps transformProps layout/subtotal normalization consistent with the initial query plan', () => {
     const formData = buildFormData({
       groupbyRows: ['r1', '__MEASURES__', 'r2'],
       groupbyColumns: ['c1', '__MEASURES__', 'c2'],
@@ -96,7 +96,7 @@ describe('layout resolution (contracts)', () => {
     );
   });
 
-  it('keeps leaf tiers visible when measure leaves are defined', () => {
+  test('keeps leaf tiers visible when measure leaves are defined', () => {
     const formData = buildFormData({
       metrics: ['m1'],
       measureLeavesByMetric: {
@@ -119,7 +119,7 @@ describe('layout resolution (contracts)', () => {
     });
   });
 
-  it('uses only runtime total position values', () => {
+  test('uses only runtime total position values', () => {
     const formData = buildFormData({
       colTotals: true,
       colTotalPosition: 'end',

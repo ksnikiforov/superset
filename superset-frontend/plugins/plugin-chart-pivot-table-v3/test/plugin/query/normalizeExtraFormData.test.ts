@@ -21,7 +21,7 @@ import { normalizeFormDataExtraFilters } from '../../../src/pivot/query/specs';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 describe('normalizeFormDataExtraFilters', () => {
-  it('does not infer temporal coercion without explicit temporal metadata', () => {
+  test('does not infer temporal coercion without explicit temporal metadata', () => {
     const formData = buildFormData({
       extra_form_data: {
         filters: [{ col: 'orderYear', op: '==', val: '1483228800000' }],
@@ -35,7 +35,7 @@ describe('normalizeFormDataExtraFilters', () => {
     ]);
   });
 
-  it('coerces epoch-like temporal strings only when column is explicitly temporal', () => {
+  test('coerces epoch-like temporal strings only when column is explicitly temporal', () => {
     const formData = buildFormData({
       colTypeMap: { orderYear: GenericDataType.Temporal },
       extra_form_data: {
@@ -50,7 +50,7 @@ describe('normalizeFormDataExtraFilters', () => {
     ]);
   });
 
-  it('keeps non-epoch temporal strings unchanged', () => {
+  test('keeps non-epoch temporal strings unchanged', () => {
     const formData = buildFormData({
       colTypeMap: { orderYear: GenericDataType.Temporal },
       extra_form_data: {
@@ -65,7 +65,7 @@ describe('normalizeFormDataExtraFilters', () => {
     ]);
   });
 
-  it('coerces IN filters for explicit temporal columns only', () => {
+  test('coerces IN filters for explicit temporal columns only', () => {
     const formData = buildFormData({
       temporal_columns_lookup: { orderYear: true },
       extra_form_data: {

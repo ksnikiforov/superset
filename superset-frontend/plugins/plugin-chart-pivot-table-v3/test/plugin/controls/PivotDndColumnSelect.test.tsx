@@ -58,21 +58,21 @@ const axisCases = [
 ];
 
 describe('PivotDndColumnSelect', () => {
-  it('renders a formatting button for each column', () => {
+  test('renders a formatting button for each column', () => {
     render(<PivotDndColumnSelect {...baseProps} />, renderOptions);
 
     const buttons = screen.getAllByTestId('pivot-dimension-formatting-button');
     expect(buttons).toHaveLength(1);
   });
 
-  it('renders a sorting button for each column', () => {
+  test('renders a sorting button for each column', () => {
     render(<PivotDndColumnSelect {...baseProps} />, renderOptions);
 
     const buttons = screen.getAllByTestId('pivot-dimension-sorting-button');
     expect(buttons).toHaveLength(1);
   });
 
-  it.each(axisCases)(
+  test.each(axisCases)(
     'does not open the column selector when opening formatting for %s',
     async ({ props }) => {
       render(<PivotDndColumnSelect {...props} />, renderOptions);
@@ -90,7 +90,7 @@ describe('PivotDndColumnSelect', () => {
     },
   );
 
-  it.each(axisCases)(
+  test.each(axisCases)(
     'does not open the column selector when interacting with formatting for %s',
     async ({ props }) => {
       render(<PivotDndColumnSelect {...props} />, renderOptions);
@@ -108,7 +108,7 @@ describe('PivotDndColumnSelect', () => {
     },
   );
 
-  it('merges background and text formatting selections for rows', async () => {
+  test('merges background and text formatting selections for rows', async () => {
     const setControlValue = jest.fn();
     render(
       <PivotDndColumnSelect
@@ -159,7 +159,7 @@ describe('PivotDndColumnSelect', () => {
     );
   });
 
-  it('updates sorting metric and order for rows', async () => {
+  test('updates sorting metric and order for rows', async () => {
     const setControlValue = jest.fn();
     render(
       <PivotDndColumnSelect
@@ -212,7 +212,7 @@ describe('PivotDndColumnSelect', () => {
     );
   });
 
-  it('shows metric labels when selecting sorting metrics', async () => {
+  test('shows metric labels when selecting sorting metrics', async () => {
     const setControlValue = jest.fn();
     const savedMetrics: Metric[] = [
       {
@@ -252,7 +252,7 @@ describe('PivotDndColumnSelect', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows metric labels when selecting formatting metrics', async () => {
+  test('shows metric labels when selecting formatting metrics', async () => {
     render(
       <PivotDndColumnSelect
         {...baseProps}
@@ -284,7 +284,7 @@ describe('PivotDndColumnSelect', () => {
     ).toBeInTheDocument();
   });
 
-  it('updates sorting order without a metric', async () => {
+  test('updates sorting order without a metric', async () => {
     const setControlValue = jest.fn();
     render(
       <PivotDndColumnSelect
@@ -317,7 +317,7 @@ describe('PivotDndColumnSelect', () => {
     );
   });
 
-  it('updates the apply-to scope when toggled', async () => {
+  test('updates the apply-to scope when toggled', async () => {
     const setControlValue = jest.fn();
     render(
       <PivotDndColumnSelect

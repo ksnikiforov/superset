@@ -24,6 +24,12 @@ assists people when migrating to a new version.
 
 ## Next
 
+### Pivot Table v3 formatting and node keys
+
+Formatting formulas are limited to 4096 characters and ranges to 4096 cells. Larger formulas must be reduced before use. Formula validation checks syntax without evaluating placeholder data, so expressions such as `=1/value` are accepted.
+
+Serialized node and cell keys preserve scalar types and reserved characters. Treat these keys as opaque and use the pivot path helpers. Saved expansion paths remain compatible; custom integrations that construct keys directly must switch to those helpers.
+
 ## 6.1.0
 
 ### ClickHouse minimum driver version bump

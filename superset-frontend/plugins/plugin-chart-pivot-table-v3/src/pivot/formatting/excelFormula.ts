@@ -36,6 +36,9 @@ export type CompiledExcelFormula = {
 };
 
 const DEFAULT_POSITION: FormulaPosition = { row: 1, col: 1, sheet: 'Sheet1' };
+const MAX_FORMULA_LENGTH = 4096;
+const MAX_RANGE_CELLS = 4096;
+const MAX_CACHED_FORMULAS = 128;
 const VALUE_REF = 'A1';
 
 type FormulaCellValue = number | string | boolean | Date | null;
@@ -110,6 +113,12 @@ export const compileExcelFormula = (
       const safeToRow = Math.max(safeFromRow, Math.floor(ref.to.row));
       const safeFromCol = Math.max(1, Math.floor(ref.from.col));
       const safeToCol = Math.max(safeFromCol, Math.floor(ref.to.col));
+      if (
+        (safeToRow - safeFromRow + 1) * (safeToCol - safeFromCol + 1) >
+        MAX_RANGE_CELLS
+      ) {
+        throw new Error('Formula range exceeds 4096 cells.');
+      }
       const result: FormulaCellValue[][] = [];
       for (let r = safeFromRow; r <= safeToRow; r += 1) {
         const rowValues: FormulaCellValue[] = [];
@@ -132,6 +141,7 @@ export const compileExcelFormula = (
     transformedFormula,
     metricReferences,
     evaluate: (values, currentValue) => {
+      if (rawFormula.length > MAX_FORMULA_LENGTH) return undefined;
       rowData[0] = coerceDataRecordValue(currentValue);
       metricReferences.forEach(metricKey => {
         const col = metricReferenceToColumn.get(metricKey);
@@ -165,6 +175,10 @@ export const compileExcelFormula = (
     },
   };
 
+  if (formulaCache.size >= MAX_CACHED_FORMULAS) {
+    const oldest = formulaCache.keys().next().value;
+    if (oldest !== undefined) formulaCache.delete(oldest);
+  }
   formulaCache.set(rawFormula, compiled);
   return compiled;
 };
@@ -176,20 +190,30 @@ export const validateExcelFormula = (
   if (normalized.length === 0) {
     return { valid: false, message: 'Formula is empty.' };
   }
-  const compiled = compileExcelFormula(formula);
-  const sampleValues: Record<string, DataRecordValue> = Object.fromEntries(
-    compiled.metricReferences.map(ref => [ref, 0]),
-  );
-  const result = compiled.evaluate(sampleValues, 0);
-  if (result === undefined) {
-    const cellRefExamples = compiled.metricReferences.map((ref, idx) =>
-      makeCellRef(2 + idx, 1),
-    );
-    const detail =
-      cellRefExamples.length > 0
-        ? `Expected references like ${VALUE_REF}, ${cellRefExamples.join(', ')}.`
-        : `Expected references like ${VALUE_REF}.`;
-    return { valid: false, message: `Could not parse formula. ${detail}` };
+  if (normalized.length > MAX_FORMULA_LENGTH) {
+    return { valid: false, message: 'Formula exceeds 4096 characters.' };
   }
-  return { valid: true };
+  try {
+    const compiled = compileExcelFormula(formula);
+    const references = new FormulaParser.DepParser().parse(
+      compiled.transformedFormula,
+      DEFAULT_POSITION,
+    );
+    if (
+      references.some(
+        ref =>
+          'from' in ref &&
+          (ref.to.row - ref.from.row + 1) * (ref.to.col - ref.from.col + 1) >
+            MAX_RANGE_CELLS,
+      )
+    ) {
+      return { valid: false, message: 'Formula range exceeds 4096 cells.' };
+    }
+    return { valid: true };
+  } catch {
+    return {
+      valid: false,
+      message: `Could not parse formula. Expected references like ${VALUE_REF}, ${makeCellRef(2, 1)}.`,
+    };
+  }
 };

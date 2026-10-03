@@ -86,7 +86,7 @@ export const buildMetricLabelMap = (
   savedMetrics: Metric[],
   overrides?: Record<string, string>,
 ): Record<string, string> => {
-  const merged: Record<string, string> = { ...(overrides ?? {}) };
+  const merged: Record<string, string> = { ...overrides };
   savedMetrics.forEach(metric => {
     const metricKey = metric.metric_name;
     if (!metricKey || merged[metricKey]) {
@@ -860,7 +860,7 @@ export const normalizeMetricFormattingMapWithKeys = (
       if (!metricKeys.has(metricKey)) {
         return acc;
       }
-      acc[metricKey] = { ...(acc[metricKey] || {}), ...formatting };
+      acc[metricKey] = { ...acc[metricKey], ...formatting };
       return acc;
     },
     {},
@@ -886,7 +886,7 @@ export const normalizeMetricDatabarMapWithKeys = (
   const merged = Object.entries(normalized).reduce<PivotMetricDatabarMap>(
     (acc, [metricKey, config]) => {
       acc[metricKey] = {
-        ...(acc[metricKey] || {}),
+        ...acc[metricKey],
         ...config,
       };
       return acc;
