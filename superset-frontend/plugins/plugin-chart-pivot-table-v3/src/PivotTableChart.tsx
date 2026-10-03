@@ -28,17 +28,13 @@ import {
 import { Loading } from '@superset-ui/core/components';
 import { supersetTheme } from '@apache-superset/core/theme';
 import { type PivotTableProps, PivotRuntimeLayout } from './types';
-import { useExpansionEngine } from './pivot/expansion/useExpansionEngine';
-import { usePivotLayout } from './pivot/chart/usePivotLayout';
 import { usePivotRenderModel } from './pivot/chart/usePivotRenderModel';
 import { PivotInteractionLayout } from './pivot/chart/PivotInteractionLayout';
 import { PivotInteractionPanel } from './pivot/chart/PivotInteractionPanel';
 import {
   buildRuntimeLayoutFromFormData,
   normalizeRuntimeLayout,
-  resolveAppliedInteractionLayout,
 } from './pivot/layout/resolveInteractionLayout';
-import { buildSelectionFilteredFormData } from './pivot/query/specs';
 import { buildTreeDimensionFilterValues } from './pivot/filters';
 import { useDimensionFilterValues } from './pivot/chart/useDimensionFilterValues';
 import { buildInteractionChips } from './pivot/layout/interactionDrag';
@@ -80,7 +76,6 @@ function PivotTableChart(props: PivotTableProps) {
 
   const isUserControlledMode = formData.interactionMode === 'user_controlled';
   const isDashboardRuntimeSync = appSection === AppSection.Dashboard;
-  const shouldPersistOwnState = !isDashboardRuntimeSync;
   const fetchFormDataBase = queryFormData || formData;
   const dimensionList = useMemo(
     () => ensureIsArray(formData.dimensions),
@@ -162,7 +157,6 @@ function PivotTableChart(props: PivotTableProps) {
   const metricsForUi = sourceMetrics;
   const metricKeys = useMemo(() => getMetricKeys(metricsForUi), [metricsForUi]);
   const hasMetrics = metricKeys.length > 0;
-  const shouldSyncControlValuesOnInteraction = Boolean(setControlValue);
   const runtimeLayout = useMemo(() => {
     const persisted = isUserControlledMode
       ? (formData.pivotRuntimeLayout ??
@@ -212,21 +206,23 @@ function PivotTableChart(props: PivotTableProps) {
     return buildSeamlessRuntimeUpstreamSignature(queryFormData);
   }, [isDashboardRuntimeSync, queryFormData]);
   const {
-    committedFilters,
     uiSelectedFilters,
-    committedRuntimeLayout,
     uiRuntimeLayout,
-    dataForRender,
-    factBatchesForRender,
-    seamlessLoading,
-    seamlessCornerLoading,
-    seamlessWarnings,
-    seamlessError,
-    retrySeamlessUpdate,
+    tree,
+    expandedRows,
+    expandedCols,
+    loadingKeys,
+    isInitialExpansionHydrating,
+    errorMessage,
+    warnings,
+    handleToggle,
+    handleRetry,
+    layoutResult,
+    appliedLayoutFormData,
+    cornerLoading,
     applyRuntimeLayoutChange,
     applyDimensionFilterChange,
     clearAllFilters,
-    commitFactBatchesForRender,
     removeRuntimeDimension,
     dropRuntimeDimension,
     dropRuntimeValue,
@@ -249,69 +245,10 @@ function PivotTableChart(props: PivotTableProps) {
     mergeOwnState,
     setControlValue,
     setDataMask,
-    syncControlValuesOnInteraction: shouldSyncControlValuesOnInteraction,
+    persistedExpansionState:
+      appliedFormData.pivotExpansionState ?? ownState?.pivotExpansionState,
+    shouldPersistExpansionState: persistExpansionState,
   });
-
-  const fixedAppliedRuntimeLayout = useMemo(
-    () =>
-      buildRuntimeLayoutFromFormData({
-        ...appliedFormData,
-        metrics: sourceMetrics,
-        measureLeavesByMetric: sourceMeasureLeavesByMetric,
-      }),
-    [appliedFormData, sourceMeasureLeavesByMetric, sourceMetrics],
-  );
-  const committedLayoutForApplied = isUserControlledMode
-    ? committedRuntimeLayout
-    : fixedAppliedRuntimeLayout;
-  const draftLayoutForApplied = isUserControlledMode
-    ? uiRuntimeLayout
-    : fixedAppliedRuntimeLayout;
-
-  const { appliedLayoutFormData, appliedPivotProgram } = useMemo(
-    () =>
-      resolveAppliedInteractionLayout({
-        appliedFormData,
-        sourceMetrics,
-        sourceMeasureLeavesByMetric,
-        committedRuntimeLayout: committedLayoutForApplied,
-        appliedDimensionKeys,
-      }),
-    [
-      appliedFormData,
-      sourceMetrics,
-      sourceMeasureLeavesByMetric,
-      committedLayoutForApplied,
-      appliedDimensionKeys,
-    ],
-  );
-  const { appliedLayoutFormData: draftLayoutFormData } = useMemo(
-    () =>
-      resolveAppliedInteractionLayout({
-        appliedFormData,
-        sourceMetrics,
-        sourceMeasureLeavesByMetric,
-        committedRuntimeLayout: draftLayoutForApplied,
-        appliedDimensionKeys,
-      }),
-    [
-      appliedFormData,
-      sourceMetrics,
-      sourceMeasureLeavesByMetric,
-      draftLayoutForApplied,
-      appliedDimensionKeys,
-    ],
-  );
-  const fetchFormData = useMemo(
-    () =>
-      buildSelectionFilteredFormData({
-        formData: draftLayoutFormData,
-        selection: committedFilters,
-      }),
-    [committedFilters, draftLayoutFormData],
-  );
-
-  const expansionFetchFormData = fetchFormData;
 
   const dimensionLabelMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -327,10 +264,6 @@ function PivotTableChart(props: PivotTableProps) {
     return map;
   }, [dimensionList, effectiveVerboseMap]);
 
-  const layoutResult = usePivotLayout({
-    formData: appliedLayoutFormData,
-    pivotProgram: appliedPivotProgram,
-  });
   const layoutRowDimensions = layoutResult.layout.pivotProgram.rowDimensions;
   const rowAxisLabels = useMemo(() => {
     const labels = layoutRowDimensions.map(dimension => {
@@ -365,34 +298,6 @@ function PivotTableChart(props: PivotTableProps) {
     layoutResult.layout.pivotProgram,
     layoutResult.layout.measureHierarchy.leafTierVisibility,
   ]);
-  const {
-    tree,
-    expandedRows,
-    expandedCols,
-    loadingKeys,
-    isInitialExpansionHydrating,
-    errorMessage,
-    warnings,
-    handleToggle,
-    handleRetry,
-  } = useExpansionEngine({
-    data: dataForRender,
-    factBatches: factBatchesForRender,
-    onFactBatchesChange: commitFactBatchesForRender,
-    expansionSemanticSignature: layoutResult.expansionSemanticSignature,
-    fetchFormData: expansionFetchFormData,
-    axisCoverageNeeds: layoutResult.layout.axisCoverageNeeds,
-    pivotProgram: layoutResult.layout.pivotProgram,
-    fetchLayout: layoutResult.layout,
-    setControlValue,
-    setDataMask: shouldPersistOwnState ? setDataMask : undefined,
-    mergeOwnState: shouldPersistOwnState ? mergeOwnState : undefined,
-    persistedExpansionState:
-      appliedLayoutFormData.pivotExpansionState ??
-      ownState?.pivotExpansionState,
-    shouldPersistExpansionState: persistExpansionState,
-  });
-
   const renderModelResult = usePivotRenderModel({
     tree,
     expandedRows,
@@ -435,17 +340,13 @@ function PivotTableChart(props: PivotTableProps) {
     isInitialExpansionHydrating,
     errorMessage,
     warnings,
-    seamlessLoading,
-    seamlessCornerLoading,
-    seamlessWarnings,
-    seamlessError,
+    cornerLoading,
     formData,
     appliedLayoutFormData,
     layout: layoutResult,
     renderModelResult,
     emitCrossFilters,
     selectedFilters: selectedFiltersFromProps,
-    onSeamlessRetry: retrySeamlessUpdate,
     setDataMask,
     mergeOwnState,
     treeDataSignature,

@@ -41,7 +41,9 @@ new PivotTableV3ChartPlugin().configure({ key: 'pivot_table_v3' }).register();
 
 ### Architecture
 
-`PivotTableChart.tsx` wires the interaction shell and view. `pivot/chart/usePivotRuntime.ts` owns committed and draft layout/filter state and refresh acknowledgements; callers do not coordinate its internal refs. `pivot/expansion/ExpansionSession.ts` owns expansion intent, checkpoints, request lifetime, and loading scopes. The React hook adapts those transitions to persistence and incoming chart data.
+`PivotTableChart.tsx` wires the interaction shell and view. `pivot/chart/usePivotRuntime.ts` owns draft changes and one committed checkpoint containing layout, filters, query plan, fact store, tree, and expansion state. Refreshes publish that checkpoint together after required coverage arrives. `pivot/expansion/ExpansionSession.ts` handles expansion requests, cancellation, deadlines, and loading scopes.
+
+Explore controls reuse Superset's metric editors, option labels, drag wrappers, and option selector. Pivot-specific controls add formatting actions, measure leaves, and the protected Values slot. Pending control edits share one acknowledgement hook.
 
 The data pipeline is:
 

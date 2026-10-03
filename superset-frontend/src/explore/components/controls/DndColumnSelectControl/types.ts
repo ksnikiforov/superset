@@ -34,6 +34,7 @@ export interface OptionProps {
   canDelete?: boolean;
   tooltipOverlay?: ReactNode;
   multiValueWarningMessage?: string;
+  rightNode?: ReactNode;
 }
 
 export interface OptionItemInterface {

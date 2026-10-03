@@ -17,7 +17,8 @@
  * under the License.
  */
 import { act, renderHook } from '@testing-library/react-hooks';
-import { useExpansionEngine } from '../src/pivot/expansion/useExpansionEngine';
+import { usePivotRuntime } from '../src/pivot/chart/usePivotRuntime';
+import { buildRuntimeLayoutFromFormData } from '../src/pivot/layout/resolveInteractionLayout';
 import {
   buildInitialPivotUpdatePlan,
   buildExpansionQuerySpecPhases,
@@ -46,6 +47,7 @@ const plan = () =>
   buildInitialPivotUpdatePlan({
     formData: buildFormData({
       groupbyRows: ['r1', 'r2'],
+      dimensions: ['r1', 'r2', 'c1', 'c2'],
       groupbyColumns: ['c1', 'c2'],
       metrics: ['m1'],
       metricsLayout: MetricsLayoutEnum.COLUMNS,
@@ -62,6 +64,37 @@ const resultsFor = (specs: QuerySpec[]): ChartDataQueryResult[] =>
       { r1: 'B', r2: 'Y', c1: 'C', c2: 'U', m1: 20 },
     ],
   }));
+const configFor = (
+  p: ReturnType<typeof plan>,
+  initial: ReturnType<typeof buildInitialRuntimeFromSpecResults>,
+): Parameters<typeof usePivotRuntime>[0] => ({
+  data: initial.tree,
+  factBatches: initial.factBatches,
+  dimensionKeys: [
+    ...p.layout.pivotProgram.rowDimensions,
+    ...p.layout.pivotProgram.columnDimensions,
+  ].map(String),
+  metricKeys: p.layout.pivotProgram.metricKeys,
+  runtimeLayout: buildRuntimeLayoutFromFormData(p.formData),
+  initialCommittedLayout: buildRuntimeLayoutFromFormData(p.formData),
+  dimensions: [
+    ...p.layout.pivotProgram.rowDimensions,
+    ...p.layout.pivotProgram.columnDimensions,
+  ],
+  baseFormData: p.formData,
+  sourceMetrics: p.formData.metrics,
+  sourceMeasureLeavesByMetric: p.formData.measureLeavesByMetric,
+  upstreamDashboardQueryContextSignature: null,
+  selectedFiltersFromFormData: {},
+  selectedFiltersFromOwnState: {},
+  selectedFiltersFromProps: {},
+  isDashboardContext: false,
+  mergeOwnState: partial => partial,
+  setDataMask: jest.fn(),
+  shouldPersistExpansionState: false,
+});
+const initialFor = (p: ReturnType<typeof plan>) =>
+  buildInitialRuntimeFromSpecResults({ ...p, results: resultsFor(p.specs) });
 const setup = () => {
   const p = plan();
   const initial = buildInitialRuntimeFromSpecResults({
@@ -70,18 +103,7 @@ const setup = () => {
     layout: p.layout,
     formData: p.formData,
   });
-  return renderHook(() =>
-    useExpansionEngine({
-      data: initial.tree,
-      factBatches: initial.factBatches,
-      expansionSemanticSignature: 'test',
-      fetchFormData: p.formData,
-      axisCoverageNeeds: p.layout.axisCoverageNeeds,
-      pivotProgram: p.layout.pivotProgram,
-      fetchLayout: p.layout,
-      shouldPersistExpansionState: false,
-    }),
-  );
+  return renderHook(usePivotRuntime, { initialProps: configFor(p, initial) });
 };
 
 beforeEach(() => fetchMock.mockReset());
@@ -241,18 +263,9 @@ test('empty warnings do not hide initial truncation or grant complete coverage',
   expect(initial.factBatches.every(batch => batch.complete === false)).toBe(
     true,
   );
-  const { result, unmount } = renderHook(() =>
-    useExpansionEngine({
-      data: initial.tree,
-      factBatches: initial.factBatches,
-      expansionSemanticSignature: 'truncated',
-      fetchFormData: p.formData,
-      axisCoverageNeeds: p.layout.axisCoverageNeeds,
-      pivotProgram: p.layout.pivotProgram,
-      fetchLayout: p.layout,
-      shouldPersistExpansionState: false,
-    }),
-  );
+  const { result, unmount } = renderHook(usePivotRuntime, {
+    initialProps: configFor(p, initial),
+  });
   expect(
     result.current.warnings.some(warning => warning.type === 'truncation'),
   ).toBe(true);
@@ -314,4 +327,120 @@ test('temporal expansion filters use the same bucket grain as grouped values', (
     { col: 'date', op: '>=', val: '2024-01-01' },
     { col: 'date', op: '==', val: '2024-01-01', grain: 'P1M' },
   ]);
+});
+
+test('upstream refresh hydration retry retains the refreshed query context', async () => {
+  const p = plan();
+  fetchMock.mockImplementation(({ specs }) =>
+    Promise.resolve(resultsFor(specs)),
+  );
+  const { result, rerender, waitFor, unmount } = renderHook(usePivotRuntime, {
+    initialProps: configFor(p, initialFor(p)),
+  });
+  await act(async () =>
+    result.current.handleToggle('row', result.current.tree.rows.A),
+  );
+  await waitFor(() => expect(result.current.expandedRows.has('A')).toBe(true));
+  const visible = result.current.tree;
+  const updated = buildInitialPivotUpdatePlan({
+    formData: { ...p.formData, time_range: '2025-01-01 : 2025-02-01' },
+  });
+  fetchMock.mockRejectedValueOnce(new Error('Refresh children failed'));
+  await act(async () => rerender(configFor(updated, initialFor(updated))));
+  await waitFor(() =>
+    expect(result.current.errorMessage).toContain('Refresh children failed'),
+  );
+  expect(result.current.tree).toBe(visible);
+  await act(async () => result.current.handleRetry());
+  await waitFor(() => expect(result.current.tree).not.toBe(visible));
+  expect(fetchMock.mock.calls.at(-1)?.[0].formData.time_range).toBe(
+    updated.formData.time_range,
+  );
+  expect(result.current.expandedRows.has('A')).toBe(true);
+  unmount();
+});
+
+test('collapse cannot publish a canceled filter refresh hydration', async () => {
+  const p = plan();
+  fetchMock.mockImplementation(({ specs }) =>
+    Promise.resolve(resultsFor(specs)),
+  );
+  const setControlValue = jest.fn();
+  const { result, waitFor, unmount } = renderHook(usePivotRuntime, {
+    initialProps: { ...configFor(p, initialFor(p)), setControlValue },
+  });
+  await act(async () =>
+    result.current.handleToggle('row', result.current.tree.rows.A),
+  );
+  await waitFor(() => expect(result.current.expandedRows.has('A')).toBe(true));
+  const visible = result.current.tree;
+  let finish!: () => void;
+  fetchMock
+    .mockImplementationOnce(({ specs }) => Promise.resolve(resultsFor(specs)))
+    .mockImplementationOnce(
+      ({ specs }) =>
+        new Promise(resolve => {
+          finish = () => resolve(resultsFor(specs));
+        }),
+    );
+  await act(async () => result.current.applyDimensionFilterChange('r1', ['A']));
+  await waitFor(() => expect(finish).toBeDefined());
+  act(() => result.current.handleToggle('row', result.current.tree.rows.A));
+  await act(async () => finish());
+  expect(result.current.tree).toBe(visible);
+  expect(result.current.expandedRows.has('A')).toBe(false);
+  expect(result.current.loadingKeys.size).toBe(0);
+  expect(result.current.uiSelectedFilters).toEqual({});
+  expect(setControlValue).toHaveBeenCalledWith('pivotSelectedFilters', {});
+  unmount();
+});
+
+test('collapse restores controls after canceling a pending layout refresh', async () => {
+  const p = buildInitialPivotUpdatePlan({
+    formData: { ...plan().formData, interactionMode: 'user_controlled' },
+  });
+  fetchMock.mockImplementation(({ specs }) =>
+    Promise.resolve(resultsFor(specs)),
+  );
+  const initialProps = {
+    ...configFor(p, initialFor(p)),
+    setControlValue: jest.fn(),
+  };
+  const { result, waitFor, unmount } = renderHook(usePivotRuntime, {
+    initialProps,
+  });
+  await act(async () =>
+    result.current.handleToggle('row', result.current.tree.rows.A),
+  );
+  await waitFor(() => expect(result.current.expandedRows.has('A')).toBe(true));
+  const visible = result.current.tree;
+  let finish!: () => void;
+  fetchMock.mockImplementationOnce(
+    ({ specs }) =>
+      new Promise(resolve => {
+        finish = () => resolve(resultsFor(specs));
+      }),
+  );
+  act(() =>
+    result.current.applyRuntimeLayoutChange({
+      ...initialProps.runtimeLayout,
+      rows: ['c1', 'r1'],
+      cols: ['r2', 'c2'],
+    }),
+  );
+  await waitFor(() => expect(finish).toBeDefined());
+  act(() => result.current.handleToggle('row', result.current.tree.rows.A));
+  await act(async () => finish());
+  expect(result.current.tree).toBe(visible);
+  expect(result.current.uiRuntimeLayout).toEqual(initialProps.runtimeLayout);
+  expect(initialProps.setControlValue).toHaveBeenLastCalledWith(
+    'pivotSelectedFilters',
+    {},
+  );
+  expect(initialProps.setControlValue).toHaveBeenCalledWith(
+    'pivotRuntimeLayout',
+    initialProps.runtimeLayout,
+  );
+  expect(result.current.cornerLoading).toBe(false);
+  unmount();
 });

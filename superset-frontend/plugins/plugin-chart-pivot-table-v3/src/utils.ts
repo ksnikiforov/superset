@@ -29,13 +29,11 @@ import {
   METRIC_FORMATTING_FIELDS,
   DIMENSION_FORMATTING_FIELDS,
   DimensionFormattingScope,
-  PivotDimensionFormatting,
   PivotDimensionFormattingMap,
   PivotDimensionSorting,
   PivotDimensionSortingMap,
   PivotAxisValueRef,
   PivotMetricFormattingMap,
-  PivotMetricFormatting,
   PivotMetricDatabarMap,
   PivotMetricDatabar,
   PivotSortMode,
@@ -375,34 +373,35 @@ const normalizePivotMetricFormattingValue = (
   return undefined;
 };
 
-export const normalizeMetricFormattingMap = (
-  metricFormatting?: PivotMetricFormattingMap,
-): PivotMetricFormattingMap => {
-  if (!metricFormatting) {
-    return {};
-  }
-  return Object.entries(metricFormatting).reduce<PivotMetricFormattingMap>(
-    (acc, [metricKey, formatting]) => {
-      if (!metricKey || !formatting) {
-        return acc;
-      }
-      const nextFormatting: PivotMetricFormatting = {};
-      METRIC_FORMATTING_FIELDS.forEach(field => {
-        const normalized = normalizePivotMetricFormattingValue(
-          formatting[field],
-        );
-        if (normalized !== undefined) {
-          nextFormatting[field] = normalized;
-        }
-      });
-      if (Object.keys(nextFormatting).length > 0) {
-        acc[metricKey] = nextFormatting;
-      }
-      return acc;
-    },
-    {},
+/** Normalizes the formatting fields shared by metric and dimension controls. */
+const normalizeFormattingMap = <Field extends string>(
+  settings: Record<string, Partial<Record<Field, unknown>>> | undefined,
+  fields: readonly Field[],
+): Record<string, Partial<Record<Field, PivotMetricFormattingValue>>> =>
+  Object.fromEntries(
+    Object.entries(settings ?? {}).flatMap(([key, value]) => {
+      if (!key || !value) return [];
+      const normalized = Object.fromEntries(
+        fields.flatMap(field => {
+          const metric = normalizePivotMetricFormattingValue(value[field]);
+          return metric === undefined ? [] : [[field, metric]];
+        }),
+      );
+      return Object.keys(normalized).length
+        ? [
+            [
+              key,
+              normalized as Partial<Record<Field, PivotMetricFormattingValue>>,
+            ],
+          ]
+        : [];
+    }),
   );
-};
+
+export const normalizeMetricFormattingMap = (
+  formatting?: PivotMetricFormattingMap,
+): PivotMetricFormattingMap =>
+  normalizeFormattingMap(formatting, METRIC_FORMATTING_FIELDS);
 
 const normalizeDatabarType = (value: unknown): PivotMetricDatabar['type'] => {
   if (value === 'bar' || value === 'lollipop' || value === 'waterfall') {
@@ -479,35 +478,18 @@ const normalizeDimensionFormattingScope = (
 
 export const normalizeDimensionFormattingMap = (
   formatting?: PivotDimensionFormattingMap,
-): PivotDimensionFormattingMap => {
-  if (!formatting) {
-    return {};
-  }
-  return Object.entries(formatting).reduce<PivotDimensionFormattingMap>(
-    (acc, [dimensionKey, formattingValue]) => {
-      if (!dimensionKey || !formattingValue) {
-        return acc;
-      }
-      const nextFormatting: PivotDimensionFormatting = {};
-      DIMENSION_FORMATTING_FIELDS.forEach(field => {
-        const normalized = normalizePivotMetricFormattingValue(
-          formattingValue[field],
-        );
-        if (normalized !== undefined) {
-          nextFormatting[field] = normalized as PivotDimensionFormattingValue;
-        }
-      });
-      if (Object.keys(nextFormatting).length > 0) {
-        nextFormatting.applyTo = normalizeDimensionFormattingScope(
-          formattingValue.applyTo,
-        );
-        acc[dimensionKey] = nextFormatting;
-      }
-      return acc;
-    },
-    {},
+): PivotDimensionFormattingMap =>
+  Object.fromEntries(
+    Object.entries(
+      normalizeFormattingMap(formatting, DIMENSION_FORMATTING_FIELDS),
+    ).map(([key, value]) => [
+      key,
+      {
+        ...value,
+        applyTo: normalizeDimensionFormattingScope(formatting?.[key].applyTo),
+      },
+    ]),
   );
-};
 
 const normalizeFormattingMetricForQuery = (
   metric: QueryFormMetric,
@@ -575,43 +557,21 @@ const collectMetricFormattingValuesForQuery = (
 
 const isDefined = <T>(value: T | undefined): value is T => value !== undefined;
 
-const getDimensionKeyFromColumn = (
-  column: QueryFormColumn,
-): string | undefined => {
-  if (isMetricsPlaceholder(column)) {
-    return undefined;
-  }
-  const key = getColumnLabel(column);
-  return key || undefined;
-};
-
-const buildDimensionKeySet = (columns: QueryFormColumn[]) => {
-  const keys = new Set<string>();
-  columns.forEach(column => {
-    const key = getDimensionKeyFromColumn(column);
-    if (key) {
-      keys.add(key);
-    }
-  });
-  return keys;
-};
+const buildDimensionKeySet = (columns: QueryFormColumn[]) =>
+  new Set(
+    columns
+      .filter(column => !isMetricsPlaceholder(column))
+      .map(getColumnLabel)
+      .filter(Boolean),
+  );
 
 const filterDimensionSettingKeys = <Value extends object>(
   settings: Record<string, Value>,
   columns: QueryFormColumn[],
 ): Record<string, Value> => {
-  const dimensionKeys = buildDimensionKeySet(columns);
-  if (dimensionKeys.size === 0) {
-    return {};
-  }
-  return Object.entries(settings).reduce<Record<string, Value>>(
-    (acc, [dimensionKey, setting]) => {
-      if (dimensionKeys.has(dimensionKey)) {
-        acc[dimensionKey] = setting;
-      }
-      return acc;
-    },
-    {},
+  const keys = buildDimensionKeySet(columns);
+  return Object.fromEntries(
+    Object.entries(settings).filter(([key]) => keys.has(key)),
   );
 };
 
@@ -724,84 +684,50 @@ export const transferDimensionSettingsAcrossAxes = (
     colSorting?: PivotDimensionSortingMap;
   },
 ): DimensionSettingsTransferResult => {
-  const prevRowKeys = buildDimensionKeySet(prevRows);
-  const prevColKeys = buildDimensionKeySet(prevCols);
-  const nextRowKeys = buildDimensionKeySet(nextRows);
-  const nextColKeys = buildDimensionKeySet(nextCols);
-
-  const movedToRows = new Set(
-    Array.from(nextRowKeys).filter(
-      key => !prevRowKeys.has(key) && prevColKeys.has(key),
-    ),
-  );
-  const movedToCols = new Set(
-    Array.from(nextColKeys).filter(
-      key => !prevColKeys.has(key) && prevRowKeys.has(key),
-    ),
-  );
-  const hasAxisChanges = movedToRows.size > 0 || movedToCols.size > 0;
-
-  const rowFormatting = normalizeDimensionFormattingMapWithKeys(
-    settings.rowFormatting,
-    prevRows,
-  );
-  const colFormatting = normalizeDimensionFormattingMapWithKeys(
-    settings.colFormatting,
-    prevCols,
-  );
-  const rowSorting = normalizeDimensionSortingMapWithKeys(
-    settings.rowSorting,
-    prevRows,
-  );
-  const colSorting = normalizeDimensionSortingMapWithKeys(
-    settings.colSorting,
-    prevCols,
-  );
-
-  if (!hasAxisChanges) {
-    return {
-      rowFormatting,
-      colFormatting,
-      rowSorting,
-      colSorting,
-      hasAxisChanges,
-    };
-  }
-
-  const nextRowFormatting = { ...rowFormatting };
-  const nextColFormatting = { ...colFormatting };
-  const nextRowSorting = { ...rowSorting };
-  const nextColSorting = { ...colSorting };
-
-  movedToCols.forEach(key => {
-    if (rowFormatting[key]) {
-      nextColFormatting[key] = rowFormatting[key];
-      delete nextRowFormatting[key];
-    }
-    if (rowSorting[key]) {
-      nextColSorting[key] = rowSorting[key];
-      delete nextRowSorting[key];
-    }
-  });
-
-  movedToRows.forEach(key => {
-    if (colFormatting[key]) {
-      nextRowFormatting[key] = colFormatting[key];
-      delete nextColFormatting[key];
-    }
-    if (colSorting[key]) {
-      nextRowSorting[key] = colSorting[key];
-      delete nextColSorting[key];
-    }
-  });
-
-  return {
-    rowFormatting: nextRowFormatting,
-    colFormatting: nextColFormatting,
-    rowSorting: nextRowSorting,
-    colSorting: nextColSorting,
-    hasAxisChanges,
+  const previous = {
+    row: buildDimensionKeySet(prevRows),
+    col: buildDimensionKeySet(prevCols),
   };
+  const moved = {
+    row: [...buildDimensionKeySet(nextRows)].filter(
+      key => !previous.row.has(key) && previous.col.has(key),
+    ),
+    col: [...buildDimensionKeySet(nextCols)].filter(
+      key => !previous.col.has(key) && previous.row.has(key),
+    ),
+  };
+  const result = {
+    rowFormatting: normalizeDimensionFormattingMapWithKeys(
+      settings.rowFormatting,
+      prevRows,
+    ),
+    colFormatting: normalizeDimensionFormattingMapWithKeys(
+      settings.colFormatting,
+      prevCols,
+    ),
+    rowSorting: normalizeDimensionSortingMapWithKeys(
+      settings.rowSorting,
+      prevRows,
+    ),
+    colSorting: normalizeDimensionSortingMapWithKeys(
+      settings.colSorting,
+      prevCols,
+    ),
+    hasAxisChanges: moved.row.length > 0 || moved.col.length > 0,
+  };
+  for (const kind of ['Formatting', 'Sorting'] as const) {
+    for (const axis of ['row', 'col'] as const) {
+      const destination = result[`${axis}${kind}`];
+      const source = result[`${axis === 'row' ? 'col' : 'row'}${kind}`];
+      for (const key of moved[axis]) {
+        if (source[key]) {
+          destination[key] = source[key];
+          delete source[key];
+        }
+      }
+    }
+  }
+  return result;
 };
 
 export const collectMetricFormattingMetricsForQuery = (
@@ -847,94 +773,37 @@ export const collectDimensionSortingMetricsForQuery = (
   );
 
 export const normalizeMetricFormattingMapWithKeys = (
-  metricFormatting: PivotMetricFormattingMap | undefined,
+  formatting: PivotMetricFormattingMap | undefined,
   metrics: QueryFormMetric[],
 ): PivotMetricFormattingMap => {
-  const normalized = normalizeMetricFormattingMap(metricFormatting);
-  if (metrics.length === 0) {
-    return normalized;
-  }
-  const metricKeys = new Set(getMetricKeys(metrics));
-  return Object.entries(normalized).reduce<PivotMetricFormattingMap>(
-    (acc, [metricKey, formatting]) => {
-      if (!metricKeys.has(metricKey)) {
-        return acc;
-      }
-      acc[metricKey] = { ...acc[metricKey], ...formatting };
-      return acc;
-    },
-    {},
-  );
+  const normalized = normalizeMetricFormattingMap(formatting);
+  const keys = new Set(getMetricKeys(metrics));
+  return metrics.length
+    ? Object.fromEntries(
+        Object.entries(normalized).filter(([key]) => keys.has(key)),
+      )
+    : normalized;
 };
 
 export const normalizeMetricDatabarMapWithKeys = (
-  metricDatabars: PivotMetricDatabarMap | undefined,
+  databars: PivotMetricDatabarMap | undefined,
   metrics: QueryFormMetric[],
 ): PivotMetricDatabarMap => {
-  const normalized = normalizeMetricDatabarMap(metricDatabars);
-  if (metrics.length === 0) {
-    return normalized;
+  const normalized = normalizeMetricDatabarMap(databars);
+  if (!metrics.length) return normalized;
+  const keys = new Set(getMetricKeys(metrics));
+  const targets = new Set<string>();
+  for (const [key, config] of Object.entries(normalized)) {
+    const target = config.scaleLike
+      ? getMetricKey(config.scaleLike)
+      : undefined;
+    if (target && keys.has(target) && target !== key) {
+      config.scaleLike = target;
+      targets.add(target);
+    } else delete config.scaleLike;
   }
-  const metricKeys = new Set(getMetricKeys(metrics));
-  const resolveMetricReference = (metric?: QueryFormMetric) => {
-    if (!metric) {
-      return undefined;
-    }
-    const metricKey = getMetricKey(metric);
-    return metricKey && metricKeys.has(metricKey) ? metricKey : undefined;
-  };
-  const merged = Object.entries(normalized).reduce<PivotMetricDatabarMap>(
-    (acc, [metricKey, config]) => {
-      acc[metricKey] = {
-        ...acc[metricKey],
-        ...config,
-      };
-      return acc;
-    },
-    {},
-  );
-  const mapped = Object.entries(merged).reduce<PivotMetricDatabarMap>(
-    (acc, [metricKey, config]) => {
-      const scaleLikeKey = resolveMetricReference(config.scaleLike);
-      const nextConfig: PivotMetricDatabar = { ...config };
-      if (scaleLikeKey && scaleLikeKey !== metricKey) {
-        nextConfig.scaleLike = scaleLikeKey;
-      } else if (nextConfig.scaleLike) {
-        delete nextConfig.scaleLike;
-      }
-      acc[metricKey] = nextConfig;
-      return acc;
-    },
-    {},
-  );
-  const scaleLikeTargets = Object.entries(mapped).reduce<Set<string>>(
-    (targets, [metricKey, config]) => {
-      const scaleLikeKey = config.scaleLike
-        ? getMetricKey(config.scaleLike)
-        : undefined;
-      if (scaleLikeKey && scaleLikeKey !== metricKey) {
-        targets.add(scaleLikeKey);
-      }
-      return targets;
-    },
-    new Set(),
-  );
-  if (scaleLikeTargets.size === 0) {
-    return mapped;
-  }
-  return Object.entries(mapped).reduce<PivotMetricDatabarMap>(
-    (acc, [metricKey, config]) => {
-      if (scaleLikeTargets.has(metricKey) && config.scaleLike) {
-        const rest = { ...config };
-        delete rest.scaleLike;
-        acc[metricKey] = rest;
-        return acc;
-      }
-      acc[metricKey] = config;
-      return acc;
-    },
-    {},
-  );
+  for (const target of targets) delete normalized[target]?.scaleLike;
+  return normalized;
 };
 
 export const collectMetricFormattingMetrics = (

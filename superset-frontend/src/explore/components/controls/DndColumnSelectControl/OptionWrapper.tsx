@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useRef } from 'react';
+import { type ReactNode, useRef } from 'react';
 import {
   useDrag,
   useDrop,
@@ -46,6 +46,10 @@ export default function OptionWrapper(
   props: OptionProps & {
     type: string;
     onShiftOptions: (dragIndex: number, hoverIndex: number) => void;
+    listId?: string;
+    onHoverIndex?: (index: number) => void;
+    onHoverListId?: (listId?: string) => void;
+    labelContent?: ReactNode;
   },
 ) {
   const {
@@ -62,6 +66,11 @@ export default function OptionWrapper(
     canDelete = true,
     tooltipOverlay,
     multiValueWarningMessage,
+    rightNode,
+    listId,
+    onHoverIndex,
+    onHoverListId,
+    labelContent,
     ...rest
   } = props;
   const ref = useRef<HTMLDivElement>(null);
@@ -71,6 +80,8 @@ export default function OptionWrapper(
     item: {
       type,
       dragIndex: index,
+      sourceId: listId,
+      column,
     },
     collect: (monitor: DragSourceMonitor) => ({
       isDragging: monitor.isDragging(),
@@ -80,12 +91,21 @@ export default function OptionWrapper(
   const [, drop] = useDrop({
     accept: type,
 
-    hover: (item: OptionItemInterface, monitor: DropTargetMonitor) => {
+    hover: (
+      item: OptionItemInterface & { sourceId?: string },
+      monitor: DropTargetMonitor,
+    ) => {
       if (!ref.current) {
         return;
       }
       const { dragIndex } = item;
       const hoverIndex = index;
+
+      onHoverIndex?.(hoverIndex);
+      onHoverListId?.(listId);
+      if (item.sourceId && listId && item.sourceId !== listId) {
+        return;
+      }
 
       // Don't replace items with themselves
       if (dragIndex === hoverIndex) {
@@ -182,7 +202,12 @@ export default function OptionWrapper(
   drag(drop(ref));
 
   return (
-    <DragContainer ref={ref} {...rest}>
+    <DragContainer
+      ref={ref}
+      data-option-index={index}
+      data-list-id={listId}
+      {...rest}
+    >
       <Option
         index={index}
         clickClose={clickClose}
@@ -191,8 +216,9 @@ export default function OptionWrapper(
         datasourceWarningMessage={datasourceWarningMessage}
         canDelete={canDelete}
         multiValueWarningMessage={multiValueWarningMessage}
+        rightNode={rightNode}
       >
-        <Label />
+        {labelContent ?? <Label />}
       </Option>
     </DragContainer>
   );

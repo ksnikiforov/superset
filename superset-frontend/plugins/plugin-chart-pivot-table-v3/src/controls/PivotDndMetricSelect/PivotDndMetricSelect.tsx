@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { useAcknowledgedValue } from '../useAcknowledgedValue';
 import { t, tn } from '@apache-superset/core/translation';
 import {
   type ComponentProps,
@@ -58,7 +59,7 @@ import {
   isDatasourcePanelDndItem,
   type savedMetricType,
 } from '../../exploreImports';
-import PivotDndSelectLabel from '../PivotDndColumnSelect/PivotSelectLabel';
+import { DndSelectLabel as PivotDndSelectLabel } from '../../exploreImports';
 import PivotMetricDefinitionValue, {
   MetricFormatSelector,
 } from './PivotMetricDefinitionValue';
@@ -436,51 +437,13 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       ensureIsArray(props.value),
     );
   }, [props.formData, props.value]);
-  const metricFormattingRef =
-    useRef<PivotMetricFormattingMap>(metricFormatting);
-  const metricDatabarsRef = useRef<PivotMetricDatabarMap>(metricDatabars);
-  const metricFormattingPendingRef = useRef<PivotMetricFormattingMap | null>(
-    null,
-  );
-  const metricDatabarsPendingRef = useRef<PivotMetricDatabarMap | null>(null);
-  const [localMetricFormatting, setLocalMetricFormatting] =
-    useState<PivotMetricFormattingMap>(metricFormatting);
-  const [localMetricDatabars, setLocalMetricDatabars] =
-    useState<PivotMetricDatabarMap>(metricDatabars);
-
-  useEffect(() => {
-    if (metricFormattingPendingRef.current) {
-      if (isEqual(metricFormatting, metricFormattingPendingRef.current)) {
-        metricFormattingPendingRef.current = null;
-        metricFormattingRef.current = metricFormatting;
-        if (!isEqual(metricFormatting, localMetricFormatting)) {
-          setLocalMetricFormatting(metricFormatting);
-        }
-      }
-      return;
-    }
-    metricFormattingRef.current = metricFormatting;
-    if (!isEqual(metricFormatting, localMetricFormatting)) {
-      setLocalMetricFormatting(metricFormatting);
-    }
-  }, [localMetricFormatting, metricFormatting]);
-
-  useEffect(() => {
-    if (metricDatabarsPendingRef.current) {
-      if (isEqual(metricDatabars, metricDatabarsPendingRef.current)) {
-        metricDatabarsPendingRef.current = null;
-        metricDatabarsRef.current = metricDatabars;
-        if (!isEqual(metricDatabars, localMetricDatabars)) {
-          setLocalMetricDatabars(metricDatabars);
-        }
-      }
-      return;
-    }
-    metricDatabarsRef.current = metricDatabars;
-    if (!isEqual(metricDatabars, localMetricDatabars)) {
-      setLocalMetricDatabars(metricDatabars);
-    }
-  }, [localMetricDatabars, metricDatabars]);
+  const [
+    localMetricFormatting,
+    setLocalMetricFormatting,
+    readMetricFormatting,
+  ] = useAcknowledgedValue(metricFormatting);
+  const [localMetricDatabars, setLocalMetricDatabars, readMetricDatabars] =
+    useAcknowledgedValue(metricDatabars);
 
   const extra = useMemo<{ disallow_adhoc_metrics?: boolean }>(() => {
     let parsedExtra: { disallow_adhoc_metrics?: boolean } = {};
@@ -658,19 +621,17 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
             activeMetricKeys.add(buildMeasureLeafOutputKey(metricKey, leaf));
           });
         });
-        const baseFormatting = metricFormattingRef.current || {};
+        const baseFormatting = readMetricFormatting() || {};
         const nextFormatting = Object.fromEntries(
           Object.entries(baseFormatting).filter(([key]) =>
             activeMetricKeys.has(key),
           ),
         ) as PivotMetricFormattingMap;
         if (!isEqual(baseFormatting, nextFormatting)) {
-          metricFormattingPendingRef.current = nextFormatting;
-          metricFormattingRef.current = nextFormatting;
           setLocalMetricFormatting(nextFormatting);
           setControlValue('metricFormatting', nextFormatting);
         }
-        const baseDatabars = metricDatabarsRef.current || {};
+        const baseDatabars = readMetricDatabars() || {};
         const nextDatabars = Object.fromEntries(
           Object.entries(baseDatabars).filter(([key]) =>
             activeMetricKeys.has(key),
@@ -690,8 +651,6 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
           return acc;
         }, {});
         if (!isEqual(baseDatabars, cleanedDatabars)) {
-          metricDatabarsPendingRef.current = cleanedDatabars;
-          metricDatabarsRef.current = cleanedDatabars;
           setLocalMetricDatabars(cleanedDatabars);
           setControlValue('metricDatabars', cleanedDatabars);
         }
@@ -701,7 +660,16 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       }
       onChange(multi ? optionValues : optionValues[0]);
     },
-    [multi, onChange, setControlValue, updateMeasureLeaves],
+    [
+      multi,
+      onChange,
+      setControlValue,
+      updateMeasureLeaves,
+      readMetricFormatting,
+      setLocalMetricFormatting,
+      readMetricDatabars,
+      setLocalMetricDatabars,
+    ],
   );
 
   const handleMetricFormattingChange = useCallback(
@@ -713,7 +681,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       if (!setControlValue) {
         return;
       }
-      const baseFormatting = metricFormattingRef.current || {};
+      const baseFormatting = readMetricFormatting() || {};
       const current = baseFormatting[metricKey] || {};
       const updated = {
         ...current,
@@ -730,11 +698,10 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
         delete nextFormatting[metricKey];
       }
       setLocalMetricFormatting(nextFormatting);
-      metricFormattingPendingRef.current = nextFormatting;
-      metricFormattingRef.current = nextFormatting;
+
       setControlValue('metricFormatting', nextFormatting);
     },
-    [setControlValue],
+    [setControlValue, readMetricFormatting, setLocalMetricFormatting],
   );
 
   const handleMetricDatabarChange = useCallback(
@@ -746,7 +713,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       if (!setControlValue) {
         return;
       }
-      const baseDatabars = metricDatabarsRef.current || {};
+      const baseDatabars = readMetricDatabars() || {};
       if (field === 'scaleLike' && nextValue) {
         const activeMetricKeys = collectActiveMetricKeys(value);
         const { sources, targets } = Object.entries(baseDatabars).reduce<{
@@ -797,11 +764,10 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
         nextDatabars[metricKey] = updated;
       }
       setLocalMetricDatabars(nextDatabars);
-      metricDatabarsPendingRef.current = nextDatabars;
-      metricDatabarsRef.current = nextDatabars;
+
       setControlValue('metricDatabars', nextDatabars);
     },
-    [setControlValue, value],
+    [setControlValue, value, readMetricDatabars, setLocalMetricDatabars],
   );
 
   const availableMetrics = useMemo(() => {
@@ -1007,8 +973,8 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
         return;
       }
       if (setControlValue) {
-        const baseFormatting = metricFormattingRef.current || {};
-        const baseDatabars = metricDatabarsRef.current || {};
+        const baseFormatting = readMetricFormatting() || {};
+        const baseDatabars = readMetricDatabars() || {};
         const {
           metricFormatting: nextFormatting,
           metricDatabars: nextDatabars,
@@ -1019,14 +985,10 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
           newMetric: changedMetric,
         });
         if (!isEqual(baseFormatting, nextFormatting)) {
-          metricFormattingPendingRef.current = nextFormatting;
-          metricFormattingRef.current = nextFormatting;
           setLocalMetricFormatting(nextFormatting);
           setControlValue('metricFormatting', nextFormatting);
         }
         if (!isEqual(baseDatabars, nextDatabars)) {
-          metricDatabarsPendingRef.current = nextDatabars;
-          metricDatabarsRef.current = nextDatabars;
           setLocalMetricDatabars(nextDatabars);
           setControlValue('metricDatabars', nextDatabars);
         }
@@ -1055,7 +1017,16 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       setValue(newValue);
       handleChange(newValue);
     },
-    [handleChange, setControlValue, updateMeasureLeaves, value],
+    [
+      handleChange,
+      setControlValue,
+      updateMeasureLeaves,
+      value,
+      readMetricFormatting,
+      readMetricDatabars,
+      setLocalMetricFormatting,
+      setLocalMetricDatabars,
+    ],
   );
 
   const onRemoveMetric = useCallback(
@@ -1389,69 +1360,23 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
                 />
                 <Typography.Text>{t('Apply time offset')}</Typography.Text>
               </Space>
-              {customMeasureOffsetEnabled && (
-                <>
-                  <Space
-                    direction="vertical"
-                    size={8}
-                    style={{ width: '100%' }}
-                  >
-                    <Typography.Text>{t('Period')}</Typography.Text>
-                    <Space size={8}>
-                      <InputNumber
-                        min={1}
-                        value={leafOffsetN}
-                        onChange={value =>
-                          setLeafOffsetN(
-                            typeof value === 'number' && value > 0 ? value : 1,
-                          )
-                        }
-                      />
-                      <Select
-                        ariaLabel={t('Period unit')}
-                        options={LEAF_UNIT_OPTIONS}
-                        value={leafOffsetUnit}
-                        onChange={value =>
-                          setLeafOffsetUnit(value as MeasureLeafOffsetUnit)
-                        }
-                        css={{ width: 160 }}
-                      />
-                    </Space>
-                  </Space>
-                  <Space
-                    direction="vertical"
-                    size={8}
-                    style={{ width: '100%' }}
-                  >
-                    <Typography.Text>{t('Direction')}</Typography.Text>
-                    <Radio.Group
-                      options={LEAF_DIRECTION_OPTIONS}
-                      optionType="button"
-                      value={leafOffsetDirection}
-                      onChange={event =>
-                        setLeafOffsetDirection(
-                          event.target.value as MeasureLeafOffsetDirection,
-                        )
-                      }
-                    />
-                  </Space>
-                </>
-              )}
             </>
           ) : (
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <Typography.Text>{t('Operation')}</Typography.Text>
+              <Select
+                ariaLabel={t('Operation')}
+                options={LEAF_OPERATOR_OPTIONS}
+                value={leafOperator}
+                onChange={value =>
+                  setLeafOperator(value as MeasureLeafOperator)
+                }
+                css={{ width: 220 }}
+              />
+            </Space>
+          )}
+          {(!customMeasureEnabled || customMeasureOffsetEnabled) && (
             <>
-              <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                <Typography.Text>{t('Operation')}</Typography.Text>
-                <Select
-                  ariaLabel={t('Operation')}
-                  options={LEAF_OPERATOR_OPTIONS}
-                  value={leafOperator}
-                  onChange={value =>
-                    setLeafOperator(value as MeasureLeafOperator)
-                  }
-                  css={{ width: 220 }}
-                />
-              </Space>
               <Space direction="vertical" size={8} style={{ width: '100%' }}>
                 <Typography.Text>{t('Period')}</Typography.Text>
                 <Space size={8}>

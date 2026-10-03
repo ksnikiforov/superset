@@ -384,6 +384,70 @@ const ColumnSubtotalSelector = ({
   );
 };
 
+/** Controls share defaults so row and column configuration cannot drift. */
+const hiddenControl = (
+  name: string,
+  value: unknown = {},
+  preventRefresh = false,
+) => ({
+  name,
+  config: {
+    type: 'HiddenControl',
+    default: value,
+    ...(preventRefresh
+      ? { dontRefreshOnChange: true, renderTrigger: false }
+      : {}),
+  },
+});
+const checkboxControl = (
+  name: string,
+  label: string,
+  description: string,
+  value: boolean,
+) => ({
+  name,
+  config: {
+    type: 'CheckboxControl',
+    label,
+    description,
+    default: value,
+    renderTrigger: true,
+  },
+});
+const positionControl = (
+  name: string,
+  label: string,
+  description: string,
+  choices: string[][],
+) => ({
+  name,
+  config: {
+    type: 'SelectControl',
+    label,
+    description,
+    choices,
+    default: 'start',
+    clearable: false,
+    renderTrigger: true,
+  },
+});
+const expansionControl = (
+  name: string,
+  label: string,
+  description: string,
+) => ({
+  name,
+  config: {
+    type: 'TextControl',
+    label,
+    description,
+    isInt: true,
+    min: 0,
+    placeholder: t('0'),
+    renderTrigger: true,
+  },
+});
+
 const config: ControlPanelConfig = {
   controlPanelSections: [
     {
@@ -472,37 +536,9 @@ const config: ControlPanelConfig = {
             },
           },
         ],
-        [
-          {
-            name: 'measureLeavesByMetric',
-            config: {
-              type: 'HiddenControl',
-              default: {},
-            },
-          },
-        ],
-        [
-          {
-            name: 'pivotRuntimeLayout',
-            config: {
-              type: 'HiddenControl',
-              default: null,
-              dontRefreshOnChange: true,
-              renderTrigger: false,
-            },
-          },
-        ],
-        [
-          {
-            name: 'pivotSelectedFilters',
-            config: {
-              type: 'HiddenControl',
-              default: {},
-              dontRefreshOnChange: true,
-              renderTrigger: false,
-            },
-          },
-        ],
+        [hiddenControl('measureLeavesByMetric', {})],
+        [hiddenControl('pivotRuntimeLayout', null, true)],
+        [hiddenControl('pivotSelectedFilters', {}, true)],
         [
           {
             name: 'metricFormattingScope',
@@ -526,75 +562,23 @@ const config: ControlPanelConfig = {
             },
           },
         ],
+        [hiddenControl('metricFormatting', {})],
+        [hiddenControl('metricDatabars', {})],
+        [hiddenControl('rowFormatting', {})],
+        [hiddenControl('colFormatting', {})],
+        [hiddenControl('rowSorting', {})],
+        [hiddenControl('colSorting', {})],
         [
-          {
-            name: 'metricFormatting',
-            config: {
-              type: 'HiddenControl',
-              default: {},
+          hiddenControl(
+            'pivotExpansionState',
+            {
+              rows: [],
+              cols: [],
+              collapsedRows: [],
+              collapsedCols: [],
             },
-          },
-        ],
-        [
-          {
-            name: 'metricDatabars',
-            config: {
-              type: 'HiddenControl',
-              default: {},
-            },
-          },
-        ],
-        [
-          {
-            name: 'rowFormatting',
-            config: {
-              type: 'HiddenControl',
-              default: {},
-            },
-          },
-        ],
-        [
-          {
-            name: 'colFormatting',
-            config: {
-              type: 'HiddenControl',
-              default: {},
-            },
-          },
-        ],
-        [
-          {
-            name: 'rowSorting',
-            config: {
-              type: 'HiddenControl',
-              default: {},
-            },
-          },
-        ],
-        [
-          {
-            name: 'colSorting',
-            config: {
-              type: 'HiddenControl',
-              default: {},
-            },
-          },
-        ],
-        [
-          {
-            name: 'pivotExpansionState',
-            config: {
-              type: 'HiddenControl',
-              default: {
-                rows: [],
-                cols: [],
-                collapsedRows: [],
-                collapsedCols: [],
-              },
-              dontRefreshOnChange: true,
-              renderTrigger: false,
-            },
-          },
+            true,
+          ),
         ],
         ['adhoc_filters'],
         ['series_limit'],
@@ -641,50 +625,30 @@ const config: ControlPanelConfig = {
           </ControlSubSectionHeader>,
         ],
         [
-          {
-            name: 'expandRowsLevel',
-            config: {
-              type: 'TextControl',
-              label: t('Auto-expand row levels'),
-              isInt: true,
-              min: 0,
-              placeholder: t('0'),
-              renderTrigger: true,
-              description: t(
-                'Number of row levels to expand on initial load. Leave blank or use 0 to keep rows collapsed.',
-              ),
-            },
-          },
+          expansionControl(
+            'expandRowsLevel',
+            t('Auto-expand row levels'),
+            t(
+              'Number of row levels to expand on initial load. Leave blank or use 0 to keep rows collapsed.',
+            ),
+          ),
         ],
         [
-          {
-            name: 'expandColumnsLevel',
-            config: {
-              type: 'TextControl',
-              label: t('Auto-expand column levels'),
-              isInt: true,
-              min: 0,
-              placeholder: t('0'),
-              renderTrigger: true,
-              description: t(
-                'Number of column levels to expand on initial load. Leave blank or use 0 to keep columns collapsed.',
-              ),
-            },
-          },
+          expansionControl(
+            'expandColumnsLevel',
+            t('Auto-expand column levels'),
+            t(
+              'Number of column levels to expand on initial load. Leave blank or use 0 to keep columns collapsed.',
+            ),
+          ),
         ],
         [
-          {
-            name: 'stickyHeaders',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Sticky headers'),
-              default: true,
-              renderTrigger: true,
-              description: t(
-                'Keep row and column headers visible while scrolling the table.',
-              ),
-            },
-          },
+          checkboxControl(
+            'stickyHeaders',
+            t('Sticky headers'),
+            t('Keep row and column headers visible while scrolling the table.'),
+            true,
+          ),
         ],
         [
           <ControlSubSectionHeader key="pivot-row-options">
@@ -692,62 +656,38 @@ const config: ControlPanelConfig = {
           </ControlSubSectionHeader>,
         ],
         [
-          {
-            name: 'colTotals',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Column totals'),
-              description: t('Show grand total row for columns.'),
-              default: true,
-              renderTrigger: true,
-            },
-          },
-          {
-            name: 'colTotalPosition',
-            config: {
-              type: 'SelectControl',
-              label: t('Column total position'),
-              description: t(
-                'Show the column grand total row at the top or bottom.',
-              ),
-              clearable: false,
-              default: 'start',
-              renderTrigger: true,
-              choices: [
-                ['start', t('Top')],
-                ['end', t('Bottom')],
-              ],
-            },
-          },
+          checkboxControl(
+            'colTotals',
+            t('Column totals'),
+            t('Show grand total row for columns.'),
+            true,
+          ),
+          positionControl(
+            'colTotalPosition',
+            t('Column total position'),
+            t('Show the column grand total row at the top or bottom.'),
+            [
+              ['start', t('Top')],
+              ['end', t('Bottom')],
+            ],
+          ),
         ],
         [
-          {
-            name: 'rowSubTotals',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Row subtotals'),
-              description: t('Show subtotals for row groups.'),
-              default: true,
-              renderTrigger: true,
-            },
-          },
-          {
-            name: 'rowSubtotalPosition',
-            config: {
-              type: 'SelectControl',
-              label: t('Row subtotal position'),
-              description: t(
-                'Show row subtotals inline or as a row at the bottom.',
-              ),
-              clearable: false,
-              default: 'start',
-              renderTrigger: true,
-              choices: [
-                ['start', t('Top')],
-                ['end', t('Bottom')],
-              ],
-            },
-          },
+          checkboxControl(
+            'rowSubTotals',
+            t('Row subtotals'),
+            t('Show subtotals for row groups.'),
+            true,
+          ),
+          positionControl(
+            'rowSubtotalPosition',
+            t('Row subtotal position'),
+            t('Show row subtotals inline or as a row at the bottom.'),
+            [
+              ['start', t('Top')],
+              ['end', t('Bottom')],
+            ],
+          ),
         ],
         [
           {
@@ -770,33 +710,21 @@ const config: ControlPanelConfig = {
           </ControlSubSectionHeader>,
         ],
         [
-          {
-            name: 'rowTotals',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Row totals'),
-              description: t('Show grand total column for rows.'),
-              default: false,
-              renderTrigger: true,
-            },
-          },
-          {
-            name: 'rowTotalPosition',
-            config: {
-              type: 'SelectControl',
-              label: t('Row total position'),
-              description: t(
-                'Place the grand total column at the front or end.',
-              ),
-              clearable: false,
-              default: 'start',
-              renderTrigger: true,
-              choices: [
-                ['start', t('Front')],
-                ['end', t('End')],
-              ],
-            },
-          },
+          checkboxControl(
+            'rowTotals',
+            t('Row totals'),
+            t('Show grand total column for rows.'),
+            false,
+          ),
+          positionControl(
+            'rowTotalPosition',
+            t('Row total position'),
+            t('Place the grand total column at the front or end.'),
+            [
+              ['start', t('Front')],
+              ['end', t('End')],
+            ],
+          ),
         ],
         [
           {
@@ -846,23 +774,15 @@ const config: ControlPanelConfig = {
           },
         ],
         [
-          {
-            name: 'colSubtotalPosition',
-            config: {
-              type: 'SelectControl',
-              label: t('Column subtotal position'),
-              description: t(
-                'Place subtotal columns before or after their group.',
-              ),
-              clearable: false,
-              default: 'start',
-              renderTrigger: true,
-              choices: [
-                ['start', t('Front')],
-                ['end', t('End')],
-              ],
-            },
-          },
+          positionControl(
+            'colSubtotalPosition',
+            t('Column subtotal position'),
+            t('Place subtotal columns before or after their group.'),
+            [
+              ['start', t('Front')],
+              ['end', t('End')],
+            ],
+          ),
         ],
         [
           {
@@ -956,18 +876,14 @@ const config: ControlPanelConfig = {
           },
         ],
         [
-          {
-            name: 'allowRenderHtml',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Render cells as HTML'),
-              renderTrigger: true,
-              default: true,
-              description: t(
-                'Render returned strings as HTML when safe. Useful for links or rich text.',
-              ),
-            },
-          },
+          checkboxControl(
+            'allowRenderHtml',
+            t('Render cells as HTML'),
+            t(
+              'Render returned strings as HTML when safe. Useful for links or rich text.',
+            ),
+            true,
+          ),
         ],
       ],
     },

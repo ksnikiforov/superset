@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useMemo } from 'react';
 import { type JsonObject } from '@superset-ui/core';
 import {
   type PivotTableProps,
@@ -48,17 +47,13 @@ type UsePivotTableViewSurfaceInput = {
   isInitialExpansionHydrating: boolean;
   errorMessage?: string;
   warnings: ChartDataWarning[];
-  seamlessLoading: boolean;
-  seamlessCornerLoading: boolean;
-  seamlessWarnings: ChartDataWarning[];
-  seamlessError?: string;
+  cornerLoading: boolean;
   formData: PivotTableProps['formData'];
   appliedLayoutFormData: PivotTableProps['formData'];
   layout: PivotLayoutResult;
   renderModelResult: PivotRenderModelResult;
   emitCrossFilters?: boolean;
   selectedFilters?: PivotTableProps['selectedFilters'];
-  onSeamlessRetry?: () => void;
   setDataMask: PivotTableProps['setDataMask'];
   mergeOwnState: (partial: JsonObject) => JsonObject;
   treeDataSignature: string;
@@ -83,17 +78,13 @@ export const usePivotTableViewSurface = ({
   isInitialExpansionHydrating,
   errorMessage,
   warnings,
-  seamlessLoading,
-  seamlessCornerLoading,
-  seamlessWarnings,
-  seamlessError,
+  cornerLoading,
   formData,
   appliedLayoutFormData,
   layout,
   renderModelResult,
   emitCrossFilters,
   selectedFilters,
-  onSeamlessRetry,
   setDataMask,
   mergeOwnState,
   treeDataSignature,
@@ -149,11 +140,6 @@ export const usePivotTableViewSurface = ({
       appliedLayoutFormData.time_grain_sqla,
   });
 
-  const combinedWarnings = useMemo(
-    () => [...warnings, ...seamlessWarnings],
-    [seamlessWarnings, warnings],
-  );
-  const activeErrorMessage = seamlessError ?? errorMessage;
   const exportChartId =
     typeof formData.slice_id === 'number' ||
     typeof formData.slice_id === 'string'
@@ -165,11 +151,11 @@ export const usePivotTableViewSurface = ({
     tree,
     expandedRows,
     expandedCols,
-    errorMessage: activeErrorMessage,
-    onRetry: seamlessError && onSeamlessRetry ? onSeamlessRetry : onRetry,
-    warnings: combinedWarnings,
+    errorMessage,
+    onRetry,
+    warnings,
     showGlobalLoader: isInitialExpansionHydrating,
-    showCornerLoader: seamlessCornerLoading,
+    showCornerLoader: cornerLoading,
     stickyHeaders,
     headerOffset,
     headerRowOffsets,

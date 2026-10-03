@@ -16,8 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { unstable_batchedUpdates } from 'react-dom';
+import { useEffect, useMemo, useReducer, useRef } from 'react';
 import { isEqual } from 'lodash';
 import { t } from '@apache-superset/core/translation';
 import {
@@ -27,26 +26,31 @@ import {
   type JsonObject,
   type SetDataMaskHook,
 } from '@superset-ui/core';
-import { useSyncRef } from '../shared/useSyncRef';
 import {
   type PivotAxis,
   type PivotRuntimeLayout,
   type PivotTableQueryFormData,
   type PivotTreeData,
+  type PivotTreeNode,
+  type PivotExpansionState,
 } from '../../types';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
-import { createLatestRequestLifecycle } from '../runtime/requestLifecycle';
 import {
-  buildSeamlessRuntimeSyncSnapshot,
+  createLatestRequestLifecycle,
+  isAbortError,
+} from '../runtime/requestLifecycle';
+import {
   fetchAndMaterializeSeamlessRuntimeUpdate,
   isSameRuntimeLayout,
-  type SeamlessRuntimeSyncSnapshot,
+  buildSeamlessRuntimeSyncSnapshot,
 } from '../runtime/seamlessRuntimeUpdate';
-import { type PivotFactStoreBatch } from '../runtime/ingestQueryResults';
 import {
   createPivotFactStoreFromBatches,
   buildPivotFactQueryContextKey,
+  assignMissingPivotFactQueryContextKey,
+  type PivotFactStoreBatch,
+  type PivotFactStore,
 } from '../runtime/factStore';
 import { materializeLoadedPivotTreeFromFactStore } from '../runtime/materializePivotTree';
 import { buildInitialPivotUpdatePlan } from '../query/specs';
@@ -63,13 +67,32 @@ import {
   removeDimensionFromLayout,
 } from '../layout/interactionDrag';
 import { getStableColumnKey } from '../../utils';
+import {
+  ExpansionSession,
+  expansionStateKeysToIntent,
+} from '../expansion/ExpansionSession';
+import {
+  coerceExpansionStateForLayout,
+  type PivotExpansionStateKeys,
+} from '../expansion/stateModel';
+import {
+  reconcileExpansionState,
+  resolveExpandedByAxisForTree,
+  resolveCollapsedExpansionState,
+  resolveExpansionToggleDecision,
+  resolveExpandedForMetrics,
+} from '../expansion/stateTransitions';
+import { planHydrationIteration } from '../expansion/planner';
+import { parsePath } from '../core/path';
+import { StaleChunkedWorkError } from '../runtime/chunkedWork';
+import { stableStringify } from '../shared/stableStringify';
+import { rootKey } from '../viewModel';
+import { usePivotLayout } from './usePivotLayout';
 
 type RuntimeSelection = Record<string, DataRecordValue[]>;
 
 const runtimeErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : t('Failed to update data');
-const sameMetricSet = (left: string[], right: string[]) =>
-  isEqual([...left].sort(), [...right].sort());
 type UsePivotRuntimeConfig = {
   dimensionKeys: string[];
   metricKeys: string[];
@@ -89,664 +112,740 @@ type UsePivotRuntimeConfig = {
   mergeOwnState: (partial: JsonObject) => JsonObject;
   setControlValue?: HandlerFunction;
   setDataMask: SetDataMaskHook;
-  syncControlValuesOnInteraction: boolean;
+  persistedExpansionState?: unknown;
+  shouldPersistExpansionState?: boolean;
 };
 
-/** Owns draft edits, committed results, persistence acknowledgments, and refresh adoption. */
-export const usePivotRuntime = (config: UsePivotRuntimeConfig) => {
-  const {
-    dimensionKeys,
-    metricKeys,
-    data,
-    factBatches,
-    upstreamDashboardQueryContextSignature,
-    runtimeLayout,
-    initialCommittedLayout: committedRuntimeLayoutProp,
-    dimensions,
-    selectedFiltersFromFormData,
-    selectedFiltersFromOwnState,
-    selectedFiltersFromProps,
-    baseFormData,
-    sourceMetrics,
-    sourceMeasureLeavesByMetric,
-    isDashboardContext,
-    mergeOwnState,
-    setControlValue,
-    setDataMask,
-    syncControlValuesOnInteraction,
-  } = config;
-  const suppressStalePersistedFilterRestoreRef = useRef(false);
-  const seamlessSyncRef = useRef<SeamlessRuntimeSyncSnapshot | null>(null);
-  const upstreamSignature = buildPivotFactQueryContextKey({
-    ...baseFormData,
-    metrics: sourceMetrics,
+type Projection = ReturnType<typeof buildInitialPivotUpdatePlan>;
+type AxisSetMap = Record<PivotAxis, Set<string>>;
+type Visible = {
+  layout: PivotRuntimeLayout;
+  filters: RuntimeSelection;
+  tree: PivotTreeData;
+  expanded: AxisSetMap;
+  plan: Projection;
+  store: PivotFactStore;
+  intent: PivotExpansionStateKeys;
+};
+type RuntimeModel = {
+  draft: { layout: PivotRuntimeLayout; filters: RuntimeSelection };
+  visible: Visible;
+  pending?: Visible;
+  busy: 'layout' | 'filters' | 'initial' | null;
+  loadingKeys: Set<string>;
+  warnings: ChartDataWarning[];
+  error?: string;
+  failed?: 'layout' | 'filters' | 'expansion';
+  epoch: number;
+  local: boolean;
+  clearedFilters: boolean;
+  source: {
+    data: PivotTreeData;
+    factBatches: PivotFactStoreBatch[];
+    dashboardContext: string | null;
+  };
+  syncSignature?: string;
+};
+const emptyExpansion = (): PivotExpansionStateKeys => ({
+  rows: [],
+  cols: [],
+  collapsedRows: [],
+  collapsedCols: [],
+});
+const layoutKeys = (plan: Projection) => ({
+  rows: plan.layout.pivotProgram.rowDimensions.map(getStableColumnKey),
+  cols: plan.layout.pivotProgram.columnDimensions.map(getStableColumnKey),
+});
+const planFor = (
+  config: UsePivotRuntimeConfig,
+  layout: PivotRuntimeLayout,
+  filters: RuntimeSelection,
+) =>
+  buildInitialPivotUpdatePlan({
+    formData: config.baseFormData,
+    runtimeLayout: layout,
+    selection: filters,
+    metricsOverride: config.sourceMetrics,
+    measureLeavesByMetricOverride: config.sourceMeasureLeavesByMetric,
   });
-  const isDashboardRuntimeSync = isDashboardContext;
-  const shouldPersistOwnState = !isDashboardRuntimeSync;
-  const committedRuntimeLayoutInput =
-    committedRuntimeLayoutProp ?? runtimeLayout;
-  const pendingLayout = useRef<PivotRuntimeLayout | null>(null);
-  const pendingSelection = useRef<RuntimeSelection | null>(null);
-  const lastLocalSyncDashboardQueryContextRef = useRef<string | null>(null);
-  const [committedFilters, setCommittedFilters] = useState<RuntimeSelection>(
-    selectedFiltersFromProps,
-  );
-  const [uiSelectedFilters, setUiSelectedFilters] = useState<RuntimeSelection>(
-    selectedFiltersFromProps,
-  );
+const hasCells = (tree: PivotTreeData) => Object.keys(tree.cells).length > 0;
 
-  const {
-    selectedFiltersForTreeSync,
-    persistedInteractionFilters,
-    persistedSelectedFilters,
-  } = useMemo(
-    () =>
-      buildRuntimeSelectionSyncState({
-        dimensions,
-        selectedFiltersFromFormData,
-        selectedFiltersFromOwnState,
-        selectedFiltersFromProps,
-        committedFilters,
-      }),
-    [
-      committedFilters,
-      dimensions,
-      selectedFiltersFromFormData,
-      selectedFiltersFromOwnState,
-      selectedFiltersFromProps,
-    ],
-  );
-
-  const [committedRuntimeLayout, setCommittedRuntimeLayout] =
-    useState<PivotRuntimeLayout>(committedRuntimeLayoutInput);
-  const committedRuntimeLayoutRef = useRef(committedRuntimeLayout);
-  useSyncRef(committedRuntimeLayoutRef, committedRuntimeLayout);
-
-  const [uiRuntimeLayout, setUiRuntimeLayout] =
-    useState<PivotRuntimeLayout>(runtimeLayout);
-  const uiRuntimeLayoutRef = useRef(runtimeLayout);
-  const updateUiRuntimeLayout = useCallback((layout: PivotRuntimeLayout) => {
-    uiRuntimeLayoutRef.current = layout;
-    setUiRuntimeLayout(layout);
-  }, []);
-
-  const commitRuntimeLayout = useCallback((layout: PivotRuntimeLayout) => {
-    committedRuntimeLayoutRef.current = layout;
-    setCommittedRuntimeLayout(current =>
-      isSameRuntimeLayout(current, layout) ? current : layout,
-    );
-  }, []);
-
-  const persistRuntimeState = useCallback(
-    (
-      layout: PivotRuntimeLayout,
-      filters: RuntimeSelection,
-      options: {
-        commit?: boolean;
-        syncControlValues?: boolean;
-        syncOwnState?: boolean;
-      } = {},
-    ) => {
-      if (!isSameRuntimeLayout(runtimeLayout, layout))
-        pendingLayout.current = layout;
-      if (isDashboardRuntimeSync) {
-        lastLocalSyncDashboardQueryContextRef.current =
-          upstreamDashboardQueryContextSignature;
-      }
-      if (!isEqual(selectedFiltersForTreeSync, filters))
-        pendingSelection.current = filters;
-      if (options.commit !== false) {
-        commitRuntimeLayout(layout);
-      }
-      if (setControlValue && options.syncControlValues !== false) {
-        setControlValue('pivotRuntimeLayout', layout);
-        setControlValue('pivotSelectedFilters', filters);
-      }
-      if (shouldPersistOwnState && options.syncOwnState !== false) {
-        const nextOwnState = mergeOwnState({
-          pivotRuntimeLayout: layout,
-          pivotSelectedFilters: filters,
-        });
-        setDataMask({ ownState: { ...nextOwnState } });
-      }
-    },
-    [
-      commitRuntimeLayout,
-      runtimeLayout,
-      selectedFiltersForTreeSync,
-      isDashboardRuntimeSync,
-      mergeOwnState,
-      setControlValue,
-      setDataMask,
-      shouldPersistOwnState,
-      upstreamDashboardQueryContextSignature,
-    ],
-  );
-
-  useEffect(() => {
-    const hasPendingRuntimeLayout = !isSameRuntimeLayout(
-      uiRuntimeLayoutRef.current,
-      committedRuntimeLayoutRef.current,
-    );
-    const parentAcknowledgedPendingLayout =
-      pendingLayout.current !== null &&
-      isSameRuntimeLayout(runtimeLayout, pendingLayout.current);
-    if (parentAcknowledgedPendingLayout) pendingLayout.current = null;
-    const shouldSyncLayout =
-      pendingLayout.current === null &&
-      (!hasPendingRuntimeLayout || parentAcknowledgedPendingLayout);
-    if (shouldSyncLayout) commitRuntimeLayout(runtimeLayout);
-    if (shouldSyncLayout) {
-      updateUiRuntimeLayout(runtimeLayout);
-    }
-  }, [
-    commitRuntimeLayout,
-    isDashboardRuntimeSync,
-    runtimeLayout,
-    updateUiRuntimeLayout,
-  ]);
-
-  useEffect(() => {
-    if (
-      pendingSelection.current &&
-      isEqual(selectedFiltersForTreeSync, pendingSelection.current)
-    ) {
-      pendingSelection.current = null;
-    }
-    if (
-      !pendingSelection.current &&
-      (!isEqual(persistedSelectedFilters, committedFilters) ||
-        !isEqual(persistedSelectedFilters, uiSelectedFilters)) &&
-      !hasSelectedFilters(uiSelectedFilters) &&
-      !hasSelectedFilters(committedFilters) &&
-      !(
-        suppressStalePersistedFilterRestoreRef.current &&
-        hasSelectedFilters(persistedSelectedFilters)
-      )
-    ) {
-      setCommittedFilters(persistedSelectedFilters);
-      setUiSelectedFilters(persistedSelectedFilters);
-    }
-  }, [
-    committedFilters,
-    selectedFiltersForTreeSync,
-    persistedSelectedFilters,
-    suppressStalePersistedFilterRestoreRef,
-    uiSelectedFilters,
-  ]);
-
-  const commitUiRuntimeLayout = updateUiRuntimeLayout;
-  const commitFilters = setCommittedFilters;
-  const updateUiSelectedFilters = setUiSelectedFilters;
-  const lastAttempt = useRef<{
-    layout: PivotRuntimeLayout;
-    filters: RuntimeSelection;
-    options: {
-      showLoading: boolean;
-      showCornerLoading: boolean;
-      syncControlValues: boolean;
-      syncOwnState: boolean;
-    };
-  }>();
-  const [loading, setLoading] = useState(false);
-  const [cornerLoading, setCornerLoading] = useState(false);
-  const [warnings, setWarnings] = useState<ChartDataWarning[]>([]);
-  const [error, setError] = useState<string | undefined>(undefined);
-  const [committedTree, setCommittedTree] = useState<PivotTreeData>(data);
-  const [committedFactBatches, setCommittedFactBatches] =
-    useState<PivotFactStoreBatch[]>(factBatches);
-  const committedFactBatchesRef = useRef<PivotFactStoreBatch[]>(factBatches);
-  const hasMetrics = metricKeys.length > 0;
-  const lastUpstreamQueryContextRef = useRef<string | null>(null);
-  const lastSyncedPropsRef = useRef({ data, factBatches });
-  const upstreamAdoptionEpochRef = useRef(0);
-  const requestLifecycle = useMemo(
+/** Owns one fact store and publishes layout, tree and expansion as a single checkpoint. */
+export const usePivotRuntime = (config: UsePivotRuntimeConfig) => {
+  const [, render] = useReducer((revision: number) => revision + 1, 0);
+  const modelRef = useRef<RuntimeModel>();
+  const sessionRef = useRef<ExpansionSession>();
+  const lifecycle = useMemo(
     () =>
       createLatestRequestLifecycle({
-        cancel: requestGroupId =>
-          supersetChartDataClient.cancel(requestGroupId),
+        cancel: group => supersetChartDataClient.cancel(group),
       }),
     [],
   );
+  if (!modelRef.current) {
+    const plan = planFor(
+      config,
+      config.initialCommittedLayout,
+      config.selectedFiltersFromProps,
+    );
+    const keys = layoutKeys(plan);
+    const initial =
+      coerceExpansionStateForLayout({
+        value: config.persistedExpansionState,
+        rowKeys: keys.rows,
+        colKeys: keys.cols,
+      }) ?? emptyExpansion();
+    const expansion = reconcileExpansionState({
+      tree: config.data,
+      reset: true,
+      previousLayout: keys,
+      currentLayout: keys,
+      state: initial,
+      axisCoverageNeeds: plan.layout.axisCoverageNeeds,
+      program: plan.layout.pivotProgram,
+      isLeafTierVisible:
+        plan.layout.measureHierarchy.leafTierVisibility === 'visible',
+    });
+    const context = buildPivotFactQueryContextKey(plan.formData);
+    modelRef.current = {
+      draft: {
+        layout: config.runtimeLayout,
+        filters: config.selectedFiltersFromProps,
+      },
+      visible: {
+        layout: config.initialCommittedLayout,
+        filters: config.selectedFiltersFromProps,
+        tree: config.data,
+        expanded: expansion.expanded,
+        plan,
+        intent: expansion.persistedState,
+        store: createPivotFactStoreFromBatches(
+          config.factBatches.map(batch =>
+            assignMissingPivotFactQueryContextKey(batch, context),
+          ),
+        ),
+      },
+      busy: null,
+      loadingKeys: new Set(),
+      warnings: [],
+      epoch: 0,
+      local: false,
+      clearedFilters: false,
+      source: {
+        data: config.data,
+        factBatches: config.factBatches,
+        dashboardContext: config.upstreamDashboardQueryContextSignature,
+      },
+    };
+    sessionRef.current = new ExpansionSession(
+      expansion.persistedState,
+      group => supersetChartDataClient.cancel(group),
+      keys => {
+        modelRef.current!.loadingKeys = keys;
+        render();
+      },
+    );
+  }
+  const model = modelRef.current;
+  const session = sessionRef.current!;
+  const layoutResult = usePivotLayout({
+    formData: model.visible.plan.formData,
+    pivotProgram: model.visible.plan.layout.pivotProgram,
+  });
+  const upstreamSignature = buildPivotFactQueryContextKey({
+    ...config.baseFormData,
+    metrics: config.sourceMetrics,
+  });
+  const syncSignature = (
+    layout: PivotRuntimeLayout,
+    filters: RuntimeSelection,
+  ) =>
+    stableStringify(
+      buildSeamlessRuntimeSyncSnapshot({
+        runtimeLayout: layout,
+        selection: filters,
+        upstreamSignature,
+      }),
+    );
+  const selectionSync = buildRuntimeSelectionSyncState({
+    dimensions: config.dimensions,
+    selectedFiltersFromFormData: config.selectedFiltersFromFormData,
+    selectedFiltersFromOwnState: config.selectedFiltersFromOwnState,
+    selectedFiltersFromProps: config.selectedFiltersFromProps,
+    committedFilters: model.visible.filters,
+  });
+
+  const persist = (layout: PivotRuntimeLayout, filters: RuntimeSelection) => {
+    if (config.setControlValue) {
+      config.setControlValue('pivotRuntimeLayout', layout);
+      config.setControlValue('pivotSelectedFilters', filters);
+    }
+    model.syncSignature = syncSignature(layout, filters);
+  };
+  const persistExpansion = () => {
+    if (!config.shouldPersistExpansionState) return;
+    const keys = layoutKeys(model.visible.plan);
+    const state = session.committedState;
+    const payload: PivotExpansionState = {
+      rowKeys: keys.rows,
+      colKeys: keys.cols,
+      rows: state.rows.map(parsePath),
+      cols: state.cols.map(parsePath),
+      collapsedRows: state.collapsedRows.map(parsePath),
+      collapsedCols: state.collapsedCols.map(parsePath),
+    };
+    if (config.setControlValue)
+      config.setControlValue('pivotExpansionState', payload);
+    else if (!config.isDashboardContext)
+      config.setDataMask({
+        ownState: { ...config.mergeOwnState({ pivotExpansionState: payload }) },
+      });
+  };
+  const expandedFor = (
+    tree: PivotTreeData,
+    plan: Projection,
+    expanded = session.intent.expanded,
+  ) =>
+    resolveExpandedByAxisForTree({
+      tree,
+      axisCoverageNeeds: plan.layout.axisCoverageNeeds,
+      manualExpanded: expanded,
+      manualCollapsed: session.intent.collapsed,
+      program: plan.layout.pivotProgram,
+      isLeafTierVisible:
+        plan.layout.measureHierarchy.leafTierVisibility === 'visible',
+    });
+  const needsHydration = (store: PivotFactStore, plan: Projection) => {
+    const { state } = session;
+    const context = buildPivotFactQueryContextKey(plan.formData);
+    const intent = expansionStateKeysToIntent(state);
+    return (
+      planHydrationIteration({
+        desired: {
+          row: new Set([rootKey, ...intent.expanded.row]),
+          col: new Set([rootKey, ...intent.expanded.col]),
+        },
+        axisCoverageNeeds: plan.layout.axisCoverageNeeds,
+        rootCoverageNeeds: store.getFactBatches(context).length
+          ? []
+          : plan.layout.rootCoverageNeeds,
+        factSelectors: store.getCoverageSelectors(context),
+        program: plan.layout.pivotProgram,
+        queryContextKey: context,
+      }).kind === 'fetch'
+    );
+  };
+  const reportError = (
+    error: unknown,
+    failed: 'layout' | 'filters' | 'expansion',
+  ) => {
+    if (error instanceof StaleChunkedWorkError || isAbortError(error)) return;
+    model.error = runtimeErrorMessage(error);
+    model.failed = failed;
+    render();
+  };
+  const hydrate = async (
+    visible: Visible,
+    store: PivotFactStore,
+    loadingKeys?: Set<string>,
+    skip = false,
+  ) => {
+    const { plan } = visible;
+    return session.hydrate({
+      axisCoverageNeeds: plan.layout.axisCoverageNeeds,
+      completeBehavior: skip ? 'skip' : 'returnTree',
+      currentTree: visible.tree,
+      factStore: store,
+      fetchFormData: plan.formData,
+      fetchLayout: plan.layout,
+      program: plan.layout.pivotProgram,
+      queryContextKey: buildPivotFactQueryContextKey(plan.formData),
+      visibleLoadingKeys: loadingKeys,
+    });
+  };
+  const revealExpansion = async (loadingKeys?: Set<string>, skip = false) => {
+    const { epoch } = model;
+    const visible = model.pending ?? model.visible;
+    try {
+      const result = await hydrate(visible, visible.store, loadingKeys, skip);
+      if (
+        epoch !== model.epoch ||
+        !result.tree ||
+        (skip && hasCells(visible.tree) && !hasCells(result.tree))
+      )
+        return;
+      model.visible = {
+        ...visible,
+        tree: result.tree,
+        intent: session.committedState,
+        expanded: expandedFor(
+          result.tree,
+          visible.plan,
+          'revealedExpanded' in result ? result.revealedExpanded : undefined,
+        ),
+      };
+      if ('warnings' in result && result.warnings) {
+        model.warnings = [
+          ...new Map(
+            [...model.warnings, ...result.warnings].map(warning => [
+              stableStringify(warning),
+              warning,
+            ]),
+          ).values(),
+        ];
+      }
+      model.pending = undefined;
+      persistExpansion();
+      render();
+    } catch (error) {
+      if (epoch === model.epoch) reportError(error, 'expansion');
+    }
+  };
+  const reconcile = (tree: PivotTreeData, plan: Projection) => {
+    const previous = model.visible;
+    const next = reconcileExpansionState({
+      tree,
+      reset:
+        !isEqual(
+          previous.plan.layout.measureHierarchy,
+          plan.layout.measureHierarchy,
+        ) ||
+        !isEqual(
+          previous.plan.layout.axisCoverageNeeds,
+          plan.layout.axisCoverageNeeds,
+        ),
+      previousLayout: layoutKeys(previous.plan),
+      currentLayout: layoutKeys(plan),
+      state: session.committedState,
+      axisCoverageNeeds: plan.layout.axisCoverageNeeds,
+      program: plan.layout.pivotProgram,
+      isLeafTierVisible:
+        plan.layout.measureHierarchy.leafTierVisibility === 'visible',
+    });
+    session.reset(next.persistedState);
+    return next.expanded;
+  };
+  const refresh = async (kind: 'layout' | 'filters') => {
+    const target = model.draft;
+    model.epoch += 1;
+    const { epoch } = model;
+    session.reset(model.visible.intent);
+    model.pending = undefined;
+    model.busy = kind;
+    model.error = undefined;
+    model.failed = undefined;
+    render();
+    const result = await fetchAndMaterializeSeamlessRuntimeUpdate({
+      requestLifecycle: lifecycle,
+      baseFormData: config.baseFormData,
+      sourceMetrics: config.sourceMetrics,
+      sourceMeasureLeavesByMetric: config.sourceMeasureLeavesByMetric,
+      runtimeLayout: target.layout,
+      selection: target.filters,
+      factBatches: (model.pending ?? model.visible).store.getFactBatches(),
+    });
+    if (epoch !== model.epoch || result.status === 'stale') return;
+    if (result.status !== 'success') {
+      model.busy = null;
+      reportError(result.error, kind);
+      return;
+    }
+    const plan = planFor(config, target.layout, target.filters);
+    const store = createPivotFactStoreFromBatches(result.factBatches);
+    const expanded = reconcile(result.tree, plan);
+    let visible: Visible = {
+      layout: target.layout,
+      filters: target.filters,
+      tree: result.tree,
+      expanded,
+      plan,
+      store,
+      intent: session.committedState,
+    };
+    model.pending = visible;
+    try {
+      if (needsHydration(store, plan)) {
+        const hydrated = await hydrate(visible, store, new Set());
+        if (epoch !== model.epoch) return;
+        if (!hydrated.tree) return;
+        visible = {
+          ...visible,
+          tree: hydrated.tree,
+          expanded: expandedFor(hydrated.tree, plan),
+          intent: session.committedState,
+        };
+      }
+      model.visible = visible;
+      model.pending = undefined;
+      model.warnings = result.warnings;
+      model.busy = null;
+      persist(target.layout, target.filters);
+      persistExpansion();
+      render();
+    } catch (error) {
+      if (epoch === model.epoch) {
+        model.busy = null;
+        reportError(error, kind);
+      }
+    }
+  };
+  const applyRuntimeLayoutChange = (next: PivotRuntimeLayout) => {
+    const layout = normalizeRuntimeLayout(
+      next,
+      config.dimensionKeys,
+      config.metricKeys,
+    );
+    model.draft = { ...model.draft, layout };
+    model.local = true;
+    persist(layout, model.draft.filters);
+    refresh('layout');
+  };
+  const changeFilters = (filters: RuntimeSelection, cleared: boolean) => {
+    model.local = true;
+    model.clearedFilters = cleared;
+    model.draft = { ...model.draft, filters };
+    refresh('filters');
+  };
+  const handleToggle = (axis: PivotAxis, node: PivotTreeNode) => {
+    const { visible } = model;
+    const decision = resolveExpansionToggleDecision({
+      node,
+      expanded: visible.expanded[axis],
+      manualExpanded: session.intent.expanded[axis],
+      manualCollapsed: session.intent.collapsed[axis],
+    });
+    model.error = undefined;
+    if (decision.kind === 'expand') {
+      session.updateAxis(
+        axis,
+        decision.nextManualExpanded,
+        decision.nextManualCollapsed,
+      );
+      revealExpansion(new Set([node.key]));
+    } else {
+      model.epoch += 1;
+      lifecycle.invalidate();
+      session.reset(visible.intent);
+      if (
+        !isSameRuntimeLayout(model.draft.layout, visible.layout) ||
+        !isEqual(model.draft.filters, visible.filters)
+      ) {
+        model.draft = { layout: visible.layout, filters: visible.filters };
+        model.clearedFilters = !hasSelectedFilters(visible.filters);
+        persist(visible.layout, visible.filters);
+      }
+      model.failed = undefined;
+      model.pending = undefined;
+      model.busy = null;
+      const { intent } = session;
+      const collapsed = resolveCollapsedExpansionState({
+        node,
+        expanded: visible.expanded[axis],
+        manualExpanded: intent.expanded[axis],
+        manualCollapsed: intent.collapsed[axis],
+        nodes: axis === 'row' ? visible.tree.rows : visible.tree.cols,
+      });
+      session.updateAxis(
+        axis,
+        collapsed.nextManualExpanded,
+        collapsed.nextManualCollapsed,
+      );
+      session.acceptCurrent();
+      const expanded = resolveExpandedForMetrics({
+        axis,
+        expanded: collapsed.nextExpanded,
+        tree: visible.tree,
+        collapsed: collapsed.nextManualCollapsed,
+        program: visible.plan.layout.pivotProgram,
+        isLeafTierVisible:
+          visible.plan.layout.measureHierarchy.leafTierVisibility === 'visible',
+      });
+      model.visible = {
+        ...visible,
+        expanded: { ...visible.expanded, [axis]: expanded },
+        intent: session.committedState,
+      };
+      persistExpansion();
+      render();
+    }
+  };
+
   useEffect(
     () => () => {
-      requestLifecycle.invalidate();
+      model.epoch += 1;
+      session.dispose();
+      lifecycle.invalidate();
     },
-    [requestLifecycle],
+    [model, session, lifecycle],
   );
-  const materializeCommittedFacts = useCallback(
-    (
-      nextRuntimeLayout: PivotRuntimeLayout,
-      selection: RuntimeSelection,
-      nextFactBatches: PivotFactStoreBatch[],
-    ) => {
-      const { formData, layout } = buildInitialPivotUpdatePlan({
-        formData: baseFormData,
-        runtimeLayout: nextRuntimeLayout,
-        selection,
-        metricsOverride: sourceMetrics,
-        measureLeavesByMetricOverride: sourceMeasureLeavesByMetric,
-      });
-      setCommittedTree(
-        materializeLoadedPivotTreeFromFactStore({
-          store: createPivotFactStoreFromBatches(nextFactBatches),
-          layout,
-          formData,
-        }),
-      );
-    },
-    [baseFormData, sourceMeasureLeavesByMetric, sourceMetrics],
-  );
-  const applySeamlessUpdate = useCallback(
-    async (
-      nextLayout: PivotRuntimeLayout,
-      nextFilters: RuntimeSelection,
-      {
-        showLoading = true,
-        showCornerLoading = showLoading,
-        syncControlValues = true,
-        syncOwnState = true,
-      }: {
-        showLoading?: boolean;
-        showCornerLoading?: boolean;
-        syncControlValues?: boolean;
-        syncOwnState?: boolean;
-      } = {},
-    ) => {
-      const normalized = normalizeRuntimeLayout(
-        nextLayout,
-        dimensionKeys,
-        metricKeys,
-      );
-      lastAttempt.current = {
-        layout: normalized,
-        filters: nextFilters,
-        options: {
-          showLoading,
-          showCornerLoading,
-          syncControlValues,
-          syncOwnState,
-        },
-      };
-      setLoading(showLoading);
-      setCornerLoading(showCornerLoading);
-      setError(undefined);
-      const upstreamAdoptionEpoch = upstreamAdoptionEpochRef.current;
-      const updateResult = await fetchAndMaterializeSeamlessRuntimeUpdate({
-        requestLifecycle,
-        baseFormData,
-        sourceMetrics,
-        sourceMeasureLeavesByMetric,
-        runtimeLayout: normalized,
-        selection: nextFilters,
-        factBatches: committedFactBatchesRef.current,
-      });
-      if (
-        updateResult.status === 'stale' ||
-        upstreamAdoptionEpoch !== upstreamAdoptionEpochRef.current
-      ) {
-        return;
-      }
-      if (updateResult.status !== 'success') {
-        setError(runtimeErrorMessage(updateResult.error));
-        setLoading(false);
-        setCornerLoading(false);
-        return;
-      }
-
-      unstable_batchedUpdates(() => {
-        setCommittedTree(updateResult.tree);
-        committedFactBatchesRef.current = updateResult.factBatches;
-        setCommittedFactBatches(updateResult.factBatches);
-        commitUiRuntimeLayout(normalized);
-        commitFilters(nextFilters);
-        setWarnings(updateResult.warnings);
-        persistRuntimeState(normalized, nextFilters, {
-          syncControlValues,
-          syncOwnState,
-        });
-      });
-      seamlessSyncRef.current = buildSeamlessRuntimeSyncSnapshot({
-        runtimeLayout: normalized,
-        selection: nextFilters,
-        upstreamSignature,
-      });
-      setLoading(false);
-      setCornerLoading(false);
-    },
-    [
-      baseFormData,
-      commitFilters,
-      commitUiRuntimeLayout,
-      dimensionKeys,
-      metricKeys,
-      persistRuntimeState,
-      requestLifecycle,
-      seamlessSyncRef,
-      sourceMeasureLeavesByMetric,
-      sourceMetrics,
-      upstreamSignature,
-    ],
-  );
-
-  const retrySeamlessUpdate = useCallback(() => {
-    const attempt = lastAttempt.current;
-    if (attempt)
-      applySeamlessUpdate(attempt.layout, attempt.filters, attempt.options);
-  }, [applySeamlessUpdate]);
-
   useEffect(() => {
-    const incomingLayoutMatchesCommitted = isSameRuntimeLayout(
-      runtimeLayout,
-      committedRuntimeLayout,
+    const shouldHydrate = needsHydration(
+      model.visible.store,
+      model.visible.plan,
     );
-    const incomingLayoutMatchesUi = isSameRuntimeLayout(
-      runtimeLayout,
-      uiRuntimeLayoutRef.current,
-    );
-    const hasLocalSyncForCurrentDashboardQueryContext =
-      upstreamDashboardQueryContextSignature !== null &&
-      lastLocalSyncDashboardQueryContextRef.current ===
-        upstreamDashboardQueryContextSignature;
-    const incomingPlan = buildInitialPivotUpdatePlan({
-      formData: baseFormData,
-      runtimeLayout,
-      selection: selectedFiltersForTreeSync,
-      metricsOverride: sourceMetrics,
-      measureLeavesByMetricOverride: sourceMeasureLeavesByMetric,
-    });
-    const incomingContext = buildPivotFactQueryContextKey(
-      incomingPlan.formData,
-    );
-    const incomingFactsMatchSelection =
-      factBatches.length > 0 &&
-      factBatches.every(batch => batch.queryContextKey === incomingContext);
+    const { tree } = model.visible;
+    const displayable =
+      hasCells(tree) ||
+      [tree.rows, tree.cols].some(nodes =>
+        Object.keys(nodes).some(key => key !== rootKey),
+      );
     if (
-      loading ||
-      hasLocalSyncForCurrentDashboardQueryContext ||
-      (hasSelectedFilters(persistedInteractionFilters) &&
-        !incomingFactsMatchSelection) ||
-      (!incomingLayoutMatchesCommitted && !incomingLayoutMatchesUi) ||
-      !isEqual(selectedFiltersForTreeSync, committedFilters) ||
-      (lastSyncedPropsRef.current.data === data &&
-        lastSyncedPropsRef.current.factBatches === factBatches)
+      shouldHydrate &&
+      !displayable &&
+      (session.state.rows.length || session.state.cols.length)
     ) {
-      return;
+      model.busy = 'initial';
+      render();
     }
-    lastSyncedPropsRef.current = { data, factBatches };
-    upstreamAdoptionEpochRef.current += 1;
-    requestLifecycle.invalidate();
-    committedFactBatchesRef.current = factBatches;
-    setCommittedFactBatches(factBatches);
-    setWarnings([]);
-    setError(undefined);
-    const { formData, layout } = buildInitialPivotUpdatePlan({
-      formData: baseFormData,
-      runtimeLayout,
-      selection: selectedFiltersForTreeSync,
-      metricsOverride: sourceMetrics,
-      measureLeavesByMetricOverride: sourceMeasureLeavesByMetric,
-    });
-    const nextTree = materializeLoadedPivotTreeFromFactStore({
-      store: createPivotFactStoreFromBatches(factBatches),
-      layout,
-      formData,
-    });
-    setCommittedTree(
-      Object.keys(data.cells).length > 0 &&
-        Object.keys(nextTree.cells).length === 0
-        ? data
-        : nextTree,
-    );
-  }, [
-    baseFormData,
-    data,
-    factBatches,
-    committedFilters,
-    committedRuntimeLayout,
-    lastLocalSyncDashboardQueryContextRef,
-    loading,
-    persistedInteractionFilters,
-    requestLifecycle,
-    runtimeLayout,
-    selectedFiltersForTreeSync,
-    sourceMeasureLeavesByMetric,
-    sourceMetrics,
-    upstreamDashboardQueryContextSignature,
-    uiRuntimeLayoutRef,
-  ]);
-
-  const applyRuntimeLayoutChange = useCallback(
-    (nextLayout: PivotRuntimeLayout) => {
-      const runtimeLayout = normalizeRuntimeLayout(
-        nextLayout,
-        dimensionKeys,
-        metricKeys,
-      );
-      const syncSnapshot = buildSeamlessRuntimeSyncSnapshot({
-        runtimeLayout,
-        selection: uiSelectedFilters,
-        upstreamSignature,
-      });
-      const previousLayout = uiRuntimeLayoutRef.current;
-      setError(undefined);
-      commitUiRuntimeLayout(runtimeLayout);
-      if (
-        isEqual(previousLayout.rows, runtimeLayout.rows) &&
-        isEqual(previousLayout.cols, runtimeLayout.cols) &&
-        isEqual(previousLayout.leafSelection, runtimeLayout.leafSelection) &&
-        previousLayout.valuePlacement.axis ===
-          runtimeLayout.valuePlacement.axis &&
-        previousLayout.valuePlacement.index ===
-          runtimeLayout.valuePlacement.index &&
-        sameMetricSet(previousLayout.metrics, runtimeLayout.metrics)
-      ) {
-        persistRuntimeState(runtimeLayout, uiSelectedFilters, {
-          syncControlValues: syncControlValuesOnInteraction,
-          syncOwnState: false,
-        });
-        seamlessSyncRef.current = syncSnapshot;
-        materializeCommittedFacts(
-          runtimeLayout,
-          uiSelectedFilters,
-          committedFactBatchesRef.current,
-        );
-        return;
+    revealExpansion(undefined, true).finally(() => {
+      if (model.busy === 'initial') {
+        model.busy = null;
+        render();
       }
-      persistRuntimeState(runtimeLayout, uiSelectedFilters, {
-        commit: false,
-        syncControlValues: syncControlValuesOnInteraction,
-        syncOwnState: false,
-      });
-      seamlessSyncRef.current = syncSnapshot;
-      applySeamlessUpdate(runtimeLayout, uiSelectedFilters, {
-        showLoading: false,
-        showCornerLoading: true,
-        syncControlValues: syncControlValuesOnInteraction,
-        syncOwnState: false,
-      });
-    },
-    [
-      applySeamlessUpdate,
-      commitUiRuntimeLayout,
-      dimensionKeys,
-      materializeCommittedFacts,
-      metricKeys,
-      persistRuntimeState,
-      seamlessSyncRef,
-      syncControlValuesOnInteraction,
-      uiSelectedFilters,
-      uiRuntimeLayoutRef,
-      upstreamSignature,
-    ],
-  );
-
-  const applyDimensionFilterChange = useCallback(
-    (dimension: QueryFormColumn, values: DataRecordValue[]) => {
-      const dimensionKey = getStableColumnKey(dimension);
-      const { selection: nextSelected, suppressStalePersistedFilterRestore } =
-        applyDimensionFilterSelectionChange({
-          selection: uiSelectedFilters,
-          dimensionKey,
-          values,
-        });
-      suppressStalePersistedFilterRestoreRef.current =
-        suppressStalePersistedFilterRestore;
-      updateUiSelectedFilters(nextSelected);
-      applySeamlessUpdate(uiRuntimeLayout, nextSelected, {
-        syncControlValues: syncControlValuesOnInteraction,
-        syncOwnState: false,
-      });
-    },
-    [
-      applySeamlessUpdate,
-      suppressStalePersistedFilterRestoreRef,
-      syncControlValuesOnInteraction,
-      uiRuntimeLayout,
-      uiSelectedFilters,
-      updateUiSelectedFilters,
-    ],
-  );
-
-  const clearAllFilters = useCallback(() => {
-    const update = buildClearSelectedFiltersUpdate(uiSelectedFilters);
-    if (!update) {
+    });
+    // Initial restoration runs once; later source receipts use the adoption transition below.
+  }, []);
+  useEffect(() => {
+    const previous = model.source;
+    const context = config.upstreamDashboardQueryContextSignature;
+    const upstreamChanged =
+      previous.dashboardContext !== null &&
+      context !== null &&
+      previous.dashboardContext !== context;
+    const restore =
+      hasSelectedFilters(selectionSync.persistedInteractionFilters) &&
+      !(model.clearedFilters && !hasSelectedFilters(model.draft.filters));
+    const selection = upstreamChanged
+      ? model.draft.filters
+      : selectionSync.persistedInteractionFilters;
+    const signature = syncSignature(model.draft.layout, selection);
+    model.source = { ...previous, dashboardContext: context };
+    if ((upstreamChanged || restore) && model.syncSignature !== signature) {
+      model.syncSignature = signature;
+      if (!model.local)
+        model.draft = { layout: config.runtimeLayout, filters: selection };
+      refresh('filters');
       return;
     }
-    suppressStalePersistedFilterRestoreRef.current =
-      update.suppressStalePersistedFilterRestore;
-    const nextSelected = update.selection;
-    updateUiSelectedFilters(nextSelected);
-    applySeamlessUpdate(uiRuntimeLayout, nextSelected, {
-      syncControlValues: syncControlValuesOnInteraction,
-      syncOwnState: false,
+    const acceptsPendingSource =
+      previous.data !== config.data &&
+      isSameRuntimeLayout(config.runtimeLayout, model.draft.layout);
+    if (
+      (model.busy && !acceptsPendingSource) ||
+      (config.isDashboardContext && model.local && !upstreamChanged)
+    )
+      return;
+    const layout = config.runtimeLayout;
+    if (
+      model.local &&
+      ((!isSameRuntimeLayout(layout, model.visible.layout) &&
+        !isSameRuntimeLayout(layout, model.draft.layout)) ||
+        !isEqual(
+          selectionSync.selectedFiltersForTreeSync,
+          model.visible.filters,
+        ))
+    )
+      return;
+    const plan = planFor(
+      config,
+      layout,
+      selectionSync.selectedFiltersForTreeSync,
+    );
+    if (
+      previous.data === config.data &&
+      previous.factBatches === config.factBatches &&
+      isSameRuntimeLayout(layout, model.visible.layout) &&
+      isEqual(plan.layout, model.visible.plan.layout)
+    ) {
+      if (!isEqual(plan.formData, model.visible.plan.formData)) {
+        model.visible = { ...model.visible, plan };
+        render();
+      }
+      return;
+    }
+    const contextKey = buildPivotFactQueryContextKey(plan.formData);
+    if (
+      restore &&
+      !config.factBatches.every(batch => batch.queryContextKey === contextKey)
+    )
+      return;
+    model.source = {
+      data: config.data,
+      factBatches: config.factBatches,
+      dashboardContext: context,
+    };
+    model.epoch += 1;
+    model.busy = null;
+    lifecycle.invalidate();
+    const store = createPivotFactStoreFromBatches(
+      config.factBatches.map(batch =>
+        assignMissingPivotFactQueryContextKey(batch, contextKey),
+      ),
+    );
+    const materialized = materializeLoadedPivotTreeFromFactStore({
+      store,
+      layout: plan.layout,
+      formData: plan.formData,
     });
+    const tree =
+      hasCells(config.data) && !hasCells(materialized)
+        ? config.data
+        : materialized;
+    const expanded = reconcile(tree, plan);
+    const visible: Visible = {
+      layout,
+      filters: selectionSync.selectedFiltersForTreeSync,
+      tree,
+      expanded,
+      plan,
+      store,
+      intent: session.committedState,
+    };
+    if (!model.local) model.draft = { layout, filters: visible.filters };
+    model.warnings = [];
+    model.error = undefined;
+    const { epoch } = model;
+    const pending = needsHydration(store, plan);
+    if (
+      !pending ||
+      (!visible.intent.rows.length && !visible.intent.cols.length)
+    ) {
+      model.visible = visible;
+      model.pending = undefined;
+      render();
+    }
+    if (pending) {
+      model.pending = visible;
+      // A refreshed root cannot replace the covered hierarchy before its children arrive.
+      hydrate(visible, store, new Set())
+        .then(result => {
+          if (
+            epoch !== model.epoch ||
+            !result.tree ||
+            (hasCells(visible.tree) && !hasCells(result.tree))
+          )
+            return;
+          model.visible = {
+            ...visible,
+            tree: result.tree,
+            expanded: expandedFor(result.tree, plan),
+            intent: session.committedState,
+          };
+          model.pending = undefined;
+          render();
+        })
+        .catch(error => {
+          if (epoch === model.epoch) reportError(error, 'expansion');
+        });
+    }
+    // Handlers operate on the single model; prop receipts, not rendered revisions, trigger adoption.
   }, [
-    applySeamlessUpdate,
-    suppressStalePersistedFilterRestoreRef,
-    syncControlValuesOnInteraction,
-    uiRuntimeLayout,
-    uiSelectedFilters,
-    updateUiSelectedFilters,
+    config.data,
+    config.factBatches,
+    config.runtimeLayout,
+    config.baseFormData,
+    config.upstreamDashboardQueryContextSignature,
+    config.selectedFiltersFromFormData,
+    config.selectedFiltersFromOwnState,
+    config.selectedFiltersFromProps,
   ]);
 
-  const commitFactBatchesForRender = useCallback(
-    (nextFactBatches: PivotFactStoreBatch[]) => {
-      committedFactBatchesRef.current = nextFactBatches;
-      setCommittedFactBatches(nextFactBatches);
-    },
-    [],
-  );
-
-  const removeRuntimeDimension = useCallback(
-    (dimensionKey: string) => {
-      applyRuntimeLayoutChange(
-        removeDimensionFromLayout(uiRuntimeLayoutRef.current, dimensionKey),
+  const context = buildPivotFactQueryContextKey(model.visible.plan.formData);
+  const warnings =
+    model.visible.store
+      .getFactBatches(context)
+      .some(batch => batch.complete === false) &&
+    !model.warnings.some(warning => warning.type === 'truncation')
+      ? [
+          ...model.warnings,
+          {
+            type: 'truncation' as const,
+            rowLimit:
+              Number(model.visible.plan.formData.row_limit) || undefined,
+          },
+        ]
+      : model.warnings;
+  const retry = () => {
+    model.error = undefined;
+    if (model.failed === 'layout' || model.failed === 'filters')
+      refresh(model.failed);
+    else revealExpansion();
+  };
+  return {
+    uiRuntimeLayout: model.draft.layout,
+    uiSelectedFilters: model.draft.filters,
+    tree: model.visible.tree,
+    expandedRows: model.visible.expanded.row,
+    expandedCols: model.visible.expanded.col,
+    layoutResult,
+    appliedLayoutFormData: model.visible.plan.formData,
+    loadingKeys: model.loadingKeys,
+    isInitialExpansionHydrating: model.busy === 'initial',
+    cornerLoading: model.busy === 'layout',
+    warnings,
+    errorMessage: model.error,
+    handleToggle,
+    handleRetry: retry,
+    applyRuntimeLayoutChange,
+    applyDimensionFilterChange: (
+      dimension: QueryFormColumn,
+      values: DataRecordValue[],
+    ) => {
+      const update = applyDimensionFilterSelectionChange({
+        selection: model.draft.filters,
+        dimensionKey: getStableColumnKey(dimension),
+        values,
+      });
+      changeFilters(
+        update.selection,
+        update.suppressStalePersistedFilterRestore,
       );
     },
-    [applyRuntimeLayoutChange, uiRuntimeLayoutRef],
-  );
-
-  const dropRuntimeDimension = useCallback(
-    (
+    clearAllFilters: () => {
+      const update = buildClearSelectedFiltersUpdate(model.draft.filters);
+      if (update)
+        changeFilters(
+          update.selection,
+          update.suppressStalePersistedFilterRestore,
+        );
+    },
+    removeRuntimeDimension: (key: string) =>
+      applyRuntimeLayoutChange(
+        removeDimensionFromLayout(model.draft.layout, key),
+      ),
+    dropRuntimeDimension: (
       dimensionKey: string,
       targetAxis: PivotAxis,
       targetChipIndex: number | undefined,
       insertBeforeValue: boolean,
       sourceAxis?: PivotAxis,
       sourceChipIndex?: number,
-    ) => {
-      const nextLayout = applyDimensionDrag(uiRuntimeLayoutRef.current, {
-        dimensionKey,
-        targetAxis,
-        targetChipIndex,
-        insertBeforeValue,
-        sourceAxis,
-        sourceChipIndex,
-        metricsAvailable: hasMetrics,
-      });
-      applyRuntimeLayoutChange(nextLayout);
-    },
-    [applyRuntimeLayoutChange, hasMetrics, uiRuntimeLayoutRef],
-  );
-
-  const dropRuntimeValue = useCallback(
-    (
+    ) =>
+      applyRuntimeLayoutChange(
+        applyDimensionDrag(model.draft.layout, {
+          dimensionKey,
+          targetAxis,
+          targetChipIndex,
+          insertBeforeValue,
+          sourceAxis,
+          sourceChipIndex,
+          metricsAvailable: config.metricKeys.length > 0,
+        }),
+      ),
+    dropRuntimeValue: (
       targetAxis: PivotAxis,
       targetChipIndex: number | undefined,
       sourceAxis: PivotAxis,
       sourceChipIndex?: number,
-    ) => {
-      const nextLayout = applyValueDrag(uiRuntimeLayoutRef.current, {
-        targetAxis,
-        targetChipIndex,
-        sourceAxis,
-        sourceChipIndex,
-        metricsAvailable: hasMetrics,
-      });
-      applyRuntimeLayoutChange(nextLayout);
-    },
-    [applyRuntimeLayoutChange, hasMetrics, uiRuntimeLayoutRef],
-  );
-
-  useEffect(() => {
-    const previousUpstream = lastUpstreamQueryContextRef.current;
-    lastUpstreamQueryContextRef.current =
-      upstreamDashboardQueryContextSignature;
-    const upstreamChanged =
-      previousUpstream !== null &&
-      upstreamDashboardQueryContextSignature !== null &&
-      previousUpstream !== upstreamDashboardQueryContextSignature;
-    const restorePersisted =
-      hasSelectedFilters(persistedInteractionFilters) &&
-      !(
-        suppressStalePersistedFilterRestoreRef.current &&
-        !hasSelectedFilters(uiSelectedFilters)
-      );
-    if (!upstreamChanged && !restorePersisted) return;
-    const selection = upstreamChanged
-      ? uiSelectedFilters
-      : persistedInteractionFilters;
-    const snapshot = buildSeamlessRuntimeSyncSnapshot({
-      runtimeLayout: uiRuntimeLayout,
-      selection,
-      upstreamSignature,
-    });
-    if (isEqual(seamlessSyncRef.current, snapshot)) return;
-    // Reserve the snapshot before dispatch so prop acknowledgements cannot restart it.
-    seamlessSyncRef.current = snapshot;
-    applySeamlessUpdate(uiRuntimeLayout, selection, {
-      syncControlValues: syncControlValuesOnInteraction,
-      syncOwnState: false,
-    });
-  }, [
-    applySeamlessUpdate,
-    persistedInteractionFilters,
-    uiSelectedFilters,
-    syncControlValuesOnInteraction,
-    uiRuntimeLayout,
-    upstreamSignature,
-    upstreamDashboardQueryContextSignature,
-  ]);
-
-  return {
-    committedRuntimeLayout,
-    committedFilters,
-    uiRuntimeLayout,
-    uiSelectedFilters,
-    dataForRender: committedTree,
-    factBatchesForRender: committedFactBatches,
-    seamlessLoading: loading,
-    seamlessCornerLoading: cornerLoading,
-    seamlessWarnings: warnings,
-    seamlessError: error,
-    retrySeamlessUpdate,
-    applyRuntimeLayoutChange,
-    applyDimensionFilterChange,
-    clearAllFilters,
-    commitFactBatchesForRender,
-    removeRuntimeDimension,
-    dropRuntimeDimension,
-    dropRuntimeValue,
+    ) =>
+      applyRuntimeLayoutChange(
+        applyValueDrag(model.draft.layout, {
+          targetAxis,
+          targetChipIndex,
+          sourceAxis,
+          sourceChipIndex,
+          metricsAvailable: config.metricKeys.length > 0,
+        }),
+      ),
   };
 };

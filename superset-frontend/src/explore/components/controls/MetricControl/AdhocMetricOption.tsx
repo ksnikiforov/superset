@@ -16,87 +16,106 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { PureComponent } from 'react';
+import { type ComponentProps, ReactNode, useCallback, useMemo } from 'react';
 import { Metric } from '@superset-ui/core';
-import { OptionControlLabel } from 'src/explore/components/controls/OptionControls';
+import { OptionControlLabel } from '../OptionControls';
 import { DndItemType } from 'src/explore/components/DndItemType';
-import { Datasource } from 'src/explore/types';
-import { ISaveableDatasource } from 'src/SqlLab/components/SaveDatasetModal';
 import AdhocMetric from './AdhocMetric';
 import AdhocMetricPopoverTrigger from './AdhocMetricPopoverTrigger';
-import { savedMetricType as SavedMetricTypeDef } from './types';
+import { type savedMetricType } from './types';
 
-interface AdhocMetricOptionProps {
+type SavedMetric = savedMetricType & { error_text?: string };
+type AdhocMetricPopoverDatasource = ComponentProps<
+  typeof AdhocMetricPopoverTrigger
+>['datasource'];
+type AdhocMetricPopoverColumns = ComponentProps<
+  typeof AdhocMetricPopoverTrigger
+>['columns'];
+
+type AdhocMetricOptionProps = {
   adhocMetric: AdhocMetric;
-  onMetricEdit: (newMetric: Metric, oldMetric: Metric) => void;
+  onMetricEdit?: (newMetric: Metric, oldMetric: Metric) => void;
   onRemoveMetric?: (index: number) => void;
-  columns?: { column_name: string; type: string }[];
-  savedMetricsOptions?: SavedMetricTypeDef[];
-  savedMetric?: SavedMetricTypeDef | Record<string, never>;
-  datasource?: Datasource & ISaveableDatasource;
+  columns?: Array<{ column_name: string; type?: string }>;
+  savedMetricsOptions?: savedMetricType[];
+  savedMetric?: SavedMetric | Record<string, never>;
+  datasource?: AdhocMetricPopoverDatasource;
   onMoveLabel?: (dragIndex: number, hoverIndex: number) => void;
   onDropLabel?: () => void;
   index?: number;
   type?: string;
   multi?: boolean;
   datasourceWarningMessage?: string;
-}
+  rightNode?: ReactNode;
+};
 
-class AdhocMetricOption extends PureComponent<AdhocMetricOptionProps> {
-  constructor(props: AdhocMetricOptionProps) {
-    super(props);
-    this.onRemoveMetric = this.onRemoveMetric.bind(this);
-  }
+const AdhocMetricOption = ({
+  adhocMetric,
+  onMetricEdit = () => {},
+  onRemoveMetric,
+  columns = [],
+  savedMetricsOptions = [],
+  savedMetric = {},
+  datasource,
+  onMoveLabel,
+  onDropLabel,
+  index = 0,
+  type,
+  multi,
+  datasourceWarningMessage,
+  rightNode,
+}: AdhocMetricOptionProps) => {
+  const popoverColumns = useMemo<AdhocMetricPopoverColumns>(
+    () =>
+      columns.map(column => ({
+        column_name: column.column_name,
+        type: column.type ?? '',
+      })),
+    [columns],
+  );
+  const handleRemoveMetric = useCallback(
+    (event?: React.MouseEvent) => {
+      event?.stopPropagation();
+      if (onRemoveMetric) {
+        onRemoveMetric(index);
+      }
+    },
+    [index, onRemoveMetric],
+  );
+  const withCaret = !savedMetric?.error_text;
 
-  onRemoveMetric(e?: React.MouseEvent): void {
-    e?.stopPropagation();
-    this.props.onRemoveMetric?.(this.props.index ?? 0);
-  }
+  const label = (
+    <OptionControlLabel
+      savedMetric={
+        savedMetric.metric_name ? (savedMetric as SavedMetric) : undefined
+      }
+      adhocMetric={adhocMetric}
+      label={adhocMetric.label}
+      onRemove={handleRemoveMetric}
+      onMoveLabel={onMoveLabel}
+      onDropLabel={onDropLabel}
+      index={index}
+      type={type ?? DndItemType.AdhocMetricOption}
+      withCaret={withCaret}
+      isFunction
+      multi={multi}
+      datasourceWarningMessage={datasourceWarningMessage}
+      rightNode={rightNode}
+    />
+  );
 
-  render() {
-    const {
-      adhocMetric,
-      onMetricEdit,
-      columns,
-      savedMetricsOptions,
-      savedMetric = {} as SavedMetricTypeDef,
-      datasource,
-      onMoveLabel,
-      onDropLabel,
-      index,
-      type,
-      multi,
-      datasourceWarningMessage,
-    } = this.props;
-    const withCaret = !(savedMetric as SavedMetricTypeDef).error_text;
-
-    return (
-      <AdhocMetricPopoverTrigger
-        adhocMetric={adhocMetric}
-        onMetricEdit={onMetricEdit}
-        columns={columns ?? []}
-        savedMetricsOptions={savedMetricsOptions ?? []}
-        savedMetric={savedMetric}
-        datasource={datasource!}
-      >
-        <OptionControlLabel
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          savedMetric={savedMetric as any}
-          adhocMetric={adhocMetric}
-          label={adhocMetric.label}
-          onRemove={() => this.onRemoveMetric()}
-          onMoveLabel={onMoveLabel}
-          onDropLabel={onDropLabel}
-          index={index ?? 0}
-          type={type ?? DndItemType.AdhocMetricOption}
-          withCaret={withCaret}
-          isFunction
-          multi={multi}
-          datasourceWarningMessage={datasourceWarningMessage}
-        />
-      </AdhocMetricPopoverTrigger>
-    );
-  }
-}
+  return (
+    <AdhocMetricPopoverTrigger
+      adhocMetric={adhocMetric}
+      onMetricEdit={onMetricEdit}
+      columns={popoverColumns}
+      savedMetricsOptions={savedMetricsOptions}
+      savedMetric={savedMetric}
+      datasource={datasource!}
+    >
+      {label}
+    </AdhocMetricPopoverTrigger>
+  );
+};
 
 export default AdhocMetricOption;

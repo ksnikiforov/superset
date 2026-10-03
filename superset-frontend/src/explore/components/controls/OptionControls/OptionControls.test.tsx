@@ -161,3 +161,41 @@ test('renders AddIconButton', () => {
   const { container } = render(<AddIconButton />);
   expect(container).toBeInTheDocument();
 });
+
+test('option actions do not open the surrounding metric editor', () => {
+  const openEditor = jest.fn();
+  const runAction = jest.fn();
+  render(
+    <div onClick={openEditor} onMouseDown={openEditor} role="presentation">
+      <OptionControlLabel
+        {...defaultProps}
+        rightNode={
+          <button type="button" onClick={runAction}>
+            Format metric
+          </button>
+        }
+      />
+    </div>,
+    { useDnd: true },
+  );
+  const action = screen.getByRole('button', { name: 'Format metric' });
+  fireEvent.mouseDown(action);
+  fireEvent.click(action);
+  expect(runAction).toHaveBeenCalledTimes(1);
+  expect(openEditor).not.toHaveBeenCalled();
+});
+
+test('protected measure options cannot be removed', () => {
+  const remove = jest.fn();
+  render(
+    <OptionControlLabel
+      {...defaultProps}
+      onRemove={remove}
+      showRemove={false}
+    />,
+    { useDnd: true },
+  );
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByTestId('remove-control-button'));
+  expect(remove).not.toHaveBeenCalled();
+});

@@ -170,21 +170,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
     });
 
     const { result } = renderHook(() => {
-      const layout = usePivotLayout({
-        formData,
-        metricsLayout: MetricsLayoutEnum.COLUMNS,
-        startCollapsed: false,
-        initialDepth: 1,
-        rowTotals: false,
-        colTotals: false,
-        rowSubTotals: false,
-        rowSubtotalLevels: [],
-        colSubtotalLevels: [],
-        rowTotalPosition: 'start',
-        rowSubtotalPosition: 'start',
-        colTotalPosition: 'start',
-        colSubtotalPosition: 'start',
-      });
+      const layout = usePivotLayout({ formData });
       return usePivotRenderModel({
         tree,
         expandedRows: new Set(),
@@ -245,21 +231,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
     });
 
     const { result } = renderHook(() => {
-      const layout = usePivotLayout({
-        formData,
-        metricsLayout: MetricsLayoutEnum.COLUMNS,
-        startCollapsed: false,
-        initialDepth: 1,
-        rowTotals: false,
-        colTotals: false,
-        rowSubTotals: false,
-        rowSubtotalLevels: [],
-        colSubtotalLevels: [],
-        rowTotalPosition: 'start',
-        rowSubtotalPosition: 'start',
-        colTotalPosition: 'start',
-        colSubtotalPosition: 'start',
-      });
+      const layout = usePivotLayout({ formData });
       return usePivotRenderModel({
         tree,
         expandedRows: new Set(),
@@ -336,21 +308,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
     });
 
     const { result } = renderHook(() => {
-      const layout = usePivotLayout({
-        formData,
-        metricsLayout: MetricsLayoutEnum.ROWS,
-        startCollapsed: false,
-        initialDepth: 1,
-        rowTotals: false,
-        colTotals: false,
-        rowSubTotals: false,
-        rowSubtotalLevels: [],
-        colSubtotalLevels: [],
-        rowTotalPosition: 'start',
-        rowSubtotalPosition: 'start',
-        colTotalPosition: 'start',
-        colSubtotalPosition: 'start',
-      });
+      const layout = usePivotLayout({ formData });
       return usePivotRenderModel({
         tree,
         expandedRows: new Set(),

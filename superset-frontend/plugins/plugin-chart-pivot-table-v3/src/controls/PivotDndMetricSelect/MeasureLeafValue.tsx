@@ -32,7 +32,7 @@ import {
   buildMeasureLeafOutputKey,
   isValueLeaf,
 } from '../../pivot/measureLeaves';
-import OptionControlLabel from './OptionControlLabel';
+import { OptionControlLabel } from '../../exploreImports';
 import {
   MetricFormattingControl,
   type MetricOptionValue,

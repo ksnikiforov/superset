@@ -26,8 +26,9 @@ import { savedMetricType } from 'src/explore/components/controls/MetricControl/t
 import AdhocMetric from 'src/explore/components/controls/MetricControl/AdhocMetric';
 import { StyledMetricOption } from '../../optionRenderers';
 
-export const DragContainer = styled.div`
+export const DragContainer = styled.div<{ containerIndent?: number }>`
   margin-bottom: ${({ theme }) => theme.sizeUnit}px;
+  padding-left: ${({ containerIndent }) => containerIndent ?? 0}px;
   :last-child {
     margin-bottom: 0;
   }
@@ -48,7 +49,7 @@ export const OptionControlContainer = styled.div<{
     background-color: ${({ theme }) => theme.colorPrimaryBgHover};
   }
 `;
-export const Label = styled.div`
+export const Label = styled.div<{ indent?: number }>`
   ${({ theme }) => `
     display: flex;
     width: 100%;
@@ -56,7 +57,6 @@ export const Label = styled.div`
     text-overflow: ellipsis;
     align-items: center;
     white-space: nowrap;
-    padding-left: ${theme.sizeUnit}px;
     svg {
       margin-right: ${theme.sizeUnit}px;
     }
@@ -70,11 +70,18 @@ export const Label = styled.div`
       display: inline;
     }
   `}
+  padding-left: ${({ theme, indent }) => theme.sizeUnit + (indent ?? 0)}px;
 `;
 
 const LabelText = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
+`;
+
+const RightNodeContainer = styled.div`
+  display: flex;
+  align-items: center;
+  margin-left: ${({ theme }) => theme.sizeUnit}px;
 `;
 
 export const CaretContainer = styled.div`
@@ -253,6 +260,11 @@ export const OptionControlLabel = ({
   datasourceWarningMessage,
   tooltipTitle,
   multi = true,
+  rightNode,
+  indent,
+  containerIndent,
+  showRemove = true,
+  isGroupDragging = false,
   ...props
 }: {
   label: string | ReactNode;
@@ -270,6 +282,11 @@ export const OptionControlLabel = ({
   datasourceWarningMessage?: string;
   tooltipTitle?: string;
   multi?: boolean;
+  rightNode?: ReactNode;
+  indent?: number;
+  containerIndent?: number;
+  showRemove?: boolean;
+  isGroupDragging?: boolean;
 }) => {
   const theme = useTheme();
   const ref = useRef<HTMLDivElement>(null);
@@ -377,22 +394,34 @@ export const OptionControlLabel = ({
       {...props}
       css={css`
         text-align: center;
+        ${(isDragging || isGroupDragging) &&
+        css`
+          background-color: ${theme.colorPrimaryBg};
+          box-shadow: inset 0 0 0 1px ${theme.colorPrimaryBorder};
+        `}
       `}
     >
       <CloseContainer
-        role="button"
+        role={showRemove ? 'button' : undefined}
         data-test="remove-control-button"
-        onClick={onRemove}
+        onClick={showRemove ? onRemove : undefined}
+        css={
+          !showRemove &&
+          css`
+            cursor: default;
+          `
+        }
       >
         <Icons.CloseOutlined
           iconSize="m"
           iconColor={theme.colorIcon}
           css={css`
             vertical-align: sub;
+            ${!showRemove ? 'visibility: hidden;' : ''}
           `}
         />
       </CloseContainer>
-      <Label data-test="control-label">
+      <Label data-test="control-label" indent={indent}>
         {isFunction && <Icons.FunctionOutlined iconSize="m" />}
         {getLabelContent()}
       </Label>
@@ -409,6 +438,14 @@ export const OptionControlLabel = ({
           }
         />
       )}
+      {rightNode && (
+        <RightNodeContainer
+          onClick={event => event.stopPropagation()}
+          onMouseDown={event => event.stopPropagation()}
+        >
+          {rightNode}
+        </RightNodeContainer>
+      )}
       {withCaret && (
         <CaretContainer>
           <Icons.RightOutlined
@@ -424,5 +461,9 @@ export const OptionControlLabel = ({
   );
 
   drag(drop(ref));
-  return <DragContainer ref={ref}>{getOptionControlContent()}</DragContainer>;
+  return (
+    <DragContainer ref={ref} containerIndent={containerIndent}>
+      {getOptionControlContent()}
+    </DragContainer>
+  );
 };

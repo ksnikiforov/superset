@@ -84,13 +84,12 @@ test('Explore refresh adopts edited metric SQL while retaining persisted filters
         isDashboardContext: false,
         mergeOwnState: partial => partial,
         setDataMask,
-        syncControlValuesOnInteraction: false,
       }),
     { initialProps: { formData: base, data: loaded(base, 10) } },
   );
   await act(async () => {});
   expect(
-    Object.values(result.current.dataForRender.cells).some(
+    Object.values(result.current.tree.cells).some(
       cell => cell.values.metric_1 === 10,
     ),
   ).toBe(true);
@@ -101,14 +100,14 @@ test('Explore refresh adopts edited metric SQL while retaining persisted filters
   rerender({ formData: updated, data: loaded(updated, 99) });
   await act(async () => {});
   expect(
-    Object.values(result.current.dataForRender.cells).some(
+    Object.values(result.current.tree.cells).some(
       cell => cell.values.metric_1 === 99,
     ),
   ).toBe(true);
   expect(
-    Object.values(result.current.dataForRender.cells).some(
+    Object.values(result.current.tree.cells).some(
       cell => cell.values.metric_1 === 10,
     ),
   ).toBe(false);
-  expect(result.current.committedFilters).toEqual(selection);
+  expect(result.current.uiSelectedFilters).toEqual(selection);
 });

@@ -32,7 +32,6 @@ import { isValuesFirstOnAxis } from '../runtime/projection';
 
 export type PivotLayoutResult = {
   layout: ReturnType<typeof buildLayoutContext>;
-  expansionSemanticSignature: string;
   normalizedColSubtotalLevels: number[];
   effectiveRowSubtotalPosition: TotalPosition;
   effectiveColSubtotalPosition: TotalPosition;
@@ -121,18 +120,6 @@ export const usePivotLayout = ({
 }: {
   formData: PivotTableProps['formData'];
   pivotProgram?: PivotProgram;
-  metricsLayout?: PivotTableProps['metricsLayout'];
-  startCollapsed?: PivotTableProps['startCollapsed'];
-  initialDepth?: PivotTableProps['initialDepth'];
-  rowTotals?: PivotTableProps['rowTotals'];
-  colTotals?: PivotTableProps['colTotals'];
-  rowSubTotals?: PivotTableProps['rowSubTotals'];
-  rowSubtotalLevels?: PivotTableProps['rowSubtotalLevels'];
-  colSubtotalLevels?: PivotTableProps['colSubtotalLevels'];
-  rowTotalPosition?: PivotTableProps['rowTotalPosition'];
-  rowSubtotalPosition?: PivotTableProps['rowSubtotalPosition'];
-  colTotalPosition?: PivotTableProps['colTotalPosition'];
-  colSubtotalPosition?: PivotTableProps['colSubtotalPosition'];
 }): PivotLayoutResult => {
   const layout = useMemo(
     () =>
@@ -145,45 +132,12 @@ export const usePivotLayout = ({
     [formData, pivotProgram],
   );
   const { metricLabelMap, metrics } = layout;
-  const { valueAxis: resolvedValueAxis, metricInsertIndex } =
-    layout.pivotProgram;
-  const { metricKeys: metricLabels } = layout.pivotProgram;
-
-  const normalizedRowSubtotalLevels = layout.rowSubtotalLevels;
   const normalizedColSubtotalLevels = useMemo(() => {
     if (layout.rowTotals && !layout.colSubtotalLevels.includes(0)) {
       return [0, ...layout.colSubtotalLevels];
     }
     return layout.colSubtotalLevels;
   }, [layout.colSubtotalLevels, layout.rowTotals]);
-
-  const expansionSemanticSignature = useMemo(
-    () =>
-      JSON.stringify({
-        metrics: metricLabels,
-        valueAxis: resolvedValueAxis,
-        metricPosition: metricLabels.length > 0 ? metricInsertIndex : -1,
-        rowSubtotalLevels: normalizedRowSubtotalLevels,
-        colSubtotalLevels: normalizedColSubtotalLevels,
-        rowTotals: layout.rowTotals,
-        colTotals: layout.colTotals,
-        rowSubTotals: layout.rowSubTotals,
-        axisCoverageNeeds: layout.axisCoverageNeeds,
-        measureHierarchy: layout.measureHierarchy,
-      }),
-    [
-      layout.axisCoverageNeeds,
-      layout.measureHierarchy,
-      layout.colTotals,
-      layout.rowSubTotals,
-      layout.rowTotals,
-      metricInsertIndex,
-      metricLabels,
-      normalizedColSubtotalLevels,
-      normalizedRowSubtotalLevels,
-      resolvedValueAxis,
-    ],
-  );
 
   const resolvedRowSubtotalPosition = layout.rowSubtotalPosition;
   const resolvedColSubtotalPosition = layout.colSubtotalPosition;
@@ -246,7 +200,6 @@ export const usePivotLayout = ({
 
   return {
     layout,
-    expansionSemanticSignature,
     normalizedColSubtotalLevels,
     effectiveRowSubtotalPosition,
     effectiveColSubtotalPosition,
